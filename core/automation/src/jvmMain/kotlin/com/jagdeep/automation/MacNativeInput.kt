@@ -50,9 +50,7 @@ internal class MacNativeInput : NativeInput {
             displayAwake?.destroy()
             displayAwake = null
         } else if (displayAwake?.isAlive != true) {
-            displayAwake = runCatching {
-                ProcessBuilder(CAFFEINATE, "-d", "-w", ProcessHandle.current().pid().toString()).start()
-            }.onFailure { Log.w("Couldn't keep the display on: ${it.message}", TAG) }.getOrNull()
+            displayAwake = ProcessBuilder(CAFFEINATE, "-d", "-w", ProcessHandle.current().pid().toString()).start()
         }
     }
 

@@ -17,7 +17,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,22 +25,34 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
+data class CourseRunContext(val module: String? = null, val lesson: String? = null, val question: String? = null)
+
 /** The Chrome routine that's running. */
 sealed interface PageActivity {
     val routine: Routine
 
-    /** Highlighting is on; [clicks] counts the key presses that clicked a button. */
-    data class Helper(override val routine: PageHelperRoutine, val clicks: Long = 0) : PageActivity
-
     data class ScrollClick(override val routine: ScrollClickRoutine, val progress: ScrollClickProgress) : PageActivity
 
-    /** The course helper is on; [clicks] counts the key presses that opened something. */
-    data class Course(override val routine: CourseHelperRoutine, val clicks: Long = 0) : PageActivity
+    data class Automation(
+        override val routine: CourseAutomationRoutine,
+        val detail: String,
+        val clicks: Long = 0,
+        val approval: CourseApprovalRequest? = null,
+        val manualAnswer: ManualAnswerRequest? = null,
+        val failure: AssessmentFailureRequest? = null,
+        val context: CourseRunContext = CourseRunContext(),
+        val progressProfile: ProgressProfileRequest? = null,
+        val progressSummary: CourseProgressSummary? = null,
+        val savingAnswer: Boolean = false,
+        val answerSaveError: String? = null,
+    ) : PageActivity
 }
 
 data class PageState(
@@ -52,6 +63,9 @@ data class PageState(
     /** The label of the button highlighted in Chrome right now. */
     val foundLabel: String? = null,
     val activity: PageActivity? = null,
+    val progressAccounts: List<com.jagdeep.persistence.room.learning.LearningAccount> = emptyList(),
+    val savedProgress: CourseProgressSummary? = null,
+    val progressHistoryError: String? = null,
 )
 
 /** Runs the routines that work inside Chrome. [ClickController] uses it so only one routine runs at a time. */
@@ -69,8 +83,14 @@ interface PageRunner {
     /** Returns true when there was a routine to stop. */
     fun stop(): Boolean
 
-    /** Starts or pauses scrolling during a page helper routine. */
+    /** Stops a running scroll-and-click routine using its secondary shortcut. */
     fun toggleScrolling()
+    fun approveAssessment(token: String) = Unit
+    fun confirmManualAnswer(token: String, save: Boolean) = Unit
+    fun loadProgressHistory(account: String) = Unit
+    fun confirmProgressProfile(token: String, localName: String) = Unit
+    fun saveReviewedAnswers(token: String, answers: Map<String, String>) = Unit
+    fun retryAssessment(token: String, automatic: Boolean) = Unit
 }
 
 /** Where there's no Chrome link, as in tests of other routines. */
@@ -82,7 +102,7 @@ object NoPageRunner : PageRunner {
     override fun toggleScrolling() = Unit
 }
 
-/** What the extension is told. [advance] counts key presses: a click only ever follows an increase. */
+/** Shared extension command. Retired helper fields stay inert for older installed extensions. */
 @Serializable
 internal data class HelperCommand(
     val enabled: Boolean,
@@ -96,8 +116,9 @@ internal data class HelperCommand(
     /** During a scroll and click run: the button text to click, once, for request [clickRequest]. */
     val clickText: String? = null,
     val clickRequest: Long = 0,
-    /** The course helper's highlighting and video start, on the course site only. */
+    /** Always false; retained until older installed extensions have been reloaded. */
     val course: Boolean = false,
+    val courseAutomation: CourseCommand? = null,
 )
 
 @Serializable
@@ -127,7 +148,112 @@ class PageController(
     private val now: () -> Long,
     private val newId: () -> String,
     private val live: LiveLog = NoLiveLog,
+    private val answerBankStore: CourseAnswerBankStore = NoCourseAnswerBankStore,
+    private val assessmentAlerts: AssessmentAlerts = AssessmentAlerts { automation.playAlert() },
+    private val progressRepository: CourseProgressRepository = NoCourseProgressRepository,
 ) : PageRunner {
+    private var historySelection = ""
+    override fun loadProgressHistory(account: String) {
+        val profile = state.value.progressAccounts.singleOrNull { it.key == account } ?: return
+        historySelection = account
+        scope.launch {
+            try {
+                val rows = progressRepository.records(account)
+                if (historySelection == account) mutableState.update { it.copy(savedProgress = CourseProgressSummary(account,profile.displayName,profile.checkedAt,rows), progressHistoryError = null) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { mutableState.update { it.copy(progressHistoryError = "Could not load saved progress.") } }
+        }
+    }
+    override fun confirmProgressProfile(token: String, localName: String) {
+        if (courseProgress?.confirm(token, localName) != true) return
+        mutableState.update { state ->
+            val activity = state.activity as? PageActivity.Automation ?: return@update state
+            state.copy(activity = activity.copy(progressProfile = null))
+        }
+        automation.apps.bringToFront(BROWSER_APP_NAME)
+    }
+    override fun confirmManualAnswer(token: String, save: Boolean) {
+        val runner = courseAutomation ?: return
+        val request = runner.manualAnswer?.takeIf { it.token == token } ?: return
+        val activity = state.value.activity as? PageActivity.Automation ?: return
+        if (activity.savingAnswer) return
+        mutableState.update { it.copy(activity = activity.copy(savingAnswer = save, answerSaveError = null)) }
+        scope.launch {
+            val result = if (save) try {
+                answerBankStore.saveReviewed(request.module, listOf(ReviewedAnswer(CourseAnswer(request.question, request.options, request.answer), request.previousAnswer)))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { AnswerBankSaveResult.Unavailable }
+            else null
+            if (courseAutomation !== runner || runner.manualAnswer?.token != token) return@launch
+            val problem = when (result) {
+                AnswerBankSaveResult.Conflict -> "The bank already has a different answer or changed while saving. Review it before replacing anything."
+                AnswerBankSaveResult.Invalid -> "The answer bank needs review before this answer can be saved."
+                AnswerBankSaveResult.Unavailable -> "Couldn't save the answer. Check that the answer-bank file is writable, or continue without saving."
+                else -> null
+            }
+            if (problem == null) runner.acceptManualAnswer(token, (result as? AnswerBankSaveResult.Saved)?.bank)
+            mutableState.update { state ->
+                val current = state.activity as? PageActivity.Automation ?: return@update state
+                state.copy(activity = current.copy(manualAnswer = runner.manualAnswer, savingAnswer = false, answerSaveError = problem))
+            }
+            if (problem == null) automation.apps.bringToFront(BROWSER_APP_NAME)
+        }
+    }
+
+    override fun saveReviewedAnswers(token: String, answers: Map<String, String>) {
+        val runner = courseAutomation ?: return
+        val failure = runner.failure?.takeIf { it.token == token } ?: return
+        val activity = state.value.activity as? PageActivity.Automation ?: return
+        if (activity.savingAnswer || answers.isEmpty()) return
+        val reviewed = answers.map { (id, answer) ->
+            val question = failure.questions.singleOrNull { it.id == id } ?: return
+            if (question.options.count { it == answer } != 1) return
+            ReviewedAnswer(CourseAnswer(question.question, question.options, answer), question.bankAnswer)
+        }
+        mutableState.update { it.copy(activity = activity.copy(savingAnswer = true, answerSaveError = null)) }
+        scope.launch {
+            val result = try { answerBankStore.saveReviewed(failure.module, reviewed) }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { AnswerBankSaveResult.Unavailable }
+            if (courseAutomation !== runner || runner.failure?.token != token) return@launch
+            if (result is AnswerBankSaveResult.Saved) runner.configureAnswers(result.bank)
+            mutableState.update { state ->
+                val current = state.activity as? PageActivity.Automation ?: return@update state
+                state.copy(activity = current.copy(savingAnswer = false,
+                    answerSaveError = if (result is AnswerBankSaveResult.Saved) "Reviewed corrections saved."
+                        else "Corrections were not saved. The bank may have changed or be unavailable; review and try again."))
+            }
+        }
+    }
+
+    override fun retryAssessment(token: String, automatic: Boolean) {
+        val runner = courseAutomation ?: return
+        if (runner.failure?.token != token) return
+        if (automatic) {
+            if (!runner.retryAssessment(token)) return
+            mutableState.update { state ->
+                val activity = state.activity as? PageActivity.Automation ?: return@update state
+                state.copy(activity = activity.copy(failure = null, detail = "Starting one approved retry using this routine's assessment mode."))
+            }
+        } else stop()
+        automation.apps.bringToFront(BROWSER_APP_NAME)
+    }
+    override fun approveAssessment(token: String) {
+        val runner = courseAutomation ?: return
+        if (runner.approval?.token != token) return
+        runner.approveAssessment(token)
+        mutableState.update { state ->
+            val activity = state.activity as? PageActivity.Automation ?: return@update state
+            state.copy(activity = activity.copy(approval = runner.approval))
+        }
+        automation.apps.bringToFront(BROWSER_APP_NAME)
+    }
+    private var questionAlertKey: String? = null
+    private var questionAlertAt: Long? = null
+    private val alertedAssessmentFailures = mutableSetOf<String>()
+    private val assessmentAlertMutex = Mutex()
+    private var failedAudioAttention: String? = null
+    private var lastCourseInventoryAt = 0L
     private val pageReading = MutableStateFlow<PageReading?>(null)
     private val currentPreferences: StateFlow<AppPreferences> = preferences.stateIn(scope, SharingStarted.Eagerly, AppPreferences())
     private val mutableState = MutableStateFlow(PageState(isSupported = automation.access.access() != InputAccess.Unsupported))
@@ -136,10 +262,15 @@ class PageController(
         if (!state.value.isConnected) RunOutcome.BrowserDisconnected else null
     }
     private var job: Job? = null
-    private var advance = 0L
     private var lastPublished: String? = null
     private var textRequest = 0L
     private var pendingText: String? = null
+    private var courseAutomation: CourseAutomationSession? = null
+    private var courseProgress: CourseProgressSession? = null
+    private var progressCheckpoint = 0
+    private val courseChunks = CourseSnapshotAssembler()
+    private var courseRunSequence = 0L
+    private var lastCourseSnapshotSummary: String? = null
     private val textClicks = object : TextClicker {
         val done = MutableStateFlow(0L)
         override val clicked: StateFlow<Long> = done
@@ -175,12 +306,12 @@ class PageController(
                 mutableState.update { it.copy(problem = problem) }
             }
         }
+        scope.launch { progressRepository.accounts().collect { accounts -> mutableState.update { it.copy(progressAccounts = accounts) } } }
         scope.launch { bridge.incoming.collect(::onMessage) }
         scope.launch {
             automation.hotKeys.presses.collect { key ->
                 val prefs = currentPreferences.value
                 when (key) {
-                    prefs.pageClickHotKey -> clickHighlighted()
                     prefs.pageScrollHotKey -> toggleScrolling()
                     else -> Unit
                 }
@@ -201,12 +332,14 @@ class PageController(
         state.value.problem?.let { return it }
         if (!state.value.isConnected) return NOT_CONNECTED
         return when (routine) {
-            is PageHelperRoutine -> {
-                launchActivity(PageActivity.Helper(routine), scrolling = false) { performHandsOn(routine.name) }
-                null
-            }
-            is CourseHelperRoutine -> {
-                launchActivity(PageActivity.Course(routine), scrolling = false) { performHandsOn(routine.name) }
+            is CourseAutomationRoutine -> {
+                lastCourseInventoryAt = now()
+                courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode)
+                courseProgress = if (progressRepository.available) CourseProgressSession(progressRepository, courseAutomation!!.session, routine.waitAfterClickMillis) else null
+                progressCheckpoint = 0
+                courseChunks.clear()
+                launchActivity(PageActivity.Automation(routine, courseAutomation!!.detail), scrolling = false) { performCourseAutomation(routine) }
+                automation.apps.bringToFront(BROWSER_APP_NAME)
                 null
             }
             is ScrollClickRoutine -> {
@@ -222,6 +355,12 @@ class PageController(
 
     override fun stop(): Boolean {
         val active = isActive
+        if (state.value.activity is PageActivity.Automation) {
+            courseAutomation = null
+            courseProgress = null
+            courseChunks.clear()
+            publish()
+        }
         if (active) job?.cancel()
         return active
     }
@@ -233,12 +372,7 @@ class PageController(
                 live.log(LiveSource.Keys) { "Scroll key: stopping scroll and click" }
                 stop()
             }
-            is PageActivity.Helper -> {
-                mutableState.update { it.copy(isScrolling = !it.isScrolling) }
-                live.log(LiveSource.Keys) { if (state.value.isScrolling) "Scroll key: scrolling on" else "Scroll key: scrolling off" }
-                publish()
-            }
-            is PageActivity.Course, null -> Unit
+            is PageActivity.Automation, null -> Unit
         }
     }
 
@@ -249,24 +383,6 @@ class PageController(
         job = scope.launch { body() }.also { started ->
             // Cancelled before its first dispatch, the body never runs to reset this.
             started.invokeOnCompletion { if (state.value.activity != null) endActivity() }
-        }
-    }
-
-    /** A routine that only acts on the user's key presses: it runs until stopped, then records its clicks. */
-    private suspend fun performHandsOn(name: String) {
-        val startedAt = now()
-        try {
-            awaitCancellation()
-        } finally {
-            withContext(NonCancellable) {
-                val clicks = when (val activity = state.value.activity) {
-                    is PageActivity.Helper -> activity.clicks
-                    is PageActivity.Course -> activity.clicks
-                    else -> 0
-                }
-                endActivity()
-                record(name, startedAt, clicks, RunOutcome.StoppedByUser)
-            }
         }
     }
 
@@ -311,6 +427,44 @@ class PageController(
         }
     }
 
+    private suspend fun performCourseAutomation(routine: CourseAutomationRoutine) {
+        val startedAt = now()
+        val runner = courseAutomation
+        var outcome = RunOutcome.StoppedByUser
+        try {
+            if (routine.answerAssessments) {
+                val bank = try { answerBankStore.load() }
+                catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (_: Exception) { null }
+                runner?.configureAnswers(bank)
+            }
+            automation.apps.bringToFront(BROWSER_APP_NAME)
+            while (true) {
+                if (!state.value.isConnected) { outcome = RunOutcome.BrowserDisconnected; break }
+                if (runner != null) updateAssessmentAlerts(runner)
+                if (runner != null && now() - lastCourseInventoryAt > 5_000 && runner.approval == null && runner.attention == null && runner.failure == null && runner.manualAnswer == null) {
+                    mutableState.update { state ->
+                        val activity = state.activity as? PageActivity.Automation ?: return@update state
+                        state.copy(activity = activity.copy(detail = "Waiting for page updates. Keep the course tab active in Chrome."))
+                    }
+                }
+                val prefs = currentPreferences.value
+                val position = automation.pointer.position()
+                if (prefs.stopAtScreenCorner && position != null && automation.pointer.isScreenCorner(position)) {
+                    outcome = RunOutcome.ScreenCorner; break
+                }
+                if (runner?.completed == true && courseProgress?.isChecking != true) { outcome = RunOutcome.Completed; break }
+                kotlinx.coroutines.delay(100)
+            }
+        } finally {
+            withContext(NonCancellable) {
+                val clicks = runner?.clicks ?: 0
+                endActivity()
+                record(routine.name, startedAt, clicks, outcome)
+            }
+        }
+    }
+
     private suspend fun record(name: String, startedAt: Long, clicks: Long, outcome: RunOutcome) {
         val record = RunRecord(newId(), name, startedAt, now(), clicks, outcome)
         live.log(LiveSource.Routine) { "Ended $name: ${outcome.label}, $clicks clicks" }
@@ -325,33 +479,19 @@ class PageController(
     }
 
     private fun endActivity() {
+        courseAutomation = null
+        courseProgress = null
+        courseChunks.clear()
+        questionAlertKey = null
+        questionAlertAt = null
+        alertedAssessmentFailures.clear()
+        failedAudioAttention = null
         mutableState.update { it.copy(activity = null, isScrolling = false) }
         publish()
     }
 
-    private fun clickHighlighted() {
-        val activity = state.value.activity
-        if (activity !is PageActivity.Helper && activity !is PageActivity.Course) return
-        val label = state.value.foundLabel
-        if (label == null) {
-            live.log(LiveSource.Keys) { "Click key: nothing highlighted, so no click" }
-            return
-        }
-        live.log(LiveSource.Keys) { "Click key: asking Chrome to click \"$label\"" }
-        advance++
-        mutableState.update {
-            it.copy(
-                activity = when (activity) {
-                    is PageActivity.Helper -> activity.copy(clicks = activity.clicks + 1)
-                    is PageActivity.Course -> activity.copy(clicks = activity.clicks + 1)
-                    else -> activity
-                },
-            )
-        }
-        publish()
-    }
-
-    private fun onMessage(raw: String) {
+    private suspend fun onMessage(raw: String) {
+        if (handleCourseMessage(raw)) return
         live.log(LiveSource.Chrome) { "← ${raw.take(MAX_LOGGED_MESSAGE)}" }
         val event = try {
             json.decodeFromString(HelperEvent.serializer(), raw)
@@ -364,14 +504,6 @@ class PageController(
         }
         when (event.type) {
             "found" -> mutableState.update { it.copy(foundLabel = event.label?.take(MAX_LABEL_LENGTH)) }
-            "videoEnded" -> {
-                val wantsSound = when (val activity = state.value.activity) {
-                    is PageActivity.Helper -> activity.routine.soundOnVideoEnd
-                    is PageActivity.Course -> activity.routine.soundOnVideoEnd
-                    else -> false
-                }
-                if (wantsSound) automation.playAlert()
-            }
             "textClicked" -> if (event.request == textRequest) textClicks.done.value = textRequest
             "page" -> pageReading.value = PageReading(event.focused, event.atBottom, event.signature?.take(MAX_SIGNATURE_LENGTH), pageVideo(event.video))
         }
@@ -390,22 +522,127 @@ class PageController(
             enabled = activity != null,
             scrolling = current.isScrolling,
             pixelsPerSecond = when (activity) {
-                is PageActivity.Helper -> activity.routine.pixelsPerSecond
                 is PageActivity.ScrollClick -> activity.routine.pixelsPerSecond
-                is PageActivity.Course, null -> DEFAULT_PIXELS_PER_SECOND
+                null -> DEFAULT_PIXELS_PER_SECOND
+                is PageActivity.Automation -> DEFAULT_PIXELS_PER_SECOND
             },
-            words = (activity as? PageActivity.Helper)?.routine?.words.orEmpty(),
-            advance = advance,
+            words = emptyList(),
+            advance = 0,
             autoRun = activity is PageActivity.ScrollClick,
             watchVideos = (activity as? PageActivity.ScrollClick)?.routine?.watchVideos ?: false,
             clickText = pendingText.takeIf { activity is PageActivity.ScrollClick },
             clickRequest = textRequest,
-            course = activity is PageActivity.Course,
+            course = false,
+            courseAutomation = courseAutomation?.let { CourseCommand(it.session, if (courseProgress?.blocksActions == true) null else courseProgress?.action ?: it.action, it.playbackSpeed) },
         )
         val encoded = json.encodeToString(HelperCommand.serializer(), command)
         if (encoded != lastPublished) live.log(LiveSource.Chrome) { "→ $encoded" }
         lastPublished = encoded
         bridge.publish(encoded)
+    }
+
+    private suspend fun handleCourseMessage(raw: String): Boolean {
+        val event = runCatching { json.decodeFromString(CourseWireEvent.serializer(), raw) }.getOrNull() ?: return false
+        if (event.type != "courseChunk" && event.type != "courseAction") return false
+        val runner = courseAutomation ?: return true
+        if (event.session != runner.session) return true
+        if (event.type == "courseAction") {
+            live.log(LiveSource.Chrome) { "Course action ${event.request}: ${if (event.success) "accepted" else "refused"}" }
+            if (courseProgress?.acknowledge(event.request, event.success, now()) != true) runner.acknowledge(event.request, event.success, now())
+        } else courseChunks.accept(event)?.let { snapshot ->
+            lastCourseInventoryAt = now()
+            val summary = "Course page ${snapshot.path} top=${snapshot.top} · " + snapshot.elements
+                .filter { it.visible && (it.tag in setOf("h1", "h2", "h3", "h4") || it.expanded != null) }
+                .joinToString(" | ") { "${it.tag}:${it.label.take(100)} expanded=${it.expanded}" }.take(1200) +
+                (snapshot.assessment?.let { assessment -> " · Assessment ${assessment.module}: " + assessment.questions.joinToString { "${it.id} ${it.text.take(140)}" } + " total=${assessment.totalQuestions} start=${assessment.start != null} result=${assessment.result}" } ?: "")
+            if (summary != lastCourseSnapshotSummary) {
+                lastCourseSnapshotSummary = summary
+                live.log(LiveSource.Chrome) { summary }
+            }
+            if (snapshot.top) mutableState.update { state ->
+                val current = state.activity as? PageActivity.Automation ?: return@update state
+                val modulePath = snapshot.path.split('/').take(4).joinToString("/")
+                val module = snapshot.assessment?.module?.takeIf { it.isNotBlank() }
+                    ?: snapshot.elements.firstOrNull { it.href == modulePath && it.label.isNotBlank() }?.label
+                    ?: current.context.module.takeIf { snapshot.path.startsWith("/dashboard/courses/") }
+                val lesson = snapshot.elements.firstOrNull { it.tag in setOf("h1","h2","h3","h4") && Regex("^Part\\s*:",RegexOption.IGNORE_CASE).containsMatchIn(it.label) }?.label
+                val question = snapshot.assessment?.questions?.firstOrNull { q -> q.options.none { it.selected } }?.text
+                state.copy(activity = current.copy(context = CourseRunContext(module,lesson,question)))
+            }
+            val previousAction = runner.action
+            val tracking = courseProgress
+            val progressHandled = tracking?.process(snapshot, now(), learningActionPending = runner.action != null) == true
+            if (courseAutomation !== runner) return true
+            if (!progressHandled) {
+                runner.configureProgress(tracking?.summary)
+                runner.read(snapshot, now())
+                if (runner.progressCheckpoint != progressCheckpoint) {
+                    progressCheckpoint = runner.progressCheckpoint
+                    tracking?.requireSync()
+                }
+            }
+            updateAssessmentAlerts(runner)
+            if (runner.action != null && runner.action != previousAction) {
+                val target = snapshot.elements.firstOrNull { it.id == runner.action?.element }
+                live.log(LiveSource.Chrome) {
+                    "Course target ${target?.id}: ${target?.tag} '${target?.label}' · ${target?.context?.take(180)}"
+                }
+            }
+        }
+        val activity = state.value.activity as? PageActivity.Automation ?: return true
+        val key = runner.attention ?: runner.failure?.token
+        val detail = (courseProgress?.takeIf { it.action != null || it.request != null || it.isChecking }?.detail ?: runner.detail) + if (key != null && key == failedAudioAttention) " Sound unavailable; check the audio output." else ""
+        mutableState.update { it.copy(activity = activity.copy(detail = detail, clicks = runner.clicks, approval = runner.approval,
+            manualAnswer = runner.manualAnswer, failure = runner.failure,
+            progressProfile = courseProgress?.request, progressSummary = courseProgress?.summary,
+            savingAnswer = activity.savingAnswer && activity.manualAnswer?.token == runner.manualAnswer?.token,
+            answerSaveError = activity.answerSaveError.takeIf { activity.manualAnswer?.token == runner.manualAnswer?.token })) }
+        publish()
+        return true
+    }
+
+    private fun updateAssessmentAlerts(runner: CourseAutomationSession) {
+        scope.launch {
+            assessmentAlertMutex.withLock {
+                if (courseAutomation === runner) emitAssessmentAlert(runner)
+            }
+        }
+    }
+
+    private fun emitAssessmentAlert(runner: CourseAutomationSession) {
+        if (!currentPreferences.value.assessmentSoundsEnabled) {
+            questionAlertKey = null
+            questionAlertAt = null
+            return
+        }
+        val failed = runner.failure
+        val key: String
+        val kind: AssessmentAlertKind
+        if (failed != null) {
+            if (!alertedAssessmentFailures.add(failed.token)) return
+            key = failed.token
+            kind = AssessmentAlertKind.Failure
+        } else {
+            val question = runner.attention
+            if (question == null || runner.manualAnswer != null) {
+                questionAlertKey = null
+                questionAlertAt = null
+                return
+            }
+            if (question == questionAlertKey && questionAlertAt?.let { now() - it < 30_000 } == true) return
+            key = question
+            kind = AssessmentAlertKind.Question
+            questionAlertKey = question
+            questionAlertAt = now()
+        }
+        runCatching { assessmentAlerts.play(kind) }.onFailure {
+            failedAudioAttention = key
+            mutableState.update { state ->
+                val activity = state.activity as? PageActivity.Automation ?: return@update state
+                state.copy(activity = activity.copy(detail = runner.detail + " Sound unavailable; check the audio output."))
+            }
+        }
+        live.log(LiveSource.App) { "Assessment alert ($kind): ${runner.detail}" }
     }
 
     private companion object {

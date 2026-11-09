@@ -21,6 +21,10 @@ import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -59,6 +63,7 @@ import com.jagdeep.ui.components.LocalToastManager
 import com.jagdeep.ui.components.LocalTopAppBarManager
 import com.jagdeep.ui.components.TopAppBarState
 import com.jagdeep.ui.navigation.RouteTopLevel
+import com.jagdeep.ui.platform.isDesktopPlatform
 import com.jagdeep.ui.themes.Palette
 import com.jagdeep.ui.themes.previewColors
 
@@ -80,119 +85,98 @@ fun SettingsScreen(
     }
     val preferences = state.preferences
 
-    // Start-aligned under the title; capped width keeps rows readable on wide windows.
+    var setupOpen by remember { mutableStateOf(false) }
+    var shortcutsOpen by remember { mutableStateOf(false) }
+    var advancedOpen by remember { mutableStateOf(false) }
+    val desktop = isDesktopPlatform()
     Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.TopStart) {
-        Column(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(vertical = 8.dp)) {
-            Group("Hot keys", first = true)
-            HotKeyRow(
-                title = "Start and stop",
-                supporting = "Starts the selected routine, or stops whichever is running. Works in any app; on a Mac keyboard you may need to hold fn.",
-                selected = preferences.toggleHotKey,
-                onSelect = viewModel::updateToggleHotKey,
+        Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(vertical = 8.dp)) {
+            Group("Automation", first = true)
+            if (desktop) SwitchRow(
+                title = "Keep the display on while running",
+                supporting = state.displayWakeProblem ?: "Prevents idle display sleep during a run. Normal sleep resumes when it stops.",
+                checked = preferences.keepDisplayOn,
+                onChange = viewModel::updateKeepDisplayOn,
             )
-            HotKeyRow(
-                title = "Pick a point",
-                supporting = "Records the pointer's position while you edit a routine.",
-                selected = preferences.captureHotKey,
-                onSelect = viewModel::updateCaptureHotKey,
-            )
-            HotKeyRow(
-                title = "Click the highlighted button",
-                supporting = "Web page helper routines: clicks the button highlighted in Chrome.",
-                selected = preferences.pageClickHotKey,
-                onSelect = viewModel::updatePageClickHotKey,
-            )
-            HotKeyRow(
-                title = "Auto-scroll",
-                supporting = "Web page helper routines: starts or stops scrolling. Scroll and click: stops it.",
-                selected = preferences.pageScrollHotKey,
-                onSelect = viewModel::updatePageScrollHotKey,
+            SwitchRow(
+                title = "Assessment sounds",
+                supporting = "Repeats every 30 seconds when an answer is needed. A different sound signals a failed assessment.",
+                checked = preferences.assessmentSoundsEnabled,
+                onChange = viewModel::updateAssessmentSounds,
             )
 
             Group("Safety")
-            SwitchRow(
-                title = "Stop when I move the pointer",
-                supporting = "Applies to routines with specific points.",
-                checked = preferences.stopWhenPointerMoves,
-                onChange = viewModel::updateStopWhenPointerMoves,
-            )
-            SwitchRow(
-                title = "Stop at a screen corner",
-                supporting = "Push the pointer into any corner of a screen to stop any routine.",
-                checked = preferences.stopAtScreenCorner,
-                onChange = viewModel::updateStopAtScreenCorner,
-            )
+            SwitchRow("Stop when I move the pointer", "For routines that click fixed screen positions.", preferences.stopWhenPointerMoves, viewModel::updateStopWhenPointerMoves)
+            SwitchRow("Stop at a screen corner", "Move the pointer to any screen corner to stop the routine.", preferences.stopAtScreenCorner, viewModel::updateStopAtScreenCorner)
 
-            if (state.access != InputAccess.Unsupported) {
-                Group("Chrome extension")
-                ListItem(
-                    colors = transparent(),
-                    headlineContent = { Text(if (state.browserConnected) "Connected to Chrome" else "Not connected") },
-                    supportingContent = {
-                        Text("Needed for scroll and click and web page helper routines. It talks only to this app on this computer.")
-                    },
-                )
-                Column(Modifier.padding(horizontal = 16.dp)) {
-                    Text("1. Press Show extension folder.", style = MaterialTheme.typography.bodyMedium)
-                    Text("2. In Chrome, open chrome://extensions and turn on Developer mode.", style = MaterialTheme.typography.bodyMedium)
-                    Text("3. Choose Load unpacked, then select the folder that opened.", style = MaterialTheme.typography.bodyMedium)
-                    Text("After an update, press reload there and refresh any open page.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = viewModel::showExtension) { Text("Show extension folder") }
-                }
-
-                Group("Display")
-                SwitchRow(
-                    title = "Keep the display on while running",
-                    supporting = "Stops the display sleeping while a routine runs. It sleeps as usual afterwards.",
-                    checked = preferences.keepDisplayOn,
-                    onChange = viewModel::updateKeepDisplayOn,
-                )
-
-                Group("Permission")
-                ListItem(
-                    colors = transparent(),
-                    headlineContent = { Text("Input in other apps") },
-                    supportingContent = {
-                        Text(
-                            if (state.access == InputAccess.Granted) {
-                                "Allowed. On Windows, apps running as administrator still can't be clicked."
-                            } else {
-                                "Not allowed yet. Turn it on under Privacy & Security → Accessibility."
-                            },
-                        )
-                    },
-                    trailingContent = if (state.access == InputAccess.NeedsPermission) {
-                        { TextButton(onClick = viewModel::requestAccess) { Text("Allow") } }
-                    } else {
-                        null
-                    },
+            if (state.routineFilesAvailable) {
+                Group("Routine files")
+                com.jagdeep.settings.ui.components.RoutineTransferControls(
+                    state.transferableRoutines, state.transferringRoutines, viewModel::importRoutines, viewModel::exportRoutines,
                 )
             }
 
+            if (state.access != InputAccess.Unsupported) {
+                Group("Controls")
+                ListItem(modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open keyboard shortcuts") { shortcutsOpen = true },
+                    colors = transparent(), headlineContent = { Text("Keyboard shortcuts") },
+                    supportingContent = { Text("${preferences.toggleHotKey.name} starts or stops a routine. Choose keys for other actions.") },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) })
+            }
+
+            if (desktop) {
+                Group("Browser connection")
+                ListItem(colors = transparent(), headlineContent = { Text("Chrome extension") },
+                    supportingContent = { Text(if(state.browserConnected) "Connected to AutoClicker on this computer." else "Not connected. Set up the extension to use browser routines.") },
+                    trailingContent = { TextButton(onClick = { setupOpen = true }) { Text("Set up extension") } })
+            }
+
+            if (desktop) {
+                Group("Permissions")
+                ListItem(colors = transparent(), headlineContent = { Text("Control other apps") },
+                    supportingContent = { Text(when(state.access) {
+                        InputAccess.Granted -> "Allowed. AutoClicker can send clicks to other apps."
+                        InputAccess.NeedsPermission -> "Allow AutoClicker in your system’s Accessibility settings to click in other apps."
+                        InputAccess.Unsupported -> "Direct clicking is unavailable on this desktop. Browser routines use the extension."
+                    }) },
+                    trailingContent = if(state.access == InputAccess.NeedsPermission) ({ TextButton(onClick = viewModel::requestAccess) { Text("Open settings") } }) else null)
+            }
+
+            Group("Advanced")
+            ListItem(modifier = Modifier.clickable(role = Role.Button, onClickLabel = if(advancedOpen) "Hide developer options" else "Show developer options") { advancedOpen = !advancedOpen },
+                colors = transparent(), headlineContent = { Text("Developer options") },
+                supportingContent = { Text(if(preferences.developerMode) "Live activity logging is on." else "Diagnostics and live activity logging.") },
+                trailingContent = { Icon(if(advancedOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null) })
+            if (advancedOpen) SwitchRow("Developer mode", "Shows live activity details in Activity. Logs stay in memory for this session.", preferences.developerMode, viewModel::updateDeveloperMode)
+
             Group("Appearance")
-            // Theme and colors are both one row each that opens a menu of choices.
             ThemeModeRow(preferences.themeMode, viewModel::updateThemeMode)
             ColorPaletteRow(preferences.colorPalette, viewModel::updateColorPalette)
 
-            Group("Developer")
-            SwitchRow(
-                title = "Developer mode",
-                supporting = "Activity shows a live log of what the app does, including what it sends to and hears from Chrome. Kept in memory for this session only.",
-                checked = preferences.developerMode,
-                onChange = viewModel::updateDeveloperMode,
-            )
-
             Group("About")
             ListItem(colors = transparent(), headlineContent = { Text("Version") }, trailingContent = { Text(appVersion) })
-            ListItem(
-                colors = transparent(),
-                headlineContent = { Text("Privacy") },
-                supportingContent = {
-                    Text("Routines and activity stay on this computer. Nothing is sent anywhere, and only the function keys are watched, never what you type.")
-                },
-            )
+            ListItem(colors = transparent(), headlineContent = { Text("Privacy") }, supportingContent = {
+                Text("Settings, routines and saved progress stay on this computer. Browser actions happen on the website you open. Only shortcut keys are monitored; typed text is not recorded.")
+            })
         }
     }
+    if (setupOpen) AlertDialog(onDismissRequest = { setupOpen = false }, title = { Text("Chrome extension setup") }, text = {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            Text("1. Choose Show extension folder below.")
+            Text("2. Open chrome://extensions in Chrome and enable Developer mode.")
+            Text("3. Choose Load unpacked and select that folder.")
+            Text("After an update, reload AutoClicker Page Helper. Refresh a course page only when no timed assessment is active.", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodySmall)
+        }
+    }, confirmButton = { TextButton(onClick = { setupOpen = false }) { Text("Done") } },
+        dismissButton = { TextButton(onClick = viewModel::showExtension) { Text("Show extension folder") } })
+    if (shortcutsOpen) AlertDialog(onDismissRequest = { shortcutsOpen = false }, title = { Text("Keyboard shortcuts") }, text = {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            Text("On a Mac, you may need to hold fn with the function key.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
+            HotKeyRow("Start and stop", "Start the selected routine or stop the current run.", preferences.toggleHotKey, viewModel::updateToggleHotKey)
+            HotKeyRow("Pick a point", "Record the pointer position while editing a routine.", preferences.captureHotKey, viewModel::updateCaptureHotKey)
+            HotKeyRow("Stop scroll and click", "Stop a running scroll-and-click routine.", preferences.pageScrollHotKey, viewModel::updatePageScrollHotKey)
+        }
+    }, confirmButton = { TextButton(onClick = { shortcutsOpen = false }) { Text("Done") } })
 }
 
 @Composable

@@ -30,6 +30,7 @@ class AppWiringTest {
             stopAtScreenCorner = false,
             keepDisplayOn = true,
             developerMode = true,
+            assessmentSoundsEnabled = false,
         )
         val stored = mutablePreferencesOf()
         writeAppPreferences(preferences, stored)
@@ -45,7 +46,16 @@ class AppWiringTest {
     }
 
     @Test
+    fun `explicit display off preference survives the enabled default`() {
+        val stored = mutablePreferencesOf()
+        writeAppPreferences(AppPreferences(keepDisplayOn = false), stored)
+        assertFalse(readAppPreferences(stored).keepDisplayOn)
+    }
+
+    @Test
     fun `given nothing saved when read then the defaults apply`() {
         assertEquals(AppPreferences(), readAppPreferences(mutablePreferencesOf()))
+        assertTrue(readAppPreferences(mutablePreferencesOf()).assessmentSoundsEnabled)
+        assertTrue(readAppPreferences(mutablePreferencesOf()).keepDisplayOn)
     }
 }

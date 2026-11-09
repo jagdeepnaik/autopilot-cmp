@@ -3,8 +3,7 @@ package com.jagdeep.home.ui.util
 import com.jagdeep.automation.PointerButton
 import com.jagdeep.home.domain.ClickRoutine
 import com.jagdeep.home.domain.ClickTarget
-import com.jagdeep.home.domain.CourseHelperRoutine
-import com.jagdeep.home.domain.PageHelperRoutine
+import com.jagdeep.home.domain.CourseAutomationRoutine
 import com.jagdeep.home.domain.PauseReason
 import com.jagdeep.home.domain.Routine
 import com.jagdeep.home.domain.ScrollClickPhase
@@ -22,8 +21,7 @@ internal fun routineSummary(routine: Routine): String = "${routine.kind.label} �
         add(if (routine.rounds == 1) "1 round" else "${routine.rounds} rounds")
         if (routine.watchVideos) add("stops for videos")
     }.joinToString(" · ")
-    is PageHelperRoutine -> routine.words.joinToString(", ")
-    is CourseHelperRoutine -> "sagarmeinyog.com · one key press opens each part"
+    is CourseAutomationRoutine -> "sagarmeinyog.com · automatically watches unfinished video lessons"
 }
 
 /** "Left click every 1 s · at the pointer · in Google Chrome", or "3 points, top to bottom · once". */

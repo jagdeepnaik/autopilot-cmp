@@ -4,7 +4,7 @@ import com.jagdeep.automation.UnsupportedDesktopAutomation
 import com.jagdeep.home.domain.ClickController
 import com.jagdeep.home.domain.ClickRoutine
 import com.jagdeep.home.domain.PageActivity
-import com.jagdeep.home.domain.PageHelperRoutine
+import com.jagdeep.home.domain.CourseAutomationRoutine
 import com.jagdeep.home.domain.PageRunner
 import com.jagdeep.home.domain.PageState
 import com.jagdeep.home.domain.Routine
@@ -27,7 +27,7 @@ import kotlinx.coroutines.test.runTest
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShellModelTest {
     private val click = ClickRoutine("c", "Refresh")
-    private val helper = PageHelperRoutine("h", "Course")
+    private val helper = CourseAutomationRoutine("h", "Course")
 
     private class Repository(library: RoutineLibrary) : RoutineRepository {
         override val library = MutableStateFlow<RoutineLibrary?>(library)
@@ -42,7 +42,7 @@ class ShellModelTest {
         override val state = MutableStateFlow(PageState(isConnected = true))
         override val lastRun = MutableStateFlow<RunRecord?>(null)
         override fun start(routine: Routine): String? {
-            if (routine is PageHelperRoutine) state.value = state.value.copy(activity = PageActivity.Helper(routine))
+            if (routine is CourseAutomationRoutine) state.value = state.value.copy(activity = PageActivity.Automation(routine, "Waiting for Chrome"))
             return null
         }
         override fun stop(): Boolean {
@@ -105,9 +105,9 @@ class ShellModelTest {
         assertEquals("Ready · Course", model.state.first().operation)
         model.start()
         runCurrent()
-        assertEquals("Course · looking for a button", model.state.first().operation)
-        page.state.value = page.state.value.copy(foundLabel = "Next", isScrolling = true)
-        assertEquals("Course · next step: Next · scrolling", model.state.first().operation)
+        assertEquals("Course · Waiting for Chrome", model.state.first().operation)
+        page.state.value = page.state.value.copy(activity = PageActivity.Automation(helper, "Watching the next video"))
+        assertEquals("Course · Watching the next video", model.state.first().operation)
     }
 
     @Test

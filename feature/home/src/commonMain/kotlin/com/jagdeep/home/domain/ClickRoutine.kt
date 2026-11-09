@@ -10,8 +10,7 @@ enum class RoutineKind(val label: String, val description: String) {
     Click("Click routine", "Clicks wherever the pointer is, in any app, at a set interval."),
     Sequence("Multi-point click", "Clicks a list of spots in order. Each has its own wait and button, and the list can run once or repeat."),
     ScrollClick("Scroll and click", "Scrolls a Chrome page to the bottom, plays any videos, clicks your spot, and repeats."),
-    PageHelper("Web page helper", "Highlights the next button on a Chrome page. You press a key to click it."),
-    CourseHelper("Course helper", "For the Sagar Mein Yog course site: highlights the next part to watch and you press a key to open it. Videos start by themselves; quizzes are yours."),
+    CourseAutomation("Sagar Mein Yog automation", "Automatically opens unfinished courses and video lessons on sagarmeinyog.com, watches videos, and follows the selected assessment mode."),
 }
 
 /** Something the Routines page can save and run. Only one routine runs at a time. */
@@ -121,49 +120,15 @@ data class ScrollClickRoutine(
     val steps: List<ClickPoint> get() = points.ifEmpty { listOfNotNull(point) }
 }
 
-/** Highlights the next button on a Chrome page; the user's key press clicks it. */
-@Serializable
-@SerialName("pageHelper")
-data class PageHelperRoutine(
-    override val id: String,
-    override val name: String,
-    /** Button words in priority order. */
-    val words: List<String> = DEFAULT_WORDS,
-    val pixelsPerSecond: Int = DEFAULT_PIXELS_PER_SECOND,
-    val soundOnVideoEnd: Boolean = true,
-) : Routine {
-    override val kind: RoutineKind get() = RoutineKind.PageHelper
-}
-
-/**
- * Hands-on help with the Sagar Mein Yog course site: the next unfinished part, or Back to Course after
- * a video, is highlighted, and each press of the user's key opens it. Videos start by themselves at the
- * site's own speed. It never clicks without a key press, and never highlights quizzes or assessments.
- */
-@Serializable
-@SerialName("courseHelper")
-data class CourseHelperRoutine(
-    override val id: String,
-    override val name: String,
-    val soundOnVideoEnd: Boolean = true,
-) : Routine {
-    override val kind: RoutineKind get() = RoutineKind.CourseHelper
-}
-
 /** Saved before routine types existed, a routine has no type and is a click routine. */
 internal const val CLICK_ROUTINE_TYPE = "click"
 
-val DEFAULT_WORDS = listOf("Next", "Continue", "Play", "Watch video")
 const val MIN_PIXELS_PER_SECOND = 10
 const val MAX_PIXELS_PER_SECOND = 400
 const val DEFAULT_PIXELS_PER_SECOND = 60
 const val MIN_SCROLL_CLICK_ROUNDS = 1
 const val MAX_SCROLL_CLICK_ROUNDS = 9_999
 const val DEFAULT_SCROLL_CLICK_ROUNDS = 20
-
-/** "Next, Continue , , Play" becomes the words in that order. */
-fun parseWords(text: String): List<String> =
-    text.split(',').map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }
 
 /** The saved routines and which one Start and the hot key act on. */
 data class RoutineLibrary(

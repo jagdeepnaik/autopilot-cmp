@@ -120,8 +120,40 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                 RoutineKind.Click -> ClickSections(state, viewModel)
                 RoutineKind.Sequence -> SequenceSections(state, viewModel)
                 RoutineKind.ScrollClick -> ScrollClickSections(state, viewModel)
-                RoutineKind.PageHelper -> PageHelperSections(state, viewModel)
-                RoutineKind.CourseHelper -> CourseHelperSections(state, viewModel)
+                RoutineKind.CourseAutomation -> {
+                    Group("Assessment")
+                    ListItem(
+                        headlineContent = { Text("Handle module assessments") },
+                        supportingContent = { Text("Use the chosen assessment mode after videos finish. Unknown answers always pause for manual help.") },
+                        trailingContent = { Switch(checked = draft.answerAssessments, onCheckedChange = { enabled -> update { it.copy(answerAssessments = enabled) } }) },
+                    )
+                    if (draft.answerAssessments) {
+                        val modes = listOf(
+                            Triple(com.jagdeep.home.domain.AssessmentMode.Manual, "Manual", "Choose answers yourself. Approve assessment starts and submissions."),
+                            Triple(com.jagdeep.home.domain.AssessmentMode.Review, "Review approvals", "Use saved answers, but approve assessment starts and submissions. Existing routines keep this mode."),
+                            Triple(com.jagdeep.home.domain.AssessmentMode.Automatic, "Automatic", "Authorize starts, saved-answer selection and submission for this routine. Unknown questions pause; a failed retry still needs your choice."),
+                        )
+                        modes.forEach { (mode, title, supporting) -> Choice(title, supporting, draft.assessmentMode == mode) { update { it.copy(assessmentMode = mode) } } }
+                    }
+                    Group("Playback speed")
+                    listOf(1.0 to "1×", 1.5 to "1.5×", 2.0 to "2×").forEach { (speed, title) ->
+                        Choice(title, null, draft.playbackSpeed == speed) { update { it.copy(playbackSpeed = speed) } }
+                    }
+                    Group("Timing")
+                    NumberField(
+                        label = "Wait after every click (seconds)",
+                        value = draft.waitAfterClickSeconds,
+                        error = errors.waitAfterClick,
+                        onChange = { value -> update { it.copy(waitAfterClickSeconds = value) } },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    )
+                    Group("Before you start")
+                    Text("Sign in to Sagar Mein Yog in Chrome and open your dashboard. Check the assessment mode above, then keep the course tab selected and Chrome in front while running.", modifier = Modifier.padding(horizontal = 16.dp))
+                    com.jagdeep.home.ui.components.CourseAutomationGuide()
+                    com.jagdeep.home.ui.components.CourseProgressHistory(
+                        state.progressAccounts, state.savedProgress, state.progressHistoryError, viewModel::loadProgressHistory,
+                    )
+                }
             }
 
             Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -489,60 +521,6 @@ private fun ScrollClickSections(state: RoutineEditorUiState, viewModel: RoutineE
         supporting = "Stops after this many clicks, or sooner if a click doesn't change the page.",
         onChange = { value -> update { it.copy(rounds = value) } },
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-    )
-}
-
-@Composable
-private fun PageHelperSections(state: RoutineEditorUiState, viewModel: RoutineEditorViewModel) {
-    val draft = state.draft
-    val update = viewModel::updateDraft
-    Group("Buttons to look for")
-    OutlinedTextField(
-        value = draft.words,
-        onValueChange = { words -> update { it.copy(words = words) } },
-        label = { Text("Words, most important first") },
-        isError = state.errors.words != null,
-        supportingText = { Text(state.errors.words ?: "Separate with commas. While it runs, press ${state.pageClickHotKey.name} to click the highlighted button.") },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-    )
-
-    Group("Auto-scroll")
-    SpeedSlider(draft.pixelsPerSecond) { value -> update { it.copy(pixelsPerSecond = value) } }
-    Text(
-        "While it runs, press ${state.pageScrollHotKey.name} in Chrome to start or stop scrolling.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp),
-    )
-
-    Group("Video alerts")
-    ListItem(
-        modifier = Modifier.toggleable(value = draft.soundOnVideoEnd, role = Role.Switch, onValueChange = { value -> update { it.copy(soundOnVideoEnd = value) } }),
-        colors = transparent(),
-        headlineContent = { Text("Play a sound when a video ends") },
-        trailingContent = { Switch(checked = draft.soundOnVideoEnd, onCheckedChange = null) },
-    )
-}
-
-@Composable
-private fun CourseHelperSections(state: RoutineEditorUiState, viewModel: RoutineEditorViewModel) {
-    val draft = state.draft
-    val update = viewModel::updateDraft
-    Group("How it works")
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf(
-            "On the sagarmeinyog.com dashboard, the next course you haven't finished is outlined; on a course page, the next part. Press ${state.pageClickHotKey.name} to open it.",
-            "Its video starts by itself, at the site's own speed. When it ends, Back to Course is outlined; press ${state.pageClickHotKey.name} again.",
-            "Nothing is clicked without your key press. Quizzes and the assessment are yours to do: they're never outlined.",
-        ).forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
-    }
-
-    Group("Video alerts")
-    ListItem(
-        modifier = Modifier.toggleable(value = draft.soundOnVideoEnd, role = Role.Switch, onValueChange = { value -> update { it.copy(soundOnVideoEnd = value) } }),
-        colors = transparent(),
-        headlineContent = { Text("Play a sound when a video ends") },
-        trailingContent = { Switch(checked = draft.soundOnVideoEnd, onCheckedChange = null) },
     )
 }
 

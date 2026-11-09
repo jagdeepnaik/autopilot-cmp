@@ -111,8 +111,7 @@ internal class FakePageRunner : PageRunner {
         refusal?.let { return it }
         started += routine
         val activity = when (routine) {
-            is PageHelperRoutine -> PageActivity.Helper(routine)
-            is CourseHelperRoutine -> PageActivity.Course(routine)
+            is CourseAutomationRoutine -> PageActivity.Automation(routine, "Waiting for Chrome")
             is ScrollClickRoutine -> PageActivity.ScrollClick(routine, ScrollClickProgress(1, routine.rounds, 0, ScrollClickPhase.ReadingPage))
             is ClickRoutine -> return "not a page routine"
         }

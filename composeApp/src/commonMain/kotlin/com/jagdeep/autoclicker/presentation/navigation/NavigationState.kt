@@ -15,6 +15,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.savedstate.compose.serialization.serializers.MutableStateSerializer
 import androidx.savedstate.serialization.SavedStateConfiguration
 import com.jagdeep.home.ui.navigation.RouteRoutineEditor
+import com.jagdeep.home.ui.navigation.RouteRunningRoutine
 import com.jagdeep.ui.navigation.NavigationState
 import com.jagdeep.ui.navigation.topLevelSavedStateSerializer
 import kotlinx.serialization.PolymorphicSerializer
@@ -26,6 +27,7 @@ private val savedStateConfiguration = SavedStateConfiguration {
         polymorphic(baseClass = NavKey::class) {
             topLevelSavedStateSerializer()
             subclass(RouteRoutineEditor::class, RouteRoutineEditor.serializer())
+            subclass(RouteRunningRoutine::class, RouteRunningRoutine.serializer())
         }
     }
 }

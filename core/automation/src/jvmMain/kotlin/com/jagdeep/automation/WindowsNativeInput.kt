@@ -7,12 +7,10 @@ import com.sun.jna.platform.win32.WinBase
 import com.sun.jna.platform.win32.WinDef.HWND
 import com.sun.jna.platform.win32.WinUser
 import com.sun.jna.ptr.IntByReference
-import java.util.concurrent.CountDownLatch
-import kotlin.concurrent.thread
 
 /** Windows needs no permission for input, except that it can't reach apps running as administrator. */
 internal class WindowsNativeInput : NativeInput {
-    private var displayAwake: CountDownLatch? = null
+    private val displayAwake = ThreadDisplayAwake { flags -> Kernel32.INSTANCE.SetThreadExecutionState(flags) != 0 }
 
     override fun access(): InputAccess = InputAccess.Granted
 
@@ -55,22 +53,7 @@ internal class WindowsNativeInput : NativeInput {
         User32.INSTANCE.SetForegroundWindow(window)
     }
 
-    /** Windows holds this request per thread, so one thread keeps it until told to let go. */
-    @Synchronized
-    override fun setDisplayAwake(awake: Boolean) {
-        if (!awake) {
-            displayAwake?.countDown()
-            displayAwake = null
-        } else if (displayAwake == null) {
-            val release = CountDownLatch(1)
-            displayAwake = release
-            thread(isDaemon = true, name = "display-awake") {
-                Kernel32.INSTANCE.SetThreadExecutionState(WinBase.ES_CONTINUOUS or WinBase.ES_DISPLAY_REQUIRED)
-                release.await()
-                Kernel32.INSTANCE.SetThreadExecutionState(WinBase.ES_CONTINUOUS)
-            }
-        }
-    }
+    override fun setDisplayAwake(awake: Boolean) = displayAwake.setAwake(awake)
 
     private fun appNameOf(window: HWND): String? {
         val processId = IntByReference()

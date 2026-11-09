@@ -147,18 +147,7 @@ class RoutineDraftTest {
         assertEquals(ok.points, saved.toDraft().points.map { it.copy(text = it.text) }.let { listOf(it.single().copy(text = " Back to Course ")) })
     }
 
-    @Test
-    fun `given a course helper when edited and saved then it keeps its sound choice`() {
-        val routine = CourseHelperRoutine("k", "Yoga course", soundOnVideoEnd = false)
-        assertEquals(routine, routine.toDraft().toRoutine("k"))
-        assertFalse(routine.needsInputAccess(), "It clicks inside Chrome, not through the pointer")
-    }
 
-    @Test
-    fun `given a page helper draft with no words when checked then it says so`() {
-        val draft = RoutineDraft(kind = RoutineKind.PageHelper, name = "Course", words = " , ")
-        assertEquals("Add at least one word.", draft.validate().words)
-    }
 
     @Test
     fun `given Chrome routines when turned into drafts and back then nothing is lost`() {
@@ -166,7 +155,7 @@ class RoutineDraftTest {
             "s", "Pages", rounds = 7, pixelsPerSecond = 120, watchVideos = false,
             points = listOf(ClickPoint(640, 880, 0, PointerButton.Left, "Next"), ClickPoint(10, 20, 1_500, PointerButton.Right, "Point 2")),
         )
-        val helper = PageHelperRoutine("h", "Course", words = listOf("Next", "Weiter"), pixelsPerSecond = 30, soundOnVideoEnd = false)
+        val helper = CourseAutomationRoutine("h", "Course", playbackSpeed = 1.5)
         assertEquals(scroll, scroll.toDraft().toRoutine("s"))
         assertEquals(helper, helper.toDraft().toRoutine("h"))
     }

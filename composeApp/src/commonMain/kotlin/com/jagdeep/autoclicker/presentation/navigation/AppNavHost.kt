@@ -42,11 +42,20 @@ fun AppNavHost(
     newId: () -> String,
     appIcon: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    displayWakeProblem: Flow<String?> = kotlinx.coroutines.flow.flowOf(null),
 ) {
+    androidx.compose.runtime.LaunchedEffect(controller, navigator) {
+        observeRunningNavigation(kotlinx.coroutines.flow.combine(controller.state, controller.page.state) { run, page ->
+            run != com.jagdeep.home.domain.RunState.Idle || page.activity != null
+        }, navigator)
+    }
+    val routineTransfer = androidx.compose.runtime.remember(routineRepository, routineFiles, controller) {
+        com.jagdeep.home.domain.RoutineFileTransfer(routineRepository, routineFiles, newId) { controller.isActive }
+    }
     val stacks = navigationState.rememberDecoratedStacks(entryProvider {
         homeEntryProvider(navigator, controller, routineRepository, newId, appIcon, routineFiles)
         activityEntryProvider(navigator, runHistory, now, liveLog, developerMode = preferencesStore.data.map { it.developerMode })
-        settingsEntryProvider(navigator, preferencesStore, accessGate, appVersion, browserConnected, onInstallExtension = ::installBrowserExtension)
+        settingsEntryProvider(navigator, preferencesStore, accessGate, appVersion, browserConnected, onInstallExtension = ::installBrowserExtension, routineTransfer = routineTransfer, displayWakeProblem = displayWakeProblem)
     })
     if (isDesktopPlatform()) {
         // Desktop navigates with the sidebar.

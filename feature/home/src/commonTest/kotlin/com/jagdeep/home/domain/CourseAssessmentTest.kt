@@ -1,0 +1,372 @@
+package com.jagdeep.home.domain
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class CourseAssessmentTest {
+    @Test
+    fun `given history confirms pass and course confirms videos done then skip a new assessment`() {
+        val runner=CourseAutomationSession("s",0,answerAssessments=true)
+        runner.configureAnswers(bank)
+        runner.configureProgress(CourseProgressSummary("user","User",1,listOf(
+            com.jagdeep.persistence.room.learning.LearningRecord("user","old","Wellness","assessment","Course Assessment","passed",90.0,observedAt=1),
+            com.jagdeep.persistence.room.learning.LearningRecord("user","new","Wellness","assessment","Course Assessment","unsubmitted",observedAt=2))))
+        val snapshot=page(home,CourseElement("module",tag="a",href=course,label="Wellness"),
+            CourseElement("done",label="Rewatch video",context="Part:1 Completed"),CourseElement("assessment",label="Assessment"))
+        runner.read(snapshot,0); runner.read(snapshot,2000)
+        assertNull(runner.approval)
+        assertEquals("home",runner.action?.element)
+        assertEquals(1,runner.progressCheckpoint)
+    }
+
+    @Test
+    fun `given user manually submits a started assessment and site reports passed then refresh progress`() {
+        val runner = ready()
+        runner.read(page(home, assessment=CourseAssessment("Wellness",result="passed")),3000)
+        assertEquals("assessmentReturn",runner.action?.kind)
+        assertEquals(1,runner.progressCheckpoint)
+    }
+
+    @Test
+    fun `given saved failed or unsubmitted attempt then automatic mode asks before starting another`() {
+        for (status in listOf("failed", "unsubmitted")) {
+            val runner = CourseAutomationSession("s",0,answerAssessments=true,assessmentMode=AssessmentMode.Automatic)
+            runner.configureAnswers(bank)
+            runner.configureProgress(CourseProgressSummary("user","User",1,listOf(
+                com.jagdeep.persistence.room.learning.LearningRecord("user","attempt","Wellness","assessment","Course Assessment",status,observedAt=1))))
+            val snapshot = page(CourseElement("module",tag="a",label="Wellness",href=course),
+                CourseElement("done",label="Rewatch video",context="Part:1 Completed"),CourseElement("assessment",label="Assessment"))
+            runner.read(snapshot,0); runner.read(snapshot,2000)
+            assertNull(runner.action)
+            assertEquals(CourseApprovalKind.StartAssessment,runner.approval?.kind)
+        }
+    }
+
+    @Test
+    fun `given automatic mode then known answers submit without another approval while manual mode waits`() {
+        fun started(mode: AssessmentMode): CourseAutomationSession {
+            val runner = CourseAutomationSession("s", 0, answerAssessments = true, assessmentMode = mode)
+            runner.configureAnswers(bank)
+            val complete = CourseElement("rewatch", label = "Rewatch video", context = "Part:1 Completed")
+            val snapshot = page(complete, CourseElement("assessment", label = "Assessment"))
+            runner.read(snapshot, 0)
+            runner.read(snapshot, 2000)
+            if (mode != AssessmentMode.Automatic) runner.approveAssessment(runner.approval!!.token)
+            runner.read(snapshot, 2000)
+            runner.action?.let { runner.acknowledge(it.request, true, 2000) }
+            return runner
+        }
+        val automatic = started(AssessmentMode.Automatic)
+        val selected = q.copy(options = q.options.map { it.copy(selected = it.id == "b") })
+        automatic.read(page(submit, assessment = CourseAssessment("Wellness", listOf(selected), submit = "submit", totalQuestions = 1)), 3000)
+        assertNull(automatic.approval)
+        assertEquals("assessmentSubmit", automatic.action?.kind)
+        val manual = started(AssessmentMode.Manual)
+        manual.read(page(submit, assessment = CourseAssessment("Wellness", listOf(q), submit = "submit", totalQuestions = 1)), 3000)
+        assertNull(manual.action)
+        assertNotNull(manual.attention)
+        val routine = CourseAutomationRoutine(id = "r", name = "Course", answerAssessments = true, assessmentMode = AssessmentMode.Automatic)
+        assertEquals(AssessmentMode.Automatic, (routine.toDraft().toRoutine("r") as CourseAutomationRoutine).assessmentMode)
+    }
+
+    @Test
+    fun `given a manually selected unknown answer then confirmation is required before using it for this attempt`() {
+        val runner = ready()
+        val unknown = q.copy(text = "New question?", options = q.options.map { it.copy(selected = it.id == "b") })
+        val snapshot = page(submit, assessment = CourseAssessment("Wellness", listOf(unknown), submit = "submit", totalQuestions = 1))
+        runner.read(snapshot, 3000)
+        assertNull(runner.action)
+        val request = runner.manualAnswer!!
+        assertEquals("2. Second", request.answer)
+        assertFalse(runner.acceptManualAnswer("old-token"))
+        assertTrue(runner.acceptManualAnswer(request.token))
+        runner.read(snapshot, 4000)
+        assertNull(runner.manualAnswer)
+        assertNull(runner.attention)
+        assertEquals(CourseApprovalKind.SubmitAssessment, runner.approval?.kind)
+        assertNull(bank.answer("Wellness", unknown), "Continue without saving must not mutate the original bank")
+    }
+
+    @Test
+    fun `given a failed attempt then only an explicit retry starts one attempt and requires fresh submission approval`() {
+        val runner = ready()
+        val first = page(submit, assessment = CourseAssessment("Wellness", listOf(q), submit = "submit", totalQuestions = 1))
+        runner.read(first, 3000)
+        assertEquals("assessmentAnswer", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true, 3000)
+        val selected = first.copy(assessment = first.assessment!!.copy(questions = listOf(q.copy(options = q.options.map { it.copy(selected = it.id == "b") }))))
+        runner.read(selected, 4000)
+        runner.approveAssessment(runner.approval!!.token)
+        runner.read(selected, 4000)
+        runner.acknowledge(runner.action!!.request, true, 4000)
+        val retry = CourseElement("retry", label = "Re-attempt")
+        val failed = page(retry, assessment = CourseAssessment("Wellness", result = "failed", retry = "retry")).copy(path = "$course/assessment/result/first")
+        runner.read(failed, 5000)
+        assertNull(runner.action)
+        assertEquals("2. Second", runner.failure!!.questions.single().selectedAnswer)
+        assertEquals("2. Second", runner.failure!!.questions.single().bankAnswer)
+        assertFalse(runner.retryAssessment("old-failure"))
+        assertTrue(runner.retryAssessment(runner.failure!!.token))
+        runner.read(failed, 6000)
+        assertEquals("assessmentRetry", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true, 6000)
+        runner.read(first.copy(path = "$course/test/test1"), 7000)
+        assertEquals("assessmentAnswer", runner.action?.kind, "Old controls and confirmed answers must not skip the new attempt")
+        runner.acknowledge(runner.action!!.request, true, 7000)
+        runner.read(selected.copy(path = "$course/test/test1"), 8000)
+        assertNull(runner.action)
+        assertEquals(CourseApprovalKind.SubmitAssessment, runner.approval?.kind)
+    }
+
+    private val course = "/dashboard/courses/first"
+    private val fixture = """{"Wellness":[{"question":"Which option is correct?","options":["1. First","2. Second"],"answer":"2. Second"}]}"""
+    private val bank = CourseAnswerBank.decode(fixture)!!
+    private val q = CourseQuestion("q", "Which option is correct?", listOf(CourseOption("a", "1. First"), CourseOption("b", "2. Second")))
+    private val home = CourseElement("home", tag = "a", label = "HOME", href = "/dashboard")
+    private val submit = CourseElement("submit", label = "Submit Assessment")
+    private fun page(vararg controls: CourseElement, assessment: CourseAssessment? = null, top: Boolean = true) =
+        CourseSnapshot("s", "doc", course, top = top, elements = controls.toList(), assessment = assessment)
+    private fun ready(wait: Long = 0): CourseAutomationSession {
+        val runner = CourseAutomationSession("s", wait, answerAssessments = true)
+        runner.configureAnswers(bank)
+        val complete = CourseElement("rewatch", label = "Rewatch video", context = "Part:1 Completed")
+        runner.read(page(complete, CourseElement("assessment", label = "Assessment")), 0)
+        runner.read(page(complete, CourseElement("assessment", label = "Assessment")), 2000)
+        assertNull(runner.action)
+        assertEquals(CourseApprovalKind.StartAssessment, runner.approval?.kind)
+        runner.approveAssessment("wrong-token")
+        assertNotNull(runner.approval)
+        runner.approveAssessment(runner.approval!!.token)
+        runner.read(page(complete, CourseElement("assessment", label = "Assessment")), 2000)
+        assertEquals("assessmentOpen", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true, 2000)
+        return runner
+    }
+
+    @Test
+    fun `given bank answers then exact text and complete option sets are required`() {
+        assertEquals("b", bank.answer("wellness", q.copy(options = q.options.reversed()))?.id)
+        assertEquals("b", bank.answer("Wellness", q.copy(options = q.options.map { it.copy(text = it.text.substringAfter(". ")) }))?.id)
+        assertNull(bank.answer("Other", q))
+        assertNull(bank.answer("Wellness", q.copy(text = "Which option is NOT correct?")))
+        assertNull(bank.answer("Wellness", q.copy(options = q.options + CourseOption("c", "Third"))))
+        assertNull(bank.answer("Wellness", q.copy(options = q.options.map { it.copy(text = "First") })))
+        assertNull(CourseAnswerBank.decode(fixture.replace("\"answer\":\"2. Second\"", "\"answer\":\"Unknown\"")))
+        assertNull(CourseAnswerBank.decode("{}"))
+        assertNull(CourseAnswerBank.decode("not json"))
+        val entry = """{"question":"Question?","options":["A","B"],"answer":"B"}"""
+        assertNotNull(CourseAnswerBank.decode("""{"Module":[$entry,$entry]}"""))
+        assertNull(CourseAnswerBank.decode("""{"Module":[$entry,${entry.replace("\"answer\":\"B\"", "\"answer\":\"A\"")}]}"""))
+    }
+
+    @Test
+    fun `given approved submission then confirm its modal once and recognize the live result route`() {
+        val runner = ready()
+        val selected = CourseAssessment("Wellness", listOf(q.copy(options = q.options.map { it.copy(selected = it.id == "b") })), submit = "submit")
+        val confirm = CourseElement("confirm", label = "End Test")
+        runner.read(page(submit, confirm, assessment = selected.copy(confirmSubmit = "confirm")), 3000)
+        assertNull(runner.action, "A confirmation modal cannot bypass submission approval")
+        runner.approveAssessment(runner.approval!!.token)
+        runner.read(page(submit, assessment = selected), 4000)
+        assertEquals("assessmentSubmit", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true, 4000)
+        runner.read(page(confirm, assessment = selected.copy(confirmSubmit = "confirm")), 5000)
+        assertEquals("assessmentConfirmSubmit", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true, 5000)
+        runner.read(page(confirm, assessment = selected.copy(confirmSubmit = "confirm")), 6000)
+        assertNull(runner.action)
+        val back = CourseElement("back", label = "Back home")
+        runner.read(page(back, assessment = selected.copy(result = "passed")).copy(path = "$course/assessment/result/result1"), 7000)
+        assertEquals("assessmentReturn", runner.action?.kind)
+        assertEquals("back", runner.action?.element)
+    }
+
+    @Test
+    fun `given a combined bank then unanswered questions remain unknown and option variants match separately`() {
+        val merged = CourseAnswerBank.decode("""{"Module":[
+            {"question":"Known?","options":["A","B"],"answer":"B"},
+            {"question":"Known?","options":["A","B"],"answer":null},
+            {"question":"Known?","options":["C","D"],"answer":"C"},
+            {"question":"Unknown?","options":["A","B"],"answer":null},
+            {"question":"Missing answer?","options":["A","B"]},
+            {"question":"Ambiguous options?","options":["A","A","B"],"answer":"B"}
+        ]}""")!!
+        fun question(text: String, vararg options: String) = CourseQuestion("q", text, options.map { CourseOption(it, it) })
+        assertEquals(5, merged.module("Module")!!.size)
+        assertEquals("B", merged.answer("Module", question("Known?", "B", "A"))?.text)
+        assertEquals("C", merged.answer("Module", question("Known?", "D", "C"))?.text)
+        assertNull(merged.answer("Module", question("Known?", "A", "C")))
+        assertNull(merged.answer("Module", question("Unknown?", "A", "B")))
+        assertNull(merged.answer("Module", question("Missing answer?", "A", "B")))
+        assertNull(merged.answer("Module", question("Ambiguous options?", "A", "A", "B")))
+    }
+
+    @Test
+    fun `given a failed result at app start then show failure without requiring lesson history or retrying`() {
+        val runner = CourseAutomationSession("s", answerAssessments = true)
+        runner.read(page(CourseElement("retake", label = "Re-attempt"), assessment = CourseAssessment("Wellness", result = "failed")).copy(path = "$course/assessment/result/result1"), 0)
+        assertNull(runner.action)
+        assertNull(runner.approval)
+        assertTrue(runner.detail.contains("did not pass"))
+        assertTrue(runner.detail.contains("not be retried"))
+    }
+
+    @Test
+    fun `given a manually opened start screen with incomplete videos then explicit approval allows one attempt only`() {
+        val runner = CourseAutomationSession("s", answerAssessments = true).apply { configureAnswers(bank) }
+        val start = CourseElement("start", label = "Start Assessment")
+        val modal = page(start, assessment = CourseAssessment("Wellness", start = "start"))
+        runner.read(modal, 0)
+        assertNull(runner.action)
+        assertNotNull(runner.approval)
+        assertTrue(runner.detail.contains("videos may be incomplete"))
+        runner.approveAssessment(runner.approval!!.token)
+        runner.read(modal, 1000)
+        assertEquals("assessmentStart", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true, 1000)
+        runner.read(page(assessment = CourseAssessment("Wellness", listOf(q))).copy(path = "$course/test/test1"), 2000)
+        assertEquals("assessmentAnswer", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true, 2000)
+        runner.read(modal, 3000)
+        assertNull(runner.action)
+        assertTrue(runner.detail.contains("No additional attempt"))
+    }
+
+    @Test
+    fun `given a resume video row then it must be opened before assessment approval`() {
+        val runner = CourseAutomationSession("s", answerAssessments = true).apply { configureAnswers(bank) }
+        val chapter = CourseElement("chapter", label = "2.2 Saving In Progress 3/4 4 Materials", expanded = true)
+        runner.read(page(chapter, CourseElement("resume", label = "Resume video", context = "2.1 Part:1 VIDEO In Progress 69% Resume video"), CourseElement("done", label = "Rewatch video", context = "Part:2 Completed"), CourseElement("assessment", label = "Assessment")), 0)
+        assertEquals("resume", runner.action?.element)
+        assertNull(runner.approval)
+        runner.acknowledge(runner.action!!.request, true, 0)
+        runner.read(page(CourseElement("ended", tag = "video", ended = true), CourseElement("next", label = "Next"), CourseElement("course", tag = "a", label = "Wellness", href = course)).copy(path = "$course/lesson1"), 1000)
+        assertEquals("course", runner.action?.element, "Return to module status instead of replaying an already completed next lesson")
+    }
+
+    @Test
+    fun `given unfinished videos then assessment is never opened`() {
+        val runner = CourseAutomationSession("s", answerAssessments = true).apply { configureAnswers(bank) }
+        runner.read(page(CourseElement("watch", label = "Watch video", context = "Part:1 Not Started"), CourseElement("assessment", label = "Assessment")), 0)
+        assertEquals("watch", runner.action?.element)
+    }
+
+    @Test
+    fun `given completed videos and exact answer then confirm selection submit once and await pass before dashboard`() {
+        val runner = ready(5000)
+        val assessment = CourseAssessment("Wellness", listOf(q), submit = "submit")
+        runner.read(page(submit, assessment = assessment), 3000)
+        assertNull(runner.action, "Preserve post-click wait")
+        runner.read(page(submit, assessment = assessment), 7000)
+        assertEquals("assessmentAnswer", runner.action?.kind)
+        assertEquals("b", runner.action?.element)
+        runner.acknowledge(runner.action!!.request, true, 7000)
+        runner.read(page(submit, assessment = assessment), 12000)
+        assertNull(runner.action, "An acknowledgement alone cannot confirm radio selection")
+        val selected = assessment.copy(questions = listOf(q.copy(options = q.options.map { it.copy(selected = it.id == "b") })))
+        runner.read(page(submit, assessment = selected), 13000)
+        assertNull(runner.action)
+        assertEquals(CourseApprovalKind.SubmitAssessment, runner.approval?.kind)
+        runner.approveAssessment(runner.approval!!.token)
+        runner.read(page(submit, assessment = selected), 13000)
+        assertEquals("assessmentSubmit", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true, 13000)
+        runner.read(page(submit, home, assessment = selected), 18000)
+        assertNull(runner.action, "No repeated submission or early dashboard return")
+        assertFalse(runner.completed)
+        runner.read(page(home, assessment = selected.copy(result = "passed")), 19000)
+        assertEquals("home", runner.action?.element)
+        assertEquals("assessmentReturn", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true, 19000)
+        runner.read(CourseSnapshot("s", "doc", "/dashboard", elements = listOf(
+            CourseElement("all", tag = "h2", label = "All Courses"),
+            CourseElement("next-module", href = "/dashboard/courses/second", context = "75% Min. Pass 96min Duration"))), 24000)
+        assertEquals("next-module", runner.action?.element)
+    }
+
+    @Test
+    fun `given unmatched questions missing modules or a failed result then no guessing submission or retry occurs`() {
+        val runner = ready()
+        val unknown = CourseAssessment("Wellness", listOf(q.copy(text = "Different question")), submit = "submit")
+        runner.read(page(submit, assessment = unknown), 3000)
+        assertNull(runner.action)
+        assertTrue(runner.detail.contains("no exact saved answer"))
+        assertNotNull(runner.attention)
+        runner.read(page(submit, assessment = unknown.copy(module = "Missing")), 4000)
+        assertNull(runner.action)
+        runner.read(page(submit, assessment = unknown.copy(result = "failed")), 5000)
+        assertNull(runner.action)
+        assertTrue(runner.detail.contains("not be retried"))
+    }
+
+    @Test
+    fun `given direct assessment entry or child frame then answers are never selected`() {
+        val runner = CourseAutomationSession("s", answerAssessments = true).apply { configureAnswers(bank) }
+        runner.read(page(submit, assessment = CourseAssessment("Wellness", listOf(q))), 0)
+        assertNull(runner.action)
+        val ready = ready()
+        ready.read(page(submit, assessment = CourseAssessment("Wellness", listOf(q)), top = false), 3000)
+        assertNull(ready.action)
+    }
+
+    @Test
+    fun `given assessment opt in when edited then it persists without changing legacy defaults`() {
+        val routine = CourseAutomationRoutine("a", "Course", answerAssessments = true)
+        assertEquals(routine, routine.toDraft().toRoutine("a"))
+        assertFalse(CourseAutomationRoutine("old", "Course").answerAssessments)
+        assertNotNull(CourseAnswerBank.decode(fixture))
+    }
+
+    @Test
+    fun `given paginated assessment then every matched question must be observed before final submission`() {
+        val first = """{"question":"First?","options":["A","B"],"answer":"B"}"""
+        val second = """{"question":"Second?","options":["A","B"],"answer":"A"}"""
+        val runner = ready()
+        runner.configureAnswers(CourseAnswerBank.decode("""{"Wellness":[$first,$second]}"""))
+        val options = listOf(CourseOption("a", "A"), CourseOption("b", "B", selected = true))
+        val next = CourseElement("next-question", label = "Next Question")
+        runner.read(page(next, submit, assessment = CourseAssessment("Wellness", listOf(CourseQuestion("q1", "First?", options)), next = next.id, submit = submit.id)), 3000)
+        assertEquals("assessmentNext", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true, 3000)
+        val last = CourseAssessment("Wellness", listOf(CourseQuestion("q2", "Second?", options.map { it.copy(selected = it.id == "a") })), submit = submit.id)
+        runner.read(page(submit, assessment = last), 4000)
+        assertNull(runner.action)
+        assertEquals(CourseApprovalKind.SubmitAssessment, runner.approval?.kind)
+        runner.approveAssessment(runner.approval!!.token)
+        runner.read(page(submit, assessment = last), 4000)
+        assertEquals("assessmentSubmit", runner.action?.kind)
+    }
+
+    @Test
+    fun `given live test route and repeated question text then separate instances count and End Test requires approval`() {
+        val runner = ready()
+        val selected = q.copy(options = q.options.map { it.copy(selected = it.id == "b") })
+        val next = CourseElement("next", label = "Next")
+        fun testPage(question: CourseQuestion, last: Boolean = false) = CourseSnapshot("s", "doc", "$course/test/attempt1",
+            elements = listOf(next, CourseElement("end", label = "End Test")),
+            assessment = CourseAssessment("Wellness", listOf(question), next = if (last) null else "next", submit = "end", totalQuestions = 2))
+        runner.read(testPage(selected.copy(id = "q0")), 3000)
+        assertEquals("assessmentNext", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true)
+        runner.read(testPage(selected.copy(id = "q1"), last = true), 4000)
+        assertNull(runner.action)
+        assertEquals(CourseApprovalKind.SubmitAssessment, runner.approval?.kind)
+        runner.approveAssessment(runner.approval!!.token)
+        runner.read(testPage(selected.copy(id = "q1"), last = true), 4001)
+        assertEquals("assessmentSubmit", runner.action?.kind)
+        assertEquals("end", runner.action?.element)
+    }
+
+    @Test
+    fun `given real Start Assessment confirmation then approved attempt can proceed without touching course navigation`() {
+        val runner = ready()
+        val start = CourseElement("start", label = "Start Assessment")
+        runner.read(page(start, assessment = CourseAssessment("Wellness", start = "start")), 3000)
+        assertEquals("assessmentStart", runner.action?.kind)
+        assertEquals("start", runner.action?.element)
+    }
+}

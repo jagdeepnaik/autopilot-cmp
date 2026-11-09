@@ -28,10 +28,11 @@ data class RoutineEditorUiState(
     val errors: DraftErrors = DraftErrors(),
     val capture: PointCapture? = null,
     val captureHotKey: HotKey = HotKey.F7,
-    val pageClickHotKey: HotKey = HotKey.F8,
-    val pageScrollHotKey: HotKey = HotKey.F9,
     val runningApps: List<String> = emptyList(),
     val isSaved: Boolean = false,
+    val progressAccounts: List<com.jagdeep.persistence.room.learning.LearningAccount> = emptyList(),
+    val savedProgress: CourseProgressSummary? = null,
+    val progressHistoryError: String? = null,
 )
 
 class RoutineEditorViewModel(
@@ -54,9 +55,16 @@ class RoutineEditorViewModel(
                 it.copy(isLoading = false, draft = existing?.toDraft() ?: newDraft(newKind, defaultRoutineName(newKind, library.routines)))
             }
         }
-        viewModelScope.launch { controller.preferences.collect { prefs -> mutableState.update { it.copy(captureHotKey = prefs.captureHotKey, pageClickHotKey = prefs.pageClickHotKey, pageScrollHotKey = prefs.pageScrollHotKey) } } }
+        viewModelScope.launch { controller.preferences.collect { prefs -> mutableState.update { it.copy(captureHotKey = prefs.captureHotKey) } } }
+        viewModelScope.launch {
+            controller.page.state.collect { page ->
+                mutableState.update { it.copy(progressAccounts = page.progressAccounts, savedProgress = page.savedProgress, progressHistoryError = page.progressHistoryError) }
+            }
+        }
         refreshApps()
     }
+
+    fun loadProgressHistory(account: String) = controller.page.loadProgressHistory(account)
 
     /** Applies an edit from a field, and clears errors so they only reappear on the next save. */
     fun updateDraft(change: (RoutineDraft) -> RoutineDraft) =

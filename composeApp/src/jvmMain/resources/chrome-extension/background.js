@@ -1,16 +1,14 @@
-// Links the page to the AutoClicker app on this computer. It never clicks by itself: its clicks only
-// follow a key press the app reports, and nothing is sent anywhere else. During a scroll and click
-// run it reports where the page is (never its contents), and the app does the clicking.
+// Links scroll-and-click pages to the local app. Reports page state and performs each requested
+// text click once. Sagar Mein Yog automation uses a separate inventory/action channel below.
 const BASE = "http://127.0.0.1:47613";
 const STALE_MILLIS = 3000;
 
 let command = null;
 let polling = false;
-let lastReported;
 let lastPage = null; // what the app last heard about the page being scrolled
 let handledTextRequest = 0; // the last "click the button with this text" request carried out
 let textClickInFlight = false;
-const frames = new Map(); // "tabId:frameId" -> { tabId, frameId, rank, label, area, at }
+const frames = new Map(); // "tabId:frameId" -> scroll, video and requested-text state
 
 const sleep = (millis) => new Promise((resolve) => setTimeout(resolve, millis));
 
@@ -26,9 +24,8 @@ async function pollApp() {
       version = body.version;
       applyCommand(body.state);
     } catch {
-      // App closed. Forget the key count, so presses from before reconnecting never fire later.
+      // App closed. Forget pending text requests before reconnecting.
       command = null;
-      lastReported = undefined;
       lastPage = null;
       handledTextRequest = 0;
       version = -1;
@@ -38,12 +35,10 @@ async function pollApp() {
 }
 
 function applyCommand(next) {
-  const previous = command;
   command = next;
   if (!next || !next.autoRun) lastPage = null;
   // A restarted app counts its requests from the start again.
   if (next && (next.clickRequest ?? 0) < handledTextRequest) handledTextRequest = 0;
-  if (previous && next && next.advance > previous.advance) clickSelected();
 }
 
 async function activeTabId() {
@@ -63,22 +58,10 @@ function videoState(tabId) {
   return states.includes("needsPlay") ? "needsPlay" : "none";
 }
 
-function selectedFrame(tabId) {
-  const found = frameEntries(tabId).filter((f) => f.rank !== null);
-  found.sort((a, b) => a.rank - b.rank || a.frameId - b.frameId);
-  return found[0] || null;
-}
-
 function scrollerFrame(tabId) {
   const scrollable = frameEntries(tabId).filter((f) => f.area > 0);
   scrollable.sort((a, b) => b.area - a.area || a.frameId - b.frameId);
   return scrollable[0] || null;
-}
-
-async function clickSelected() {
-  const tabId = await activeTabId();
-  const frame = tabId === null ? null : selectedFrame(tabId);
-  if (frame) chrome.tabs.sendMessage(tabId, { type: "click" }, { frameId: frame.frameId }).catch(() => {});
 }
 
 function report(event) {
@@ -116,28 +99,19 @@ async function onTick(message, sender) {
   const active = tabId !== undefined && tabId === (await activeTabId());
   if (!command || !command.enabled || !active) return { enabled: false };
   frames.set(`${tabId}:${frameId}`, {
-    tabId, frameId, rank: message.rank, label: message.label, area: message.area, video: message.video,
+    tabId, frameId, area: message.area, video: message.video,
     content: message.reading?.content, textRank: message.textRank ?? null, at: Date.now(),
   });
   clickTextIfFound(tabId);
-  const selected = selectedFrame(tabId);
-  const label = selected ? selected.label : null;
-  if (label !== lastReported) {
-    lastReported = label;
-    report({ type: "found", label });
-  }
   const scroller = scrollerFrame(tabId);
   const video = command.autoRun ? videoState(tabId) : "none";
   if (command.autoRun) await reportPageFrom(tabId, frameId, scroller, message.reading, video);
   return {
     enabled: true,
-    words: command.words,
     scrolling: command.scrolling && scroller?.frameId === frameId && video === "none",
     autoRun: !!command.autoRun,
     watchVideos: !!command.watchVideos,
-    course: !!command.course,
     pixelsPerSecond: command.pixelsPerSecond,
-    selected: selected?.frameId === frameId,
     clickText: pendingText(),
   };
 }
@@ -173,11 +147,6 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     onTick(message, sender).then(respond, () => respond({ enabled: false }));
     return true;
   }
-  if (message.type === "videoEnded") {
-    activeTabId().then((tabId) => {
-      if (command?.enabled && sender.tab?.id === tabId) report({ type: "videoEnded" });
-    });
-  }
   return false;
 });
 
@@ -196,3 +165,6 @@ chrome.alarms.onAlarm.addListener(pollApp);
 chrome.runtime.onStartup.addListener(pollApp);
 chrome.runtime.onInstalled.addListener(pollApp);
 pollApp();
+
+// Isolated inventory/action channel for Sagar Mein Yog automation.
+if (typeof importScripts === "function") importScripts("course-automation-background.js");

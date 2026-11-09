@@ -70,11 +70,13 @@ data class RoutineDraft(
     val onlyInApp: String? = null,
     val startDelaySeconds: String = "3",
     // Chrome routines. A scroll and click routine uses the first of [points] as its spot.
-    val words: String = DEFAULT_WORDS.joinToString(", "),
     val pixelsPerSecond: Int = DEFAULT_PIXELS_PER_SECOND,
-    val soundOnVideoEnd: Boolean = true,
     val rounds: String = DEFAULT_SCROLL_CLICK_ROUNDS.toString(),
     val watchVideos: Boolean = true,
+    val waitAfterClickSeconds: String = "5",
+    val playbackSpeed: Double = 1.0,
+    val answerAssessments: Boolean = false,
+    val assessmentMode: AssessmentMode = AssessmentMode.Review,
 )
 
 /** Field-level problems; a null field is fine. */
@@ -85,10 +87,11 @@ data class DraftErrors(
     val randomExtra: String? = null,
     val limit: String? = null,
     val startDelay: String? = null,
-    val words: String? = null,
     val rounds: String? = null,
+    val waitAfterClick: String? = null,
+    val playbackSpeed: String? = null,
 ) {
-    val hasAny: Boolean get() = listOf(name, points, interval, randomExtra, limit, startDelay, words, rounds).any { it != null }
+    val hasAny: Boolean get() = listOf(name, points, interval, randomExtra, limit, startDelay, rounds, waitAfterClick, playbackSpeed).any { it != null }
 }
 
 internal const val MIN_INTERVAL_MILLIS = 10L
@@ -120,14 +123,7 @@ fun Routine.toDraft(): RoutineDraft = when (this) {
         rounds = rounds.toString(),
         watchVideos = watchVideos,
     )
-    is CourseHelperRoutine -> RoutineDraft(kind = RoutineKind.CourseHelper, name = name, soundOnVideoEnd = soundOnVideoEnd)
-    is PageHelperRoutine -> RoutineDraft(
-        kind = RoutineKind.PageHelper,
-        name = name,
-        words = words.joinToString(", "),
-        pixelsPerSecond = pixelsPerSecond,
-        soundOnVideoEnd = soundOnVideoEnd,
-    )
+    is CourseAutomationRoutine -> RoutineDraft(kind = RoutineKind.CourseAutomation, name = name, waitAfterClickSeconds = (waitAfterClickMillis / 1000).toString(), playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode)
 }
 
 fun ClickRoutine.toDraft(): RoutineDraft {
@@ -179,11 +175,11 @@ fun RoutineDraft.validate(): DraftErrors = when (kind) {
             if (it == null || it !in MIN_SCROLL_CLICK_ROUNDS..MAX_SCROLL_CLICK_ROUNDS) "Use between $MIN_SCROLL_CLICK_ROUNDS and $MAX_SCROLL_CLICK_ROUNDS rounds." else null
         },
     )
-    RoutineKind.PageHelper -> DraftErrors(
+    RoutineKind.CourseAutomation -> DraftErrors(
         name = nameError(),
-        words = if (parseWords(words).isEmpty()) "Add at least one word." else null,
+        playbackSpeed = if (playbackSpeed in setOf(1.0, 1.5, 2.0)) null else "Choose 1×, 1.5× or 2×.",
+        waitAfterClick = if (waitAfterClickSeconds.trim().toLongOrNull()?.let { it in 0..86_400 } == true) null else "Enter whole seconds from 0 to 86400.",
     )
-    RoutineKind.CourseHelper -> DraftErrors(name = nameError())
 }
 
 private fun RoutineDraft.nameError(): String? = when {
@@ -248,14 +244,7 @@ fun RoutineDraft.toRoutine(id: String): Routine = when (kind) {
         pixelsPerSecond = pixelsPerSecond.coerceIn(MIN_PIXELS_PER_SECOND, MAX_PIXELS_PER_SECOND),
         watchVideos = watchVideos,
     )
-    RoutineKind.CourseHelper -> CourseHelperRoutine(id = id, name = name.trim(), soundOnVideoEnd = soundOnVideoEnd)
-    RoutineKind.PageHelper -> PageHelperRoutine(
-        id = id,
-        name = name.trim(),
-        words = parseWords(words),
-        pixelsPerSecond = pixelsPerSecond.coerceIn(MIN_PIXELS_PER_SECOND, MAX_PIXELS_PER_SECOND),
-        soundOnVideoEnd = soundOnVideoEnd,
-    )
+    RoutineKind.CourseAutomation -> CourseAutomationRoutine(id = id, name = name.trim(), waitAfterClickMillis = waitAfterClickSeconds.trim().toLong() * 1000, playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode)
 }
 
 private fun RoutineDraft.toClickRoutine(id: String): ClickRoutine = ClickRoutine(

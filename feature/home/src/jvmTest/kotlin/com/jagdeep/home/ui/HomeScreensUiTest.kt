@@ -20,7 +20,7 @@ import com.jagdeep.home.domain.ClickRoutine
 import com.jagdeep.home.domain.ClickTarget
 import com.jagdeep.home.domain.FakeAutomation
 import com.jagdeep.home.domain.FakePageRunner
-import com.jagdeep.home.domain.PageHelperRoutine
+import com.jagdeep.home.domain.CourseAutomationRoutine
 import com.jagdeep.home.domain.RoutineKind
 import com.jagdeep.home.domain.ScrollClickRoutine
 import com.jagdeep.home.domain.FakeRoutineRepository
@@ -70,22 +70,101 @@ class HomeScreensUiTest {
     fun tearDown() = scope.cancel()
 
     @Test
-    fun `given a selected routine when Start then Stop are pressed then the screen follows the run`() = runDesktopComposeUiTest(1000, 800) {
-        val viewModel = HomeViewModel(controller(), repository)
-        setContent { AppTheme(darkTheme = false) { HomeScreen(viewModel, appIcon = {}, onNewRoutine = {}, onEditRoutine = {}) } }
+    fun `given course selected on home then setup and saved progress links stay out of the home screen`() = runDesktopComposeUiTest(1000, 800) {
+        val routine=com.jagdeep.home.domain.CourseAutomationRoutine("course","Course")
+        val library=FakeRoutineRepository(RoutineLibrary(listOf(routine),"course"))
+        val viewModel=HomeViewModel(controller(),library)
+        setContent { AppTheme { HomeScreen(viewModel,appIcon={},onNewRoutine={},onEditRoutine={}) } }
         onNodeWithText("Ready").assertExists()
-        saveShot("home-ready")
+        onNodeWithText("Setup and how it works").assertDoesNotExist()
+        onNodeWithText("Saved progress by user").assertDoesNotExist()
+    }
 
+    @Test
+    fun `given course routine options then setup and saved user history can be opened there`() = runDesktopComposeUiTest(1000, 900) {
+        val routine=com.jagdeep.home.domain.CourseAutomationRoutine("course","Course")
+        val library=FakeRoutineRepository(RoutineLibrary(listOf(routine),"course"))
+        val page=FakePageRunner()
+        page.state.value=page.state.value.copy(progressAccounts=listOf(com.jagdeep.persistence.room.learning.LearningAccount("user","Example User",1000)))
+        var loaded: String? = null
+        val runner=object : com.jagdeep.home.domain.PageRunner by page {
+            override fun loadProgressHistory(account: String) {
+                loaded=account
+                page.state.value=page.state.value.copy(savedProgress=com.jagdeep.home.domain.CourseProgressSummary(account,"Example User",1000,listOf(
+                    com.jagdeep.persistence.room.learning.LearningRecord(account,"attempt","Wellness","assessment","Course Assessment","passed",90.0,observedAt=1000))))
+            }
+        }
+        val controller=ClickController(automation,library,MutableStateFlow(AppPreferences()),FakeRunHistory(),scope,{System.currentTimeMillis()},{"id"},page=runner)
+        val viewModel=RoutineEditorViewModel("course",controller,library,{"id"})
+        setContent { AppTheme { RoutineEditorScreen(viewModel,onBack={}) } }
+        onNodeWithText("Setup and how it works").performScrollTo().performClick()
+        onNodeWithText("Sagar Mein Yog automation guide").assertExists()
+        onNodeWithText("Got it").performClick()
+        onNodeWithText("Saved progress by user").performScrollTo().performClick()
+        onNodeWithText("Example User · user").performClick()
+        onNodeWithText("assessment: passed · 90.0%",substring=true).assertExists()
+        runOnIdle { assertEquals("user",loaded) }
+        onNodeWithText("Close").performClick()
+    }
+
+    @Test
+    fun `given course needs submission approval then running screen shows details and routes the approval`() = runDesktopComposeUiTest(1000, 900) {
+        val page=FakePageRunner()
+        var approved: String? = null
+        val runner=object : com.jagdeep.home.domain.PageRunner by page {
+            override fun approveAssessment(token: String) { approved=token }
+        }
+        val routine=com.jagdeep.home.domain.CourseAutomationRoutine("course","Course")
+        val library=FakeRoutineRepository(RoutineLibrary(listOf(routine),"course"))
+        val controller=ClickController(automation,library,MutableStateFlow(AppPreferences()),FakeRunHistory(),scope,{System.currentTimeMillis()},{"run"},page=runner)
+        page.state.value=page.state.value.copy(activity=com.jagdeep.home.domain.PageActivity.Automation(routine,"All answers reviewed",clicks=12,
+            approval=com.jagdeep.home.domain.CourseApprovalRequest("approval",com.jagdeep.home.domain.CourseApprovalKind.SubmitAssessment,"Wellness"),
+            context=com.jagdeep.home.domain.CourseRunContext(module="Wellness",question="Which option?")))
+        val viewModel=HomeViewModel(controller,library)
+        setContent { AppTheme { com.jagdeep.home.ui.screens.RunningRoutineScreen(viewModel) {} } }
+        onNodeWithText("All answers reviewed").assertExists()
+        onNodeWithText("Setup and how it works").assertDoesNotExist()
+        onNodeWithText("Saved progress by user").assertDoesNotExist()
+        onNodeWithText("Wellness").assertExists()
+        onNodeWithText("Which option?").assertExists()
+        onNodeWithText("Approve submission").performClick()
+        runOnIdle { assertEquals("approval",approved) }
+    }
+
+    @Test
+    fun `given an active routine then home only offers a link to its running screen`() = runDesktopComposeUiTest(1000, 800) {
+        val viewModel = HomeViewModel(controller(), repository)
+        var opened = false
+        setContent { AppTheme(darkTheme = false) { HomeScreen(viewModel, appIcon = {}, onNewRoutine = {}, onEditRoutine = {}, onOpenRunning = { opened = true }) } }
+        onNodeWithText("Ready").assertExists()
         onNodeWithText("Start").performClick()
         waitUntil(timeoutMillis = 5_000) { automation.clicks.isNotEmpty() }
-        onNodeWithText("Clicking").assertExists()
+        onNodeWithText("A routine is running").assertExists()
+        onNodeWithText("Clicking").assertDoesNotExist()
         onNodeWithContentDescription("Edit Chrome button").assertIsNotEnabled()
-        saveShot("home-running")
-
-        onNodeWithText("Stop").performClick()
+        onNodeWithText("View running routine").performClick()
+        runOnIdle { assertTrue(opened); viewModel.stop() }
         waitUntil(timeoutMillis = 5_000) { viewModel.state.value.lastRun != null }
         onNodeWithText("Ready").assertExists()
-        onNodeWithText("Last run: 1 click. Stopped by you.").assertExists()
+    }
+
+    @Test
+    fun `given dedicated running screen then show status stop and a finished summary without routine list`() = runDesktopComposeUiTest(1000, 800) {
+        val viewModel = HomeViewModel(controller(), repository)
+        var back = false
+        setContent { AppTheme { com.jagdeep.home.ui.screens.RunningRoutineScreen(viewModel) { back = true } } }
+        waitUntil(timeoutMillis = 5_000) { !viewModel.state.value.isLoading }
+        runOnIdle { viewModel.start() }
+        waitUntil(timeoutMillis = 5_000) { automation.clicks.isNotEmpty() }
+        onNodeWithText("Clicking").assertExists()
+        onNodeWithText("Run details").assertExists()
+        onNodeWithContentDescription("Edit Chrome button").assertDoesNotExist()
+        onNodeWithText("Stop").performClick()
+        waitUntil(timeoutMillis = 5_000) { viewModel.state.value.lastRun != null }
+        onNodeWithText("Run finished").assertExists()
+        onNodeWithText("Stopped by you").assertExists()
+        onNodeWithText("Back to routines").performClick()
+        runOnIdle { assertTrue(back) }
     }
 
     @Test
@@ -111,6 +190,9 @@ class HomeScreensUiTest {
         onNodeWithText("No routines yet").assertExists()
         onNodeWithText("New routine").performClick()
         RoutineKind.entries.forEach { onNodeWithText(it.label).assertExists() }
+        onNodeWithText("Web page helper").assertDoesNotExist()
+        onNodeWithText("Course helper").assertDoesNotExist()
+        onNodeWithText("Sagar Mein Yog automation").assertExists()
         onNodeWithText(RoutineKind.ScrollClick.label).performClick()
         assertEquals(RoutineKind.ScrollClick, opened)
     }
@@ -118,7 +200,7 @@ class HomeScreensUiTest {
     @Test
     fun `given routines of every kind when listed then each shows its kind`() = runDesktopComposeUiTest(1000, 800) {
         val mixed = FakeRoutineRepository(
-            RoutineLibrary(listOf(atPointer, ScrollClickRoutine("s", "Next pages", ClickPoint(640, 880)), PageHelperRoutine("h", "Course")), "s"),
+            RoutineLibrary(listOf(atPointer, ScrollClickRoutine("s", "Next pages", ClickPoint(640, 880)), CourseAutomationRoutine("h", "Course")), "s"),
         )
         val files = object : com.jagdeep.home.domain.RoutineFiles {
             override suspend fun save(suggestedName: String, contents: String): String? = null
@@ -126,37 +208,14 @@ class HomeScreensUiTest {
         }
         val viewModel = HomeViewModel(controller(), mixed, files)
         setContent { AppTheme(darkTheme = false) { HomeScreen(viewModel, appIcon = {}, onNewRoutine = {}, onEditRoutine = {}) } }
-        onNodeWithText("Import").assertExists()
-        onNodeWithText("Export all").assertExists()
+        onNodeWithText("Import").assertDoesNotExist()
+        onNodeWithText("Export all").assertDoesNotExist()
         onNodeWithText("Scroll and click · at 640, 880 · 20 rounds · stops for videos").assertExists()
-        onNodeWithText("Web page helper · Next, Continue, Play, Watch video").assertExists()
-        onNodeWithContentDescription("Export Next pages").assertExists()
+        onNodeWithText("Sagar Mein Yog automation · sagarmeinyog.com · automatically watches unfinished video lessons").assertExists()
+        onNodeWithContentDescription("Export Next pages").assertDoesNotExist()
         saveShot("home-kinds")
     }
 
-    @Test
-    fun `given a page helper routine running when shown then it says what to press, and Stop stops it`() = runDesktopComposeUiTest(1000, 800) {
-        val page = FakePageRunner()
-        val helper = PageHelperRoutine("h", "Course")
-        val library = FakeRoutineRepository(RoutineLibrary(listOf(helper), "h"))
-        val controller = ClickController(
-            automation, library, MutableStateFlow(AppPreferences()), FakeRunHistory(), scope, { System.currentTimeMillis() }, { "run" }, page = page,
-        )
-        val viewModel = HomeViewModel(controller, library)
-        setContent { AppTheme(darkTheme = true) { HomeScreen(viewModel, appIcon = {}, onNewRoutine = {}, onEditRoutine = {}) } }
-        onNodeWithText("Start").performClick()
-        page.state.value = page.state.value.copy(foundLabel = "Next")
-        waitUntil(timeoutMillis = 5_000) { viewModel.state.value.page.foundLabel == "Next" }
-        onNodeWithText("Web page helper on").assertExists()
-        onNodeWithText("Next step: Next. Press F8 to click it.").assertExists()
-        onNodeWithText("Start scrolling").performClick()
-        waitUntil(timeoutMillis = 5_000) { page.state.value.isScrolling }
-        saveShot("home-page-helper")
-
-        onNodeWithText("Stop").performClick()
-        waitUntil(timeoutMillis = 5_000) { !viewModel.state.value.isActive }
-        onNodeWithText("Ready").assertExists()
-    }
 
     @Test
     fun `given a multi-point click when a step is opened then it can be changed and picked again`() = runDesktopComposeUiTest(1000, 1700) {
@@ -193,14 +252,6 @@ class HomeScreensUiTest {
         assertTrue(empty.library.value!!.routines.isEmpty())
     }
 
-    @Test
-    fun `given a new page helper routine when opened then it offers words and speed`() = runDesktopComposeUiTest(1000, 1200) {
-        val viewModel = RoutineEditorViewModel(null, controller(), FakeRoutineRepository(RoutineLibrary()), newId = { "new" }, newKind = RoutineKind.PageHelper)
-        setContent { AppTheme(darkTheme = false) { RoutineEditorScreen(viewModel, onBack = {}) } }
-        onNodeWithText("Words, most important first").assertExists()
-        onNodeWithText("Speed: 60 pixels a second").assertExists()
-        saveShot("editor-page-helper")
-    }
 
     @Test
     fun `given a blank name when saving in the editor then the error shows and nothing is saved`() = runDesktopComposeUiTest(1000, 1700) {

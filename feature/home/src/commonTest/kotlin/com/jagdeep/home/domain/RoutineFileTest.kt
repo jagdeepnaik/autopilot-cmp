@@ -20,6 +20,18 @@ import com.jagdeep.shared.preferences.AppPreferences
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RoutineFileTest {
+    @Test
+    fun `retired helper imports are skipped while automation and click records keep their fields`() {
+        val imported = RoutineFileCodec.decode("""{"format":"autoclicker-routines","version":1,"routines":[{"type":"pageHelper","id":"p","name":"Old page"},{"type":"courseHelper","id":"h","name":"Old course"},{"type":"click","id":"c","name":"Click"},{"type":"courseAutomation","id":"s","name":"Yoga","waitAfterClickMillis":9000,"playbackSpeed":2.0}]}""")!!
+        assertEquals(2, imported.skipped)
+        assertEquals(listOf("c", "s"), imported.routines.map { it.id })
+        val yoga = imported.routines[1] as CourseAutomationRoutine
+        assertEquals(9000, yoga.waitAfterClickMillis)
+        assertEquals(2.0, yoga.playbackSpeed)
+        assertEquals("Sagar Mein Yog automation", yoga.kind.label)
+        assertEquals(setOf(RoutineKind.Click, RoutineKind.Sequence, RoutineKind.ScrollClick, RoutineKind.CourseAutomation), RoutineKind.entries.toSet())
+    }
+
     private val sequence = ClickRoutine(
         "seq", "Course steps",
         target = ClickTarget.AtPoints(listOf(ClickPoint(640, 880, 1_500, PointerButton.Right, "Play"), ClickPoint(10, 20, 250, PointerButton.Left, "Point 2"))),
@@ -29,7 +41,7 @@ class RoutineFileTest {
         ClickRoutine("c", "Refresh", intervalMillis = 2_000),
         sequence,
         ScrollClickRoutine("s", "Next pages", ClickPoint(640, 880), rounds = 7),
-        PageHelperRoutine("h", "Course", words = listOf("Weiter")),
+        CourseAutomationRoutine("h", "Course", playbackSpeed = 1.5),
     )
 
     @Test

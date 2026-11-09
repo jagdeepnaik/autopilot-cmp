@@ -21,10 +21,12 @@ fun EntryProviderScope<NavKey>.settingsEntryProvider(
     appVersion: String,
     browserConnected: Flow<Boolean>,
     onInstallExtension: suspend () -> String?,
+    routineTransfer: com.jagdeep.shared.routines.RoutineTransfer = com.jagdeep.shared.routines.NoRoutineTransfer,
+    displayWakeProblem: Flow<String?> = kotlinx.coroutines.flow.flowOf(null),
 ) {
     entry<RouteTopLevel.Settings> {
         val viewModel: SettingsViewModel = viewModel(factory = viewModelFactory {
-            initializer { SettingsViewModel(preferencesStore, accessGate, browserConnected, onInstallExtension) }
+            initializer { SettingsViewModel(preferencesStore, accessGate, browserConnected, onInstallExtension, routineTransfer, displayWakeProblem) }
         })
         SettingsScreen(viewModel, onBack = navigator::goBack, appVersion = appVersion)
     }

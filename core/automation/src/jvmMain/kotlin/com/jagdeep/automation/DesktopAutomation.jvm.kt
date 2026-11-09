@@ -10,6 +10,7 @@ actual fun createDesktopAutomation(): DesktopAutomation {
     return when {
         osName.contains("Mac", ignoreCase = true) -> JvmDesktopAutomation(MacNativeInput())
         osName.contains("Windows", ignoreCase = true) -> JvmDesktopAutomation(WindowsNativeInput())
+        osName.contains("Linux", ignoreCase = true) -> LinuxDisplayAutomation()
         else -> UnsupportedDesktopAutomation
     }
 }
@@ -39,4 +40,11 @@ private class JvmDesktopAutomation(private val native: NativeInput) : DesktopAut
         native.setDisplayAwake(false)
         scope.cancel()
     }
+}
+
+/** Linux Chrome routines can keep the display awake even where global input isn't implemented. */
+private class LinuxDisplayAutomation : DesktopAutomation by UnsupportedDesktopAutomation {
+    private val display = DisplayAwakeLease { acquireLinuxDisplayInhibition() }
+    override fun setDisplayAwake(awake: Boolean) = display.setAwake(awake)
+    override fun close() = display.setAwake(false)
 }

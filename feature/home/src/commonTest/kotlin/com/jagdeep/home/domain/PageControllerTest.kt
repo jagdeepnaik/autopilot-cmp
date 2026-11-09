@@ -49,6 +49,7 @@ class PageControllerTest {
     private class FakeDesktop : DesktopAutomation by UnsupportedDesktopAutomation {
         val keys = MutableSharedFlow<HotKey>(extraBufferCapacity = 8)
         var alerts = 0
+        var alertFails = false
         var inputAccess = InputAccess.Granted
         var position: ScreenPoint? = ScreenPoint(100, 100)
         var corners = emptySet<ScreenPoint>()
@@ -80,6 +81,7 @@ class PageControllerTest {
         }
         override fun playAlert() {
             alerts++
+            check(!alertFails) { "Test audio output unavailable" }
         }
     }
 
@@ -87,12 +89,218 @@ class PageControllerTest {
     private val desktop = FakeDesktop()
     private val history = FakeRunHistory()
     private val json = Json { ignoreUnknownKeys = true }
-    private val helper = PageHelperRoutine("h", "Course pages", words = listOf("Next", "Play"), pixelsPerSecond = 90)
+    private val helper = CourseAutomationRoutine("h", "Course pages")
 
     private fun TestScope.controller() =
         PageController(desktop, bridge, MutableStateFlow(AppPreferences()), backgroundScope, history, { currentTime }, { "run" }).also { runCurrent() }
 
     private fun lastCommand() = json.decodeFromString(HelperCommand.serializer(), bridge.published.last())
+
+    @Test
+    fun `given a completed module then refresh durable progress before selecting another course`() = runTest {
+        var imports = 0
+        val profiles = MutableStateFlow(emptyList<com.jagdeep.persistence.room.learning.LearningAccount>())
+        val repository = object : CourseProgressRepository {
+            override val available = true
+            override fun accounts() = profiles
+            override suspend fun records(account: String) = emptyList<com.jagdeep.persistence.room.learning.LearningRecord>()
+            override suspend fun save(account: com.jagdeep.persistence.room.learning.LearningAccount, records: List<com.jagdeep.persistence.room.learning.LearningRecord>) {
+                if(records.isEmpty()) imports++
+                profiles.value = listOf(account)
+            }
+        }
+        val controller = PageController(desktop,bridge,MutableStateFlow(AppPreferences()),backgroundScope,history,{currentTime},{"run"},progressRepository=repository)
+        runCurrent(); controller.start(CourseAutomationRoutine("course","Course",waitAfterClickMillis=0)); runCurrent()
+        val session=lastCommand().courseAutomation!!.session
+        var counter=0
+        suspend fun send(snapshot: CourseSnapshot) {
+            val chunks=json.encodeToString(CourseSnapshot.serializer(),snapshot).chunked(1000)
+            val id="snapshot-${++counter}"
+            chunks.forEachIndexed { index, chunk ->
+                bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(),CourseWireEvent("courseChunk",session,id,index,chunks.size,chunk)))
+                runCurrent()
+            }
+        }
+        suspend fun ack() {
+            val action=lastCommand().courseAutomation!!.action!!
+            bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(),CourseWireEvent("courseAction",session,request=action.request,success=true)))
+            runCurrent()
+        }
+        val links=listOf(CourseElement("home",tag="a",href="/dashboard"),CourseElement("progress",tag="a",href="/dashboard/progress"))
+        val dashboard=CourseSnapshot(session,"doc","/dashboard",profileName="Person",elements=links)
+        val progress=dashboard.copy(path="/dashboard/progress",progress=ProgressTable(true,page=1,pages=1,total=0,unfiltered=true))
+        send(dashboard)
+        val profile=(controller.state.value.activity as PageActivity.Automation).progressProfile!!
+        controller.confirmProgressProfile(profile.token,"Person")
+        send(progress); assertEquals(1,imports)
+        send(progress); assertEquals("home",lastCommand().courseAutomation!!.action?.element)
+        ack(); advanceTimeBy(1000)
+        val course=dashboard.copy(path="/dashboard/courses/abc",elements=links+CourseElement("done",label="Rewatch video",context="Part:1 Completed"))
+        send(course); advanceTimeBy(2000); send(course)
+        assertEquals("home",lastCommand().courseAutomation!!.action?.element)
+        ack(); send(dashboard)
+        assertEquals("progress",lastCommand().courseAutomation!!.action?.element,"Progress must be checked before another course is opened")
+        ack(); advanceTimeBy(1000); send(progress)
+        assertEquals(2,imports)
+        controller.stop(); runCurrent()
+    }
+
+    @Test
+    fun `given course automation starts from the app then bring Chrome forward for page updates`() = runTest {
+        val controller = controller()
+        assertNull(controller.start(CourseAutomationRoutine("course", "Course")))
+        assertEquals(listOf("Google Chrome"), desktop.broughtForward)
+        controller.stop()
+    }
+
+    @Test
+    fun `given a failed assessment then use a distinct alert honor mute and allow manual takeover without a retry click`() = runTest {
+        val preferences = MutableStateFlow(AppPreferences(assessmentSoundsEnabled = false))
+        val kinds = mutableListOf<AssessmentAlertKind>()
+        val controller = PageController(desktop, bridge, preferences, backgroundScope, history, { currentTime }, { "run" },
+            assessmentAlerts = AssessmentAlerts { kinds += it })
+        runCurrent()
+        controller.start(CourseAutomationRoutine("auto", "Course"))
+        runCurrent()
+        val session = lastCommand().courseAutomation!!.session
+        val failed = CourseSnapshot(session, "result-doc", "/dashboard/courses/abc/assessment/result/result1", elements = listOf(CourseElement("retry", label = "Re-attempt")),
+            assessment = CourseAssessment("Wellness", result = "failed", retry = "retry"))
+        suspend fun send(id: String) {
+            val text = json.encodeToString(CourseSnapshot.serializer(), failed)
+            val chunks = text.chunked(1000)
+            chunks.forEachIndexed { index, chunk ->
+                bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("courseChunk", session, id, index, chunks.size, chunk)))
+                runCurrent()
+            }
+        }
+        send("first")
+        assertTrue(kinds.isEmpty())
+        assertNotNull((controller.state.value.activity as PageActivity.Automation).failure)
+        preferences.value = preferences.value.copy(assessmentSoundsEnabled = true)
+        advanceTimeBy(100)
+        runCurrent()
+        assertEquals(listOf(AssessmentAlertKind.Failure), kinds)
+        send("repeat")
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(1, kinds.size, "Failure gets one distinct sound; question reminders alone repeat")
+        val token = (controller.state.value.activity as PageActivity.Automation).failure!!.token
+        controller.retryAssessment("old-token", automatic = true)
+        assertNull(lastCommand().courseAutomation!!.action)
+        controller.retryAssessment(token, automatic = false)
+        runCurrent()
+        assertNull(controller.state.value.activity)
+        assertNull(lastCommand().courseAutomation)
+    }
+
+    @Test
+    fun `given unmatched assessment questions then alert once per question show status and never guess`() = runTest {
+        val store = object : CourseAnswerBankStore {
+            override suspend fun load() = CourseAnswerBank.decode("""{"Wellness":[{"question":"Known?","options":["A","B"],"answer":"B"}]}""")
+        }
+        val preferences = MutableStateFlow(AppPreferences())
+        val controller = PageController(desktop, bridge, preferences, backgroundScope, history, { currentTime }, { "run" }, answerBankStore = store)
+        runCurrent()
+        controller.start(CourseAutomationRoutine("auto", "Course", waitAfterClickMillis = 0, answerAssessments = true))
+        runCurrent()
+        val session = lastCommand().courseAutomation!!.session
+        var snapshotNumber = 0
+        suspend fun send(snapshot: CourseSnapshot) {
+            val encoded = json.encodeToString(CourseSnapshot.serializer(), snapshot)
+            val chunks = encoded.chunked(1000)
+            val id = "snapshot-${++snapshotNumber}"
+            chunks.forEachIndexed { index, chunk ->
+                bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("courseChunk", session, id, index, chunks.size, chunk)))
+                runCurrent()
+            }
+        }
+        val course = CourseSnapshot(session, "doc", "/dashboard/courses/abc", elements = listOf(
+            CourseElement("title", tag = "a", label = "Wellness", href = "/dashboard/courses/abc"),
+            CourseElement("done", label = "Rewatch video", context = "Part:1 Completed"), CourseElement("assessment", label = "Assessment")))
+        send(course)
+        advanceTimeBy(2000)
+        send(course)
+        val approval = (controller.state.value.activity as PageActivity.Automation).approval!!
+        controller.approveAssessment("stale")
+        assertEquals(2, desktop.broughtForward.size)
+        controller.approveAssessment(approval.token)
+        assertEquals(3, desktop.broughtForward.size, "Return focus to Chrome after app approval")
+        send(course)
+        val action = lastCommand().courseAutomation!!.action!!
+        bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("courseAction", session, request = action.request, success = true)))
+        runCurrent()
+        val question = CourseQuestion("q0", "Unknown question?", listOf(CourseOption("a", "A"), CourseOption("b", "B")))
+        val test = course.copy(path = "/dashboard/courses/abc/test/test1", assessment = CourseAssessment("Wellness", listOf(question), totalQuestions = 1))
+        send(test)
+        assertEquals(1, desktop.alerts)
+        assertTrue((controller.state.value.activity as PageActivity.Automation).detail.contains("Unknown question?"))
+        assertNull(lastCommand().courseAutomation!!.action)
+        send(test)
+        assertEquals(1, desktop.alerts, "Repeated inventories must not beep continuously")
+        advanceTimeBy(6000)
+        runCurrent()
+        assertTrue((controller.state.value.activity as PageActivity.Automation).detail.contains("Unknown question?"), "A missing page update must not hide an unanswered-question warning")
+        send(test.copy(assessment = test.assessment!!.copy(questions = listOf(question.copy(id = "rerendered", options = question.options.reversed())))))
+        assertEquals(1, desktop.alerts, "Recreated controls and reordered options are still the same unanswered question")
+        advanceTimeBy(23_999)
+        runCurrent()
+        assertEquals(1, desktop.alerts, "No reminder before 30 seconds")
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(2, desktop.alerts, "Reminder at 30 seconds without a new inventory")
+        preferences.value = preferences.value.copy(assessmentSoundsEnabled = false)
+        runCurrent()
+        advanceTimeBy(90_000)
+        runCurrent()
+        assertEquals(2, desktop.alerts, "Muted settings suppress reminders")
+        preferences.value = preferences.value.copy(assessmentSoundsEnabled = true)
+        advanceTimeBy(100)
+        runCurrent()
+        assertEquals(3, desktop.alerts)
+        send(test.copy(assessment = test.assessment!!.copy(questions = listOf(question.copy(id = "q1", text = "Another unknown?")))))
+        assertEquals(4, desktop.alerts)
+        desktop.alertFails = true
+        val audioFailure = test.copy(assessment = test.assessment.copy(questions = listOf(question.copy(id = "q2", text = "Needs another answer?"))))
+        send(audioFailure)
+        assertEquals(5, desktop.alerts)
+        assertTrue((controller.state.value.activity as PageActivity.Automation).detail.contains("Sound unavailable"))
+        send(audioFailure)
+        assertEquals(5, desktop.alerts)
+        assertTrue((controller.state.value.activity as PageActivity.Automation).detail.contains("Sound unavailable"))
+        controller.stop()
+        runCurrent()
+        send(test)
+        assertEquals(5, desktop.alerts, "Stopped sessions cannot trigger alerts")
+    }
+
+    @Test
+    fun `given course automation when a snapshot arrives then it commands a target and stop immediately revokes the session`() = runTest {
+        val controller = controller()
+        assertNull(controller.start(CourseAutomationRoutine("auto", "Automatic course", playbackSpeed = 2.0)))
+        runCurrent()
+        val session = lastCommand().courseAutomation!!.session
+        advanceTimeBy(5100)
+        runCurrent()
+        assertTrue((controller.state.value.activity as PageActivity.Automation).detail.contains("Waiting for page updates"))
+        assertEquals(2.0, lastCommand().courseAutomation!!.playbackSpeed)
+        assertFalse(lastCommand().course)
+        assertFalse(lastCommand().autoRun)
+        val snapshot = CourseSnapshot(session, "doc", "/dashboard/courses/abc", elements = listOf(CourseElement("watch", label = "Watch video", context = "Part 1 Not started")))
+        val encoded = json.encodeToString(CourseSnapshot.serializer(), snapshot)
+        encoded.chunked(1000).forEachIndexed { index, chunk ->
+            bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("courseChunk", session, "snapshot", index, encoded.chunked(1000).size, chunk)))
+            runCurrent()
+        }
+        assertEquals("watch", lastCommand().courseAutomation?.action?.element)
+        assertFalse((controller.state.value.activity as PageActivity.Automation).detail.contains("Waiting for page updates"))
+        bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("courseAction", session, request = lastCommand().courseAutomation!!.action!!.request, success = true)))
+        runCurrent()
+        assertTrue(controller.stop())
+        assertNull(lastCommand().courseAutomation)
+        runCurrent()
+        assertFalse(lastCommand().enabled)
+        assertEquals(1, history.records.value.single().clicks)
+    }
 
     private fun TestScope.found(label: String?) {
         val body = if (label == null) """{"type":"found","label":null}""" else """{"type":"found","label":"$label"}"""
@@ -136,7 +344,7 @@ class PageControllerTest {
     }
 
     @Test
-    fun `given developer mode when a page helper runs then the log shows what was sent, heard and done`() = runTest {
+    fun `given developer mode when automation runs then the log shows commands and messages`() = runTest {
         val live = RecordingLog()
         val controller = PageController(desktop, bridge, MutableStateFlow(AppPreferences()), backgroundScope, history, { currentTime }, { "run" }, live)
         runCurrent()
@@ -147,8 +355,8 @@ class PageControllerTest {
         val texts = live.entries.value.map { it.text }
         assertTrue(texts.any { it.startsWith("→ ") && "\"enabled\":true" in it }, "The command sent to Chrome")
         assertTrue(texts.any { it == "← {\"type\":\"found\",\"label\":\"Next\"}" }, "The message heard from Chrome")
-        assertTrue("Started Course pages (Web page helper)" in texts)
-        assertTrue("Click key: asking Chrome to click \"Next\"" in texts)
+        assertTrue("Started Course pages (Sagar Mein Yog automation)" in texts)
+        assertEquals(0, lastCommand().advance, "Removed helper key must never click")
         assertTrue(texts.any { it.startsWith("Ended Course pages") })
     }
 
@@ -202,74 +410,16 @@ class PageControllerTest {
         controller.start(helper)
         controller.start(scrollRoutine())
         runCurrent()
-        assertTrue(controller.state.value.activity is PageActivity.Helper)
+        assertTrue(controller.state.value.activity is PageActivity.Automation)
         finish(controller)
     }
 
     // Page helper routine
 
-    @Test
-    fun `given a page helper routine when started then the extension gets its words and speed`() = runTest {
-        val controller = controller()
-        controller.start(helper)
-        runCurrent()
-        assertTrue(lastCommand().enabled)
-        assertEquals(listOf("Next", "Play"), lastCommand().words)
-        assertEquals(90, lastCommand().pixelsPerSecond)
-        assertFalse(lastCommand().autoRun)
-        finish(controller)
-        assertFalse(lastCommand().enabled)
-    }
 
-    @Test
-    fun `given a highlighted button when the key is pressed then exactly one click is requested per press`() = runTest {
-        val controller = controller()
-        controller.start(helper)
-        found("Next")
-        press(HotKey.F8)
-        assertEquals(1, lastCommand().advance)
-        press(HotKey.F8)
-        assertEquals(2, lastCommand().advance)
-        finish(controller)
-    }
 
-    @Test
-    fun `given nothing highlighted, or no key press, then no click is requested`() = runTest {
-        val controller = controller()
-        controller.start(helper)
-        found(null)
-        press(HotKey.F8)
-        repeat(5) { found("Next") }
-        assertEquals(0, lastCommand().advance)
-        finish(controller)
-    }
 
-    @Test
-    fun `given a page helper routine when the scroll key is pressed twice then scrolling starts then stops`() = runTest {
-        val controller = controller()
-        controller.start(helper)
-        press(HotKey.F9)
-        assertTrue(lastCommand().scrolling)
-        press(HotKey.F9)
-        assertFalse(lastCommand().scrolling)
-        finish(controller)
-    }
 
-    @Test
-    fun `given a page helper routine when stopped then it's recorded with its clicks and name`() = runTest {
-        val controller = controller()
-        controller.start(helper)
-        found("Next")
-        press(HotKey.F8)
-        press(HotKey.F8)
-        finish(controller)
-        val record = history.added.single()
-        assertEquals("Course pages", record.routineName)
-        assertEquals(2, record.clicks)
-        assertEquals(RunOutcome.StoppedByUser, record.outcome)
-        assertEquals(record, controller.lastRun.value)
-        assertNull(controller.state.value.activity)
-    }
 
     @Test
     fun `given a lost connection when shown then nothing counts as highlighted`() = runTest {
@@ -281,25 +431,6 @@ class PageControllerTest {
         assertNull(controller.state.value.foundLabel)
     }
 
-    @Test
-    fun `given a video ended when its page helper wants a sound it plays, and otherwise it doesn't`() = runTest {
-        val controller = controller()
-        bridge.messages.tryEmit("""{"type":"videoEnded"}""")
-        runCurrent()
-        assertEquals(0, desktop.alerts, "Nothing running")
-
-        controller.start(helper)
-        bridge.messages.tryEmit("""{"type":"videoEnded"}""")
-        runCurrent()
-        assertEquals(1, desktop.alerts)
-        finish(controller)
-
-        controller.start(helper.copy(soundOnVideoEnd = false))
-        bridge.messages.tryEmit("""{"type":"videoEnded"}""")
-        runCurrent()
-        assertEquals(1, desktop.alerts)
-        finish(controller)
-    }
 
     @Test
     fun `given malformed or unknown messages when received then they're ignored`() = runTest {
@@ -312,38 +443,7 @@ class PageControllerTest {
 
     // Course helper routine
 
-    @Test
-    fun `given the course helper when started then Chrome is told, and each key press opens what's highlighted`() = runTest {
-        val controller = controller()
-        controller.start(CourseHelperRoutine("k", "Yoga course"))
-        runCurrent()
-        assertTrue(lastCommand().enabled)
-        assertTrue(lastCommand().course)
-        assertFalse(lastCommand().autoRun, "It never clicks by itself")
 
-        repeat(3) { found("1.2 Part:2") }
-        assertEquals(0, lastCommand().advance, "Highlighting alone clicks nothing")
-        press(HotKey.F8)
-        assertEquals(1, lastCommand().advance)
-
-        bridge.messages.tryEmit("""{"type":"videoEnded"}""")
-        runCurrent()
-        assertEquals(1, desktop.alerts)
-        finish(controller)
-        assertFalse(lastCommand().course)
-        assertEquals(1, history.added.single().clicks)
-    }
-
-    @Test
-    fun `given the course helper when the scroll key is pressed then nothing scrolls`() = runTest {
-        val controller = controller()
-        controller.start(CourseHelperRoutine("k", "Yoga course"))
-        press(HotKey.F9)
-        assertFalse(lastCommand().scrolling)
-        finish(controller)
-    }
-
-    // Scroll and click routine
 
     @Test
     fun `given a run starts when no page has reported then Chrome is brought forward and it's reading the page`() = runTest {

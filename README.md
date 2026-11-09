@@ -13,25 +13,15 @@ Built with Kotlin Multiplatform and Compose Multiplatform. macOS and Windows com
 - **Stop conditions:** when you stop it, after a number of clicks, or after some time.
 - **Only in one app:** pause automatically unless a chosen app, such as Google Chrome, is in front.
 - **Activity:** what ran, how many clicks it made, and why it stopped.
-- **One page for every routine:** the Routines page holds click routines, multi-point clicks, scroll and click routines and web page helper routines. Choose the kind with **New routine**. Only one routine runs at a time.
-- **Desktop layout like Android Studio:** a toolbar in the title bar row with the routine to run and its Start and Stop, a narrow icon strip for the pages, the page in a rounded panel, and a status bar. Its colours follow the app's theme.
-- **Course helper:** for the Sagar Mein Yog course site. On the dashboard the next unfinished course is outlined, and on a course page the next unfinished part and one key press (F8) opens it; its video starts by itself at the site's speed, a sound plays when it ends, and Back to Course is outlined for the next press. Nothing is clicked without your key press, and quizzes and the assessment are never outlined.
-- **Share routines:** export one routine or all of them to a `.autoclicker.json` file, and import a file someone sent you. Imported routines are added alongside yours, and anything the editor wouldn't accept is left out. Spots are screen positions, so check them on a different screen.
+- **One page for every routine:** the Routines page holds click routines, multi-point clicks, scroll and click routines and Sagar Mein Yog automation routines. Choose the kind with **New routine**. Only one routine runs at a time.
+- **Desktop layout:** the current page icon/Back button, title and page actions live in the window toolbar beside the routine picker and Start/Stop controls. The page has no duplicate title row. Hover over the sidebar’s empty middle area for a horizontal resize cursor; click to toggle, or use keyboard focus and Enter. Its colours follow the app’s theme.
+- **Share routines:** use **Settings → Routine files** to import files or export selected routines (all are selected by default) to a `.autoclicker.json` file, and import a file someone sent you. Imported routines are added alongside yours, and anything the editor wouldn't accept is left out. Spots are screen positions, so check them on a different screen.
 - **Developer mode:** a Settings switch that turns Activity into a live log of what the app does, including every message to and from Chrome. Copy it to report a problem.
 - **Keep the display on:** an optional Settings switch that stops the display sleeping while something is running.
 
-## Page helper (Chrome)
-
-For pages you're working through yourself, in your normal Chrome profile. It removes the repetitive parts while you're at the screen:
-
-- **Auto-scroll:** scrolls the open tab at the speed you set. Press **F9** in Chrome or use the app's button.
-- **Next step:** highlights the first visible button matching your words, such as Next or Play. Disabled buttons are skipped.
-- **One key, one click:** press **F8** to click the highlighted button. It never clicks without a key press.
-- **Video alerts:** plays a sound when a video ends.
-
 ### Scroll and click
 
-For long feeds, "load more" lists and paged documents, the helper can also run by itself: it scrolls to the bottom, clicks a spot you picked, waits for the page to change, and repeats. This is the one mode that clicks with no key press, and it's off until you start it.
+For long feeds, "load more" lists and paged documents, a scroll-and-click routine runs by itself: it scrolls to the bottom, clicks a spot you picked, waits for the page to change, and repeats. This is the one mode that clicks with no key press, and it's off until you start it.
 
 With **Stop for videos** on, it stops at each video it reaches and plays it so you can watch, at the speed the page set, pressing the video's play button if it has one. When the video ends, it scrolls the rest of the way and clicks. If Chrome won't start a video by itself, or you pause one, it waits for you to press play. Looping and silent autoplaying videos are skipped, and it can't see players that don't use a standard video element.
 
@@ -43,7 +33,40 @@ After adding or reloading the extension, refresh any page that's already open.
 
 It stops after the last round, or if a click leaves the page unchanged for 15 seconds. The usual stops below also work, and each run appears in Activity. The spot is a position on the screen, so keep the Chrome window where it was when you picked it.
 
-A **Web page helper** routine highlights the next button while it runs; press **F8** to click it and **F9** to scroll.
+
+### Running a routine
+
+Starting a routine from Home, the desktop toolbar, or a hot key opens **Running routine**. This screen contains live status, click counts, course/module/question details when available, user progress, assessment settings, approvals, manual-answer prompts and Stop. Home remains the routine library. Back keeps the routine running; use **View running routine** on Home to return. After stopping or finishing, the running screen shows the result and a **Back to routines** action. Changing screens does not restart or stop a routine.
+
+### Sagar Mein Yog automation
+
+In the routine editor, **Timing > Wait after every click (seconds)** controls the pause before the next action. It defaults to **5 seconds**, including for routines saved before this option existed, and stays in effect across page navigation. Set 0 for no extra wait.
+
+Completed videos are skipped. The routine opens the next unfinished video, waits for its end, returns to the course and continues through the chapters. An unfinished quiz does not make it replay already-watched videos. Chapter quizzes stay manual; module assessments are manual unless local answers are enabled below.
+
+Choose **New routine > Sagar Mein Yog automation** to automate the Sagar Mein Yog dashboard, course list and video lesson pages. Open one of those pages in Chrome and start the routine. It opens unfinished courses and video lessons, waits for each standard video to actually end, then clicks **Next** or returns to the course and continues. Keep Chrome in front; if playback is blocked or paused, press play in Chrome. The usual Stop button, stop hotkey and screen-corner stop work.
+
+The routine editor offers **Playback speed: 1×, 1.5× or 2×**. New routines default to 1×; existing routines keep their saved selection. Speed applies to each video while the routine is authorized, without seeking or faking completion; stopping restores the previous speed. Reload extension **1.8.3** and refresh course tabs after updating to enable speed control.
+
+#### Assessments and saved progress (extension 1.9.8)
+
+In the course routine editor, enable **Handle module assessments**, then choose **Manual**, **Review approvals** or **Automatic**. Manual lets you choose answers in Chrome, with approval before starts/submissions. Review approvals selects exact saved answers and asks before each start and submission; existing routines retain this mode. Automatic authorizes starts, saved-answer selection and submission when you start the routine. Unknown questions always pause. A failed or unsubmitted attempt found in saved progress still requires an explicit start approval; failed results offer one explicitly chosen retry or manual takeover. Chapter quizzes remain manual.
+
+The desktop app loads `private/course-q&a/sagarmeinyog.json` when launched from the project (or its composeApp directory), otherwise `~/.autoclicker/sagarmeinyog.json`. The file is a JSON object keyed by module title; each entry contains `question`, `options` and `answer` (null when unanswered). Unanswered entries are retained but never selected automatically. An unknown question, changed option set, or missing answer pauses the run, plays a short two-note sound through normal desktop audio output once for that distinct question, and shows the question in the bottom status bar. Repeated inventories, recreated controls and option reordering do not repeat the sound. If audio cannot start, the status also says Sound unavailable. If inventories stop arriving, the run shows Waiting for page updates and asks you to keep the course tab active in Chrome; existing unanswered-question warnings stay visible. The whole bank is validated: identical question/options entries are deduplicated, conflicting non-null answers reject the file, and option variants are matched separately by their complete option set. Captured unanswered entries with repeated option labels remain unanswerable without rejecting other valid entries. Missing/ambiguous questions, changed option sets, unknown page layouts, failed results and unconfirmed selections pause the routine. No fuzzy matching, AI calls or automatic retakes. File answers are user-supplied, not independently verified as correct. The live question pool contains questions missing from this file. Every question instance in the website's displayed total must be observed, matched and confirmed selected before requesting submission approval; without a displayed total, coverage of the entire module bank is required. Repeated question text at different positions is tracked separately.
+
+After updating, reload **AutoClicker Page Helper 1.9.8**, refresh course tabs before starting an attempt, restart the rebuilt desktop app and save the opt-in setting. Do not refresh an assessment already in progress. The shared extension retains scrolling, video watching and requested text clicks; retired highlighting and key-click paths are removed in version 1.9.9. The assessment collector supports ordinary radio groups/fieldsets and the observed Sagar Mein Yog `/test/<attempt>` layout, including its start modal, generic question text, question counter, End Test/Submit confirmation and explicit CLEARED/NOT CLEARED result pages. Failed assessments are shown clearly; a retry starts only after you explicitly choose it. Unexpected live layouts require inspection, not a blind click.
+
+#### Per-user progress
+
+Before course navigation, the desktop routine asks you to confirm a local profile name for the displayed signed-in user. Reuse the same name for the same account; use distinct local profile names if two users share a displayed name. The app pauses if the displayed user changes. Sign-in and passwords stay in Chrome.
+
+The routine selects the largest numeric **Rows per page** option offered by the website (currently 100), waits for the new page size to load, then reads every page of **Your Progress** before continuing and after a completed module. Keep **All Time** selected and clear table filters; if required columns are hidden, the status message lists what to show. Only a complete validated import updates the last-check timestamp. Earlier passes and attempt history survive newer unsubmitted attempts and failed refreshes. Passed assessments are matched by exact course title and skipped after the course page confirms its videos are complete. A test pass alone does not mark videos complete. Individual video completion is checked on course pages and saved as observed, including chapter identity; video progress is not inferred from the test table. Active timed tests are never left to perform a progress check.
+
+**Saved progress by user** inside the course routine editor shows stored users, attempts, scores, timestamps and observed lessons, even after an app restart. Data is local at `~/.autoclicker/course-progress.db`, in a separate Room database (schema version 1); existing app databases are unchanged. A local save failure pauses further course actions. No credentials are stored. This progress feature is currently implemented and tested for Desktop/JVM.
+
+This routine uses separate extension scripts; the retired Web page helper and Course helper routines have been removed. Other routine types retain their behavior. While it runs, the extension reports semantic page elements (controls, headings, status context and videos, including hidden/disabled controls) to the local app. The app chooses the action and the extension executes it once against that document's element ID. Input values and full page HTML are excluded. Very large or unrecognized pages pause for manual handling. A course without a dashboard-return control finishes after its available videos.
+
+After updating the app, use **Settings > Chrome extension > Show extension folder**, reload the extension in `chrome://extensions`, and refresh the course tabs so Chrome loads the new scripts. The signed-in live site still needs validation; automated coverage uses isolated local course pages in headless Chrome.
 
 Set up the extension once from **Settings > Chrome extension**: press **Show extension folder**, open `chrome://extensions`, turn on Developer mode, choose **Load unpacked**, and select that folder. The extension talks only to the app on this computer.
 
@@ -98,6 +121,8 @@ Three extras are opt-in:
 - `UI_TEST_SHOT_DIR=/some/dir` saves what each UI test rendered.
 - `AUTOCLICKER_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInputTest*' --rerun` sends real clicks and a key press to its own window. It moves your pointer, so keep your hands off while it runs.
 - `AUTOCLICKER_LIVE_CHROME_TEST="<path to Chrome>" ./gradlew :composeApp:jvmTest --tests '*LiveChromeExtensionTest*' --rerun` runs the extension's scripts in headless Chrome with a throwaway profile.
+
+For the new routine, use `AUTOCLICKER_LIVE_CHROME_TEST="<path to Chrome>" ./gradlew :composeApp:jvmTest --tests '*LiveCourseAutomationTest*' --rerun`. Its protocol tests also run with `node --test composeApp/src/jvmTest/resources/course-automation-background.test.cjs`.
 
 ## Release builds
 

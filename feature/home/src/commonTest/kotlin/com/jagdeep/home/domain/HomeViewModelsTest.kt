@@ -127,10 +127,10 @@ class HomeViewModelsTest {
 
     @Test
     fun `given routines of a kind when a new one is named then it takes the kind's name and the next free number`() {
-        val existing = listOf(ClickRoutine("a", "Multi-point click 1"), ClickRoutine("b", "multi-point click 2"), PageHelperRoutine("c", "Web page helper 1"))
+        val existing = listOf(ClickRoutine("a", "Multi-point click 1"), ClickRoutine("b", "multi-point click 2"), CourseAutomationRoutine("c", "Sagar Mein Yog automation 1"))
         assertEquals("Multi-point click 3", defaultRoutineName(RoutineKind.Sequence, existing))
         assertEquals("Scroll and click 1", defaultRoutineName(RoutineKind.ScrollClick, existing))
-        assertEquals("Web page helper 2", defaultRoutineName(RoutineKind.PageHelper, existing))
+        assertEquals("Sagar Mein Yog automation 2", defaultRoutineName(RoutineKind.CourseAutomation, existing))
     }
 
     @Test
@@ -218,7 +218,7 @@ class HomeViewModelsTest {
     @Test
     fun `given a page helper routine selected when access is missing then it can still start`() = test {
         automation.inputAccess = InputAccess.NeedsPermission
-        val helper = PageHelperRoutine("h", "Course")
+        val helper = CourseAutomationRoutine("h", "Course")
         assertFalse(helper.needsInputAccess())
         assertTrue(first.needsInputAccess())
     }

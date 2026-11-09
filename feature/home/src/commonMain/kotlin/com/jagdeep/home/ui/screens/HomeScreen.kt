@@ -17,9 +17,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdsClick
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.LaunchedEffect
 import com.jagdeep.ui.components.LocalToastManager
 import androidx.compose.material3.AlertDialog
@@ -69,6 +66,7 @@ fun HomeScreen(
     appIcon: @Composable () -> Unit,
     onNewRoutine: (RoutineKind) -> Unit,
     onEditRoutine: (Routine) -> Unit,
+    onOpenRunning: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val toast = LocalToastManager.current
@@ -108,10 +106,23 @@ fun HomeScreen(
     // Start-aligned under the title with a readable width, like Activity and Settings.
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().weight(1f)) {
-            RunPanel(state, viewModel::start, viewModel::stop, viewModel::requestAccess, viewModel::toggleScrolling)
+            if (state.isActive) {
+                ListItem(
+                    headlineContent = { Text("A routine is running") },
+                    supportingContent = { Text("Open the running screen for status and actions. Going back here does not stop it.") },
+                    trailingContent = { FilledTonalButton(onClick = onOpenRunning) { Text("View running routine") } },
+                )
+            } else {
+            RunPanel(state, viewModel::start, viewModel::stop, viewModel::requestAccess,
+                onApproveAssessment = viewModel::approveAssessment,
+                onManualAnswer = viewModel::confirmManualAnswer,
+                onProgressProfile = viewModel::confirmProgressProfile,
+                onRetryAssessment = viewModel::retryAssessment,
+                onSaveReviewedAnswers = viewModel::saveReviewedAnswers)
+            }
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
             if (state.routines.isEmpty()) {
-                EmptyRoutines(onNewRoutine = { choosingKind = true }, onImport = viewModel::import.takeIf { state.canUseFiles })
+                EmptyRoutines(onNewRoutine = { choosingKind = true })
             } else {
                 RoutineList(state, viewModel, { choosingKind = true }, onEditRoutine)
             }
@@ -125,6 +136,7 @@ private fun RoutineList(
     viewModel: HomeViewModel,
     onNewRoutine: () -> Unit,
     onEditRoutine: (Routine) -> Unit,
+    onOpenRunning: () -> Unit = {},
 ) {
     // A running routine stays what it is until stopped, so changes wait until then.
     val editable = !state.isActive
@@ -147,11 +159,6 @@ private fun RoutineList(
                 supportingContent = { Text(routineSummary(routine)) },
                 trailingContent = {
                     Row {
-                        if (state.canUseFiles) {
-                            IconButton(onClick = { viewModel.export(routine) }) {
-                                Icon(Icons.Default.IosShare, contentDescription = "Export ${routine.name}")
-                            }
-                        }
                         IconButton(onClick = { onEditRoutine(routine) }, enabled = editable) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit ${routine.name}")
                         }
@@ -168,20 +175,13 @@ private fun RoutineList(
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Text("New routine", Modifier.padding(start = 8.dp))
                 }
-                if (state.canUseFiles) {
-                    OutlinedButton(onClick = viewModel::import) {
-                        Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text("Import", Modifier.padding(start = 8.dp))
-                    }
-                    TextButton(onClick = viewModel::exportAll) { Text("Export all") }
-                }
             }
         }
     }
 }
 
 @Composable
-private fun EmptyRoutines(onNewRoutine: () -> Unit, onImport: (() -> Unit)?) {
+private fun EmptyRoutines(onNewRoutine: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(Modifier.widthIn(max = 420.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Default.AdsClick, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
@@ -195,12 +195,6 @@ private fun EmptyRoutines(onNewRoutine: () -> Unit, onImport: (() -> Unit)?) {
                 FilledTonalButton(onClick = onNewRoutine) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Text("New routine", Modifier.padding(start = 8.dp))
-                }
-                onImport?.let {
-                    OutlinedButton(onClick = it) {
-                        Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text("Import", Modifier.padding(start = 8.dp))
-                    }
                 }
             }
         }

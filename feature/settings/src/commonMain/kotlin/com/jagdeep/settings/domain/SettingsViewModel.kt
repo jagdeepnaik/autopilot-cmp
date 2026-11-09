@@ -23,13 +23,16 @@ data class SettingsUiState(
     val access: InputAccess = InputAccess.Granted,
     /** True while the Chrome extension is checking in. */
     val browserConnected: Boolean = false,
+    val routineFilesAvailable: Boolean = false,
+    val transferableRoutines: List<com.jagdeep.shared.routines.TransferRoutine> = emptyList(),
+    val transferringRoutines: Boolean = false,
+    val displayWakeProblem: String? = null,
 )
 
 private enum class HotKeyJob(val description: String, val keyIn: (AppPreferences) -> HotKey) {
     Toggle("starting and stopping", AppPreferences::toggleHotKey),
     Capture("picking points", AppPreferences::captureHotKey),
-    PageClick("clicking the highlighted button", AppPreferences::pageClickHotKey),
-    PageScroll("auto-scroll", AppPreferences::pageScrollHotKey),
+    PageScroll("stopping scroll and click", AppPreferences::pageScrollHotKey),
 }
 
 class SettingsViewModel(
@@ -38,13 +41,29 @@ class SettingsViewModel(
     browserConnected: Flow<Boolean> = flowOf(false),
     /** Puts the Chrome extension in a folder and shows it; returns a problem to explain, or null. */
     private val installExtension: suspend () -> String? = { null },
+    private val routineTransfer: com.jagdeep.shared.routines.RoutineTransfer = com.jagdeep.shared.routines.NoRoutineTransfer,
+    displayWakeProblem: Flow<String?> = flowOf(null),
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(SettingsUiState(access = accessGate.access()))
+    private val mutableState = MutableStateFlow(SettingsUiState(access = accessGate.access(), routineFilesAvailable = routineTransfer.isAvailable))
     val state = mutableState.asStateFlow()
     private val mutableMessages = Channel<String>(Channel.BUFFERED)
     val messages: Flow<String> = mutableMessages.receiveAsFlow()
 
+    fun importRoutines() = transfer { routineTransfer.importRoutines() }
+    fun exportRoutines(ids: Set<String>) = transfer { routineTransfer.exportRoutines(ids) }
+    private fun transfer(action: suspend () -> String?) {
+        if (!routineTransfer.isAvailable || state.value.transferringRoutines) return
+        mutableState.update { it.copy(transferringRoutines = true) }
+        viewModelScope.launch {
+            try { action()?.let { mutableMessages.send(it) } }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { mutableMessages.send("Couldn't transfer routines. Check the file and try again.") }
+            finally { mutableState.update { it.copy(transferringRoutines = false) } }
+        }
+    }
     init {
+        viewModelScope.launch { displayWakeProblem.collect { problem -> mutableState.update { it.copy(displayWakeProblem = problem) } } }
+        viewModelScope.launch { routineTransfer.routines.collect { items -> mutableState.update { it.copy(transferableRoutines = items) } } }
         viewModelScope.launch {
             preferencesStore.data.collect { preferences -> mutableState.update { it.copy(preferences = preferences) } }
         }
@@ -66,13 +85,13 @@ class SettingsViewModel(
     fun updateDeveloperMode(enabled: Boolean) = save(state.value.preferences.copy(developerMode = enabled))
 
     fun updateKeepDisplayOn(enabled: Boolean) = save(state.value.preferences.copy(keepDisplayOn = enabled))
+    fun updateAssessmentSounds(enabled: Boolean) = save(state.value.preferences.copy(assessmentSoundsEnabled = enabled))
 
     /** One key can't do two jobs, so a clash keeps the saved choice and says why. */
     fun updateToggleHotKey(key: HotKey) = assignKey(key, HotKeyJob.Toggle) { copy(toggleHotKey = key) }
 
     fun updateCaptureHotKey(key: HotKey) = assignKey(key, HotKeyJob.Capture) { copy(captureHotKey = key) }
 
-    fun updatePageClickHotKey(key: HotKey) = assignKey(key, HotKeyJob.PageClick) { copy(pageClickHotKey = key) }
 
     fun updatePageScrollHotKey(key: HotKey) = assignKey(key, HotKeyJob.PageScroll) { copy(pageScrollHotKey = key) }
 

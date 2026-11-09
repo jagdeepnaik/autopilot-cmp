@@ -43,11 +43,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
@@ -76,8 +76,8 @@ internal val DesktopToolbarHeight = 28.dp
 private val DesktopToolbarBottomSpace = 8.dp
 
 /**
- * The desktop app shell, laid out like Android Studio: a toolbar in the title bar row with the button
- * that shows the pages' names, then the routine to run and its ▶ and ■; an icon strip for the pages,
+ * The desktop app shell, laid out like Android Studio: a toolbar in the title bar row with
+ * the current page header, then the routine to run and its ▶ and ■; an icon strip for the pages,
  * with Settings at its foot; the page in a rounded panel; and a status bar with what's happening and
  * Chrome's link. Phones keep the adaptive scaffold.
  */
@@ -94,8 +94,6 @@ internal fun DesktopShell(
     footerItems: Map<NavKey, MainNavigationItem>,
     onNavigate: (NavKey) -> Unit,
     now: () -> Long,
-    appIcon: @Composable () -> Unit,
-    appName: String,
     appVersion: String,
     /** Room for the Mac window buttons, which share the toolbar's row. */
     toolbarStartInset: Dp,
@@ -115,19 +113,18 @@ internal fun DesktopShell(
     Column(Modifier.fillMaxSize().background(colors.surfaceContainer)) {
         toolbarDragArea {
             Column {
-                Toolbar(state, onSelectRoutine, onStart, onStop, appIcon, appName, toolbarStartInset, toolbarHeight, stripExpanded) { stripExpanded = !stripExpanded }
+                Toolbar(state, onSelectRoutine, onStart, onStop, toolbarStartInset, toolbarHeight, stripExpanded, { stripExpanded = !stripExpanded }, topBar)
                 // A little more bar below a standard-height row, which stays in line with the Mac window buttons.
                 if (toolbarHeight <= DesktopToolbarHeight) Spacer(Modifier.fillMaxWidth().height(DesktopToolbarBottomSpace))
             }
         }
         Row(Modifier.weight(1f).fillMaxWidth()) {
-            ToolStripe(selectedRoute, navigationItems, footerItems, stripExpanded, onNavigate)
+            ToolStripe(selectedRoute, navigationItems, footerItems, stripExpanded, onNavigate) { stripExpanded = !stripExpanded }
             // The page as a rounded panel on the darker frame.
             Column(
                 Modifier.weight(1f).fillMaxHeight().padding(end = 6.dp)
                     .clip(RoundedCornerShape(10.dp)).background(colors.surface),
             ) {
-                topBar()
                 Box(Modifier.weight(1f).fillMaxWidth()) { content() }
             }
         }
@@ -141,12 +138,11 @@ private fun Toolbar(
     onSelectRoutine: (com.jagdeep.home.domain.Routine) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
-    appIcon: @Composable () -> Unit,
-    appName: String,
     startInset: Dp,
     height: Dp,
-    stripExpanded: Boolean,
-    onToggleStrip: () -> Unit,
+    sidebarExpanded: Boolean,
+    onToggleSidebar: () -> Unit,
+    topBar: @Composable () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     Row(
@@ -154,17 +150,10 @@ private fun Toolbar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // The Mac sidebar button, just after the window buttons as in Finder; shaded while names show.
-        ToolbarIcon(
-            SidebarIcon,
-            if (stripExpanded) "Collapse sidebar" else "Expand sidebar",
-            colors.onSurfaceVariant,
-            enabled = true,
-            selected = stripExpanded,
-            onClick = onToggleStrip,
-        )
-        appIcon()
-        Text(appName, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = colors.onSurface)
+        ToolbarIcon(SidebarIcon, if (sidebarExpanded) "Collapse sidebar from toolbar" else "Expand sidebar from toolbar", colors.onSurfaceVariant, enabled = true, selected = sidebarExpanded, onClick = onToggleSidebar)
+        Box(Modifier.weight(1f, fill = false).widthIn(max = 340.dp).height(height)) {
+            DesktopPageHeader(topBar)
+        }
         VerticalDivider(Modifier.height(16.dp), color = colors.outlineVariant)
         RoutinePicker(state, onSelectRoutine)
         ToolbarIcon(Icons.Default.PlayArrow, "Start ${state.selected?.name.orEmpty()}".trim(), AppColors.live, enabled = !state.isActive && state.selected != null, onClick = onStart)
@@ -256,7 +245,7 @@ private fun ChromeStatus(state: ShellUiState) {
     }
 }
 
-/** The pages as icons, with Settings at the foot; the toolbar's first button widens it to show their names. */
+/** Pages above and Settings below; the empty middle changes the cursor and toggles the sidebar on click. */
 @Composable
 private fun ToolStripe(
     selectedRoute: NavKey,
@@ -264,6 +253,7 @@ private fun ToolStripe(
     footerItems: Map<NavKey, MainNavigationItem>,
     expanded: Boolean,
     onNavigate: (NavKey) -> Unit,
+    onToggle: () -> Unit,
 ) {
     val width by animateDpAsState(if (expanded) 168.dp else 44.dp)
     Column(
@@ -271,7 +261,7 @@ private fun ToolStripe(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items.forEach { (route, item) -> StripEntry(item, route == selectedRoute, expanded) { onNavigate(route) } }
-        Spacer(Modifier.weight(1f))
+        SidebarToggleArea(expanded, onToggle, Modifier.weight(1f))
         footerItems.forEach { (route, item) -> StripEntry(item, route == selectedRoute, expanded) { onNavigate(route) } }
     }
 }

@@ -39,11 +39,13 @@ internal class AppServices private constructor() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val preferences: PreferencesStore<AppPreferences> = createAppPreferencesStore()
-    val automation: DesktopAutomation = createDesktopAutomation()
+    val automation: DesktopAutomation = withAlertSound(createDesktopAutomation())
     val routines: RoutineRepository = PreferencesRoutineRepository(createDocumentStore(ROUTINES_STORE), scope)
     val runHistory: RunHistoryStore = PreferencesRunHistoryStore(createDocumentStore(RUN_HISTORY_STORE))
+    val displayWakeProblem = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     val liveLog = MemoryLiveLog(AppClock::nowMillis)
     private val bridge: LocalBridge = createLocalBridge(BROWSER_LINK_PORT, BROWSER_EXTENSION_ORIGIN)
+    private val courseProgress = createCourseProgressRepository()
     val page = PageController(
         automation = automation,
         bridge = bridge,
@@ -53,6 +55,9 @@ internal class AppServices private constructor() {
         now = AppClock::nowMillis,
         newId = ::newId,
         live = liveLog,
+        answerBankStore = createCourseAnswerBankStore(),
+        assessmentAlerts = createAssessmentAlerts(automation),
+        progressRepository = courseProgress,
     )
 
     // Runs every kind of routine, one at a time, handing Chrome routines to [page].
@@ -85,7 +90,17 @@ internal class AppServices private constructor() {
                 )
             }.distinctUntilChanged().collect { awake ->
                 liveLog.log(LiveSource.App) { if (awake) "Keeping the display on" else "Display may sleep again" }
-                automation.setDisplayAwake(awake)
+                try {
+                    automation.setDisplayAwake(awake)
+                    displayWakeProblem.value = null
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (_: Exception) {
+                    displayWakeProblem.value = "This desktop couldn't keep the display awake. Check your system's power settings."
+                    liveLog.log(LiveSource.App) { displayWakeProblem.value.orEmpty() }
+                } catch (_: LinkageError) {
+                    displayWakeProblem.value = "Display sleep prevention isn't available on this desktop. Check your system's power settings."
+                    liveLog.log(LiveSource.App) { displayWakeProblem.value.orEmpty() }
+                }
             }
         }
     }
@@ -95,6 +110,7 @@ internal class AppServices private constructor() {
         controller.stop()
         scope.cancel()
         bridge.close()
+        courseProgress.close()
         automation.close()
     }
 

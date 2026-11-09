@@ -86,6 +86,7 @@ fun App(
     val routineFiles = remember { createRoutineFiles() }
     // Explanations can come from the hot key, whichever tab is open.
     LaunchedEffect(services) { services.controller.messages.collect(toastHost::show) }
+    LaunchedEffect(services) { services.displayWakeProblem.collect { problem -> problem?.let { toastHost.show(it) } } }
 
     // Null until the saved choice is read, so the app never flashes the wrong theme on launch.
     val appearance by remember(preferencesStore) { preferencesStore.data.map { it.themeMode to it.colorPalette } }
@@ -119,6 +120,7 @@ fun App(
                         runHistory = services.runHistory,
                         liveLog = services.liveLog,
                         routineFiles = routineFiles,
+                        displayWakeProblem = services.displayWakeProblem,
                         accessGate = services.automation.access,
                         appVersion = AppConfig.APP_VERSION_NAME,
                         now = AppClock::nowMillis,
@@ -142,8 +144,6 @@ fun App(
                         footerItems = navigationItems.filterKeys { it == RouteTopLevel.Settings },
                         onNavigate = navigator::navigate,
                         now = AppClock::nowMillis,
-                        appIcon = { AppLogo(18.dp) },
-                        appName = AppConfig.APP_NAME,
                         appVersion = AppConfig.APP_VERSION_NAME,
                         toolbarStartInset = toolbarStartInset,
                         toolbarDragArea = toolbarDragArea,

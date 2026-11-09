@@ -30,6 +30,7 @@ private val STOP_WHEN_POINTER_MOVES = booleanPreferencesKey("stop_when_pointer_m
 private val STOP_AT_SCREEN_CORNER = booleanPreferencesKey("stop_at_screen_corner")
 private val KEEP_DISPLAY_ON = booleanPreferencesKey("keep_display_on")
 private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
+private val ASSESSMENT_SOUNDS = booleanPreferencesKey("assessment_sounds_enabled")
 internal val DOCUMENT_KEY = stringPreferencesKey("document")
 
 /** Absent or unknown values fall back to the model's defaults. */
@@ -46,6 +47,7 @@ internal fun readAppPreferences(stored: Preferences): AppPreferences {
         stopAtScreenCorner = stored[STOP_AT_SCREEN_CORNER] ?: defaults.stopAtScreenCorner,
         keepDisplayOn = stored[KEEP_DISPLAY_ON] ?: defaults.keepDisplayOn,
         developerMode = stored[DEVELOPER_MODE] ?: defaults.developerMode,
+        assessmentSoundsEnabled = stored[ASSESSMENT_SOUNDS] ?: defaults.assessmentSoundsEnabled,
     )
 }
 
@@ -60,6 +62,7 @@ internal fun writeAppPreferences(value: AppPreferences, stored: MutablePreferenc
     stored[STOP_AT_SCREEN_CORNER] = value.stopAtScreenCorner
     stored[KEEP_DISPLAY_ON] = value.keepDisplayOn
     stored[DEVELOPER_MODE] = value.developerMode
+    stored[ASSESSMENT_SOUNDS] = value.assessmentSoundsEnabled
 }
 
 private inline fun <reified T : Enum<T>> enumOrDefault(name: String?, default: T): T =

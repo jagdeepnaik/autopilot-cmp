@@ -24,8 +24,6 @@ data class HomeUiState(
     val lastRun: RunRecord? = null,
     val access: InputAccess = InputAccess.Granted,
     val toggleHotKey: HotKey = HotKey.F6,
-    val pageClickHotKey: HotKey = HotKey.F8,
-    val pageScrollHotKey: HotKey = HotKey.F9,
     val routinePendingDeletion: Routine? = null,
     /** Whether routines can be exported to and imported from files here. */
     val canUseFiles: Boolean = true,
@@ -34,8 +32,8 @@ data class HomeUiState(
     val isActive: Boolean get() = run != RunState.Idle || page.activity != null
 }
 
-/** A page helper only reads Chrome and clicks through the extension, so it needs no input permission. */
-fun Routine.needsInputAccess(): Boolean = this !is PageHelperRoutine && this !is CourseHelperRoutine
+/** Website automation uses the extension; pointer-based routines need native input permission. */
+fun Routine.needsInputAccess(): Boolean = this !is CourseAutomationRoutine
 
 class HomeViewModel(
     private val controller: ClickController,
@@ -69,7 +67,7 @@ class HomeViewModel(
         viewModelScope.launch {
             controller.preferences.collect { prefs ->
                 mutableState.update {
-                    it.copy(toggleHotKey = prefs.toggleHotKey, pageClickHotKey = prefs.pageClickHotKey, pageScrollHotKey = prefs.pageScrollHotKey)
+                    it.copy(toggleHotKey = prefs.toggleHotKey)
                 }
             }
         }
@@ -85,7 +83,11 @@ class HomeViewModel(
 
     fun stop() = controller.stop()
 
-    fun toggleScrolling() = controller.page.toggleScrolling()
+    fun approveAssessment(token: String) = controller.page.approveAssessment(token)
+    fun confirmProgressProfile(token: String, localName: String) = controller.page.confirmProgressProfile(token, localName)
+    fun confirmManualAnswer(token: String, save: Boolean) = controller.page.confirmManualAnswer(token, save)
+    fun saveReviewedAnswers(token: String, answers: Map<String, String>) = controller.page.saveReviewedAnswers(token, answers)
+    fun retryAssessment(token: String, automatic: Boolean) = controller.page.retryAssessment(token, automatic)
 
     fun select(routine: Routine) {
         viewModelScope.launch { repository.select(routine.id) }
@@ -95,46 +97,11 @@ class HomeViewModel(
         controller.requestAccess()
     }
 
-    /** Saves every routine to one file, to share or keep. */
-    fun exportAll() = export(state.value.routines, suggestedName = "AutoClicker routines")
-
-    fun export(routine: Routine) = export(listOf(routine), suggestedName = routine.name)
-
-    private fun export(routines: List<Routine>, suggestedName: String) {
-        if (routines.isEmpty()) return
-        viewModelScope.launch {
-            val fileName = suggestedName.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifEmpty { "Routines" } + RoutineFileCodec.FILE_SUFFIX
-            val result = runCatching { files.save(fileName, RoutineFileCodec.encode(routines)) }
-            val message = result.fold(
-                onSuccess = { savedTo -> savedTo?.let { "Exported ${count(routines.size)}." } },
-                onFailure = { (it as? RoutineFileException)?.message ?: "Couldn't save the file. Try another folder." },
-            )
-            message?.let { mutableMessages.send(it) }
-        }
-    }
-
-    /** Adds the routines in a file the user picks, as new routines alongside their own. */
-    fun import() {
-        viewModelScope.launch {
-            val text = runCatching { files.open() }.getOrElse {
-                mutableMessages.send((it as? RoutineFileException)?.message ?: "Couldn't read that file.")
-                return@launch
-            } ?: return@launch
-            val imported = RoutineFileCodec.decode(text)
-            if (imported == null || imported.routines.isEmpty()) {
-                mutableMessages.send("That file has no routines AutoClicker can use.")
-                return@launch
-            }
-            // New ids, so an import never replaces the user's own routines.
-            val added = imported.routines.map { it.withId(newId()) }
-            added.forEach { repository.save(it) }
-            repository.select(added.first().id)
-            val skipped = if (imported.skipped > 0) " ${count(imported.skipped)} couldn't be used and were left out." else ""
-            mutableMessages.send("Imported ${count(added.size)}.$skipped Spots are positions on the screen they were made on, so check them before running.")
-        }
-    }
-
-    private fun count(n: Int) = if (n == 1) "1 routine" else "$n routines"
+    private val transfer = RoutineFileTransfer(repository, files, newId) { controller.isActive }
+    fun exportAll() = exportIds(state.value.routines.map { it.id }.toSet())
+    fun export(routine: Routine) = exportIds(setOf(routine.id))
+    private fun exportIds(ids: Set<String>) { viewModelScope.launch { transfer.exportRoutines(ids)?.let { mutableMessages.send(it) } } }
+    fun import() { viewModelScope.launch { transfer.importRoutines()?.let { mutableMessages.send(it) } } }
 
     fun requestDeletion(routine: Routine) = mutableState.update { it.copy(routinePendingDeletion = routine) }
 
@@ -171,6 +138,5 @@ class HomeViewModel(
 internal fun Routine.withId(id: String): Routine = when (this) {
     is ClickRoutine -> copy(id = id)
     is ScrollClickRoutine -> copy(id = id)
-    is PageHelperRoutine -> copy(id = id)
-    is CourseHelperRoutine -> copy(id = id)
+    is CourseAutomationRoutine -> copy(id = id)
 }

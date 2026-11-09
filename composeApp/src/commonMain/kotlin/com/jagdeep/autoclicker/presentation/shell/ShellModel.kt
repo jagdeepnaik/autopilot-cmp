@@ -82,12 +82,7 @@ class ShellModel(
                     null -> Unit
                 }
             }
-            activity is PageActivity.Helper -> buildString {
-                append(activity.routine.name).append(" · ")
-                append(page.foundLabel?.let { "next step: $it" } ?: "looking for a button")
-                if (page.isScrolling) append(" · scrolling")
-            }
-            activity is PageActivity.Course -> "${activity.routine.name} · " + (page.foundLabel?.let { "next: $it" } ?: "open sagarmeinyog.com in Chrome")
+            activity is PageActivity.Automation -> "${activity.routine.name} · ${activity.detail}"
             activity is PageActivity.ScrollClick -> {
                 val progress = activity.progress
                 val doing = if (progress.phase == ScrollClickPhase.ClickingSteps) "clicking step ${progress.step} of ${progress.steps}" else phase(progress.phase)

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.jagdeep.automation.InputAccess
 import com.jagdeep.automation.InputAccessGate
@@ -19,6 +20,7 @@ import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertEquals
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
@@ -28,6 +30,41 @@ class SettingsScreenUiTest {
         var current = InputAccess.Granted
         override fun access() = current
         override fun requestAccess() = true
+    }
+
+    @Test
+    fun `given routine files in settings then choose exports and open import without Home actions`() = runDesktopComposeUiTest(1000,1200) {
+        var exports=emptySet<String>()
+        var imports=0
+        val transfer=object : com.jagdeep.shared.routines.RoutineTransfer {
+            override val isAvailable=true
+            override val routines=kotlinx.coroutines.flow.flowOf(listOf(com.jagdeep.shared.routines.TransferRoutine("one","First routine"),com.jagdeep.shared.routines.TransferRoutine("two","Second routine")))
+            override suspend fun importRoutines(): String? { imports++; return null }
+            override suspend fun exportRoutines(ids:Set<String>):String? { exports=ids; return null }
+        }
+        val vm=SettingsViewModel(InMemoryPreferencesStore(AppPreferences()),gate,routineTransfer=transfer)
+        setContent { AppTheme { SettingsScreen(vm,onBack={},appVersion="1.0.0") } }
+        onNodeWithText("Export routines").performScrollTo().performClick()
+        onNodeWithText("Select routines to export").assertExists()
+        onNodeWithText("Second routine").performClick()
+        onNodeWithText("Export selected").performClick()
+        waitUntil { exports.isNotEmpty() }
+        assertEquals(setOf("one"),exports)
+        onNodeWithText("Import routines").performScrollTo().performClick()
+        waitUntil { imports==1 }
+    }
+
+    @Test
+    fun `setup and advanced details open only on request`() = runDesktopComposeUiTest(1000, 1400) {
+        val vm = SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate)
+        setContent { AppTheme { SettingsScreen(vm, onBack = {}, appVersion = "1.0.0") } }
+        onNodeWithText("Chrome extension setup").assertDoesNotExist()
+        onNodeWithText("Set up extension").performScrollTo().performClick()
+        onNodeWithText("Chrome extension setup").assertExists()
+        onNodeWithText("Done").performClick()
+        onNodeWithText("Developer mode").assertDoesNotExist()
+        onNodeWithText("Developer options").performScrollTo().performClick()
+        onNodeWithText("Developer mode").assertExists()
     }
 
     @Test
@@ -47,7 +84,7 @@ class SettingsScreenUiTest {
         val viewModel = SettingsViewModel(store, gate)
         setContent { AppTheme(darkTheme = false) { SettingsScreen(viewModel, onBack = {}, appVersion = "1.0.0") } }
         onNodeWithText("Keep the display on while running").performClick()
-        waitUntil(timeoutMillis = 5_000) { runBlocking { store.data.first().keepDisplayOn } }
+        waitUntil(timeoutMillis = 5_000) { runBlocking { !store.data.first().keepDisplayOn } }
     }
 
     @Test
@@ -55,7 +92,7 @@ class SettingsScreenUiTest {
         gate.current = InputAccess.NeedsPermission
         val viewModel = SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate)
         setContent { AppTheme(darkTheme = true) { SettingsScreen(viewModel, onBack = {}, appVersion = "1.0.0") } }
-        onNodeWithText("Allow").assertExists()
+        onNodeWithText("Open settings").assertExists()
     }
 }
 

@@ -3,7 +3,7 @@ package com.jagdeep.home.data
 import com.jagdeep.home.domain.ClickPoint
 import com.jagdeep.home.domain.ClickRoutine
 import com.jagdeep.home.domain.ClickTarget
-import com.jagdeep.home.domain.PageHelperRoutine
+import com.jagdeep.home.domain.CourseAutomationRoutine
 import com.jagdeep.home.domain.ScrollClickRoutine
 import com.jagdeep.home.domain.RunLimit
 import com.jagdeep.persistence.preferences.InMemoryPreferencesStore
@@ -18,6 +18,19 @@ import kotlinx.coroutines.test.runTest
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PreferencesRoutineRepositoryTest {
+    @Test
+    fun `retired helper records do not discard surviving routines or selection`() = runTest {
+        val store = InMemoryPreferencesStore("""{"selectedId":"smy","routines":[{"type":"pageHelper","id":"old-page","name":"Old page"},{"type":"click","id":"click","name":"Click"},{"type":"courseHelper","id":"old-course","name":"Old course"},{"type":"courseAutomation","id":"smy","name":"My yoga","playbackSpeed":2.0}]}""")
+        val repository = repository(store)
+        assertEquals(listOf("click", "smy"), repository.library.value!!.routines.map { it.id })
+        assertEquals("smy", repository.library.value!!.selected?.id)
+        repository.save(ClickRoutine("extra", "Extra"))
+        runCurrent()
+        val saved = repository(store).library.value!!
+        assertEquals(listOf("click", "smy", "extra"), saved.routines.map { it.id })
+        assertEquals(2.0, (saved.routines[1] as CourseAutomationRoutine).playbackSpeed)
+    }
+
     private val full = ClickRoutine(
         id = "r",
         name = "Full",
@@ -80,7 +93,7 @@ class PreferencesRoutineRepositoryTest {
     fun `given every kind of routine when saved and read back then each keeps its kind and fields`() = runTest {
         val store = InMemoryPreferencesStore("")
         val scroll = ScrollClickRoutine("s", "Next pages", ClickPoint(640, 880), rounds = 7, pixelsPerSecond = 120, watchVideos = false)
-        val helper = PageHelperRoutine("h", "Course", words = listOf("Weiter"), soundOnVideoEnd = false)
+        val helper = CourseAutomationRoutine("h", "Course", playbackSpeed = 1.5)
         repository(store).run {
             save(full)
             save(scroll)

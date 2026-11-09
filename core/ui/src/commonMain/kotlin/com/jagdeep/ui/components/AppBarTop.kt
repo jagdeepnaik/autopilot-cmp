@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import com.jagdeep.ui.platform.isDesktopPlatform
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,7 +44,7 @@ fun AppBarTop(
         navigationIcon = {
             if (selectedRoute != RouteTopLevel.Home) {
                 IconButton(onClick = onBackButtonClicked) {
-                    Icon(imageVector = Icons.Default.ArrowBackIosNew, contentDescription = "Back")
+                    Icon(imageVector = if (isDesktopPlatform()) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.ArrowBackIosNew, contentDescription = "Back", modifier = Modifier.size(if (isDesktopPlatform()) 18.dp else 24.dp))
                 }
             } else if (titleIcon != null) {
                 Box(Modifier.size(NAVIGATION_SLOT_SIZE), contentAlignment = Alignment.Center) { titleIcon() }

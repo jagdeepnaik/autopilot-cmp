@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -36,15 +37,38 @@ class SettingsViewModelTest {
     private val store = InMemoryPreferencesStore(AppPreferences())
 
     @Test
-    fun `given the display setting when changed then it's off by default and saved`() = test {
+    fun `given routine file actions then settings forwards selections and prevents duplicate imports`() = test {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var imports = 0
+        var exported = emptySet<String>()
+        val transfer = object : com.jagdeep.shared.routines.RoutineTransfer {
+            override val isAvailable = true
+            override val routines = kotlinx.coroutines.flow.flowOf(listOf(com.jagdeep.shared.routines.TransferRoutine("a","First")))
+            override suspend fun importRoutines(): String? { imports++; gate.await(); return "Imported 1 routine." }
+            override suspend fun exportRoutines(ids: Set<String>): String? { exported=ids; return "Exported 1 routine." }
+        }
+        val vm=SettingsViewModel(store,FakeGate(),routineTransfer=transfer)
+        advanceUntilIdle()
+        assertTrue(vm.state.value.routineFilesAvailable)
+        assertEquals("First",vm.state.value.transferableRoutines.single().name)
+        vm.exportRoutines(setOf("a")); advanceUntilIdle()
+        assertEquals(setOf("a"),exported); assertEquals("Exported 1 routine.",vm.messages.first())
+        vm.importRoutines(); vm.importRoutines(); runCurrent()
+        assertEquals(1,imports); assertTrue(vm.state.value.transferringRoutines)
+        gate.complete(Unit); advanceUntilIdle()
+        assertFalse(vm.state.value.transferringRoutines); assertEquals("Imported 1 routine.",vm.messages.first())
+    }
+
+    @Test
+    fun `given the display setting when changed then it's on by default and saved`() = test {
         val viewModel = SettingsViewModel(store, FakeGate())
         advanceUntilIdle()
-        assertFalse(viewModel.state.value.preferences.keepDisplayOn)
-
-        viewModel.updateKeepDisplayOn(true)
-        advanceUntilIdle()
         assertTrue(viewModel.state.value.preferences.keepDisplayOn)
-        assertTrue(store.data.first().keepDisplayOn)
+
+        viewModel.updateKeepDisplayOn(false)
+        advanceUntilIdle()
+        assertFalse(viewModel.state.value.preferences.keepDisplayOn)
+        assertFalse(store.data.first().keepDisplayOn)
     }
 
     @Test
@@ -144,17 +168,17 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `given a page helper key when it clashes it is refused, and a free one is saved`() = test {
+    fun `given a scroll stop key when it clashes it is refused and a retired key can be reused`() = test {
         val viewModel = SettingsViewModel(store, FakeGate())
         advanceUntilIdle()
-        viewModel.updatePageClickHotKey(HotKey.F9)
+        viewModel.updatePageScrollHotKey(HotKey.F7)
         advanceUntilIdle()
-        assertEquals(HotKey.F8, store.data.first().pageClickHotKey)
-        assertEquals("F9 is already used for auto-scroll.", viewModel.messages.first())
+        assertEquals(HotKey.F9, store.data.first().pageScrollHotKey)
+        assertEquals("F7 is already used for picking points.", viewModel.messages.first())
 
-        viewModel.updatePageScrollHotKey(HotKey.F12)
+        viewModel.updatePageScrollHotKey(HotKey.F8)
         advanceUntilIdle()
-        assertEquals(HotKey.F12, store.data.first().pageScrollHotKey)
+        assertEquals(HotKey.F8, store.data.first().pageScrollHotKey)
     }
 
     @Test

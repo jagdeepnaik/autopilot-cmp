@@ -7,7 +7,7 @@ import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal val BROWSER_EXTENSION_FILES = listOf("manifest.json", "background.js", "content.js")
+internal val BROWSER_EXTENSION_FILES = listOf("manifest.json", "background.js", "content.js", "course-automation.js", "course-automation-background.js")
 
 /** Chrome loads an unpacked extension from a folder, so the app's bundled copy is written to one. */
 internal fun writeBrowserExtension(folder: File) {

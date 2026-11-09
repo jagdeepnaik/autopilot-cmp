@@ -21,6 +21,10 @@ node_modules/
 # Personal notes stay local
 /private/misc/
 
+# Local research, assessment captures, answer banks and working plans stay off GitHub.
+# Already tracked project documentation is unaffected.
+/private/
+
 # Read-only reference copy of the template
 /private/zynk-cmp-main/
 

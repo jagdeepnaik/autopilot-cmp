@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,22 +54,49 @@ internal fun RunPanel(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onRequestAccess: () -> Unit,
-    onToggleScrolling: () -> Unit,
     modifier: Modifier = Modifier,
+    onApproveAssessment: (String) -> Unit = {},
+    onProgressProfile: (String, String) -> Unit = { _, _ -> },
+    onManualAnswer: (String, Boolean) -> Unit = { _, _ -> },
+    onSaveReviewedAnswers: (String, Map<String, String>) -> Unit = { _, _ -> },
+    onRetryAssessment: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     val colors = MaterialTheme.colorScheme
     val run = state.run
     val page = state.page
     val activity = page.activity
-    // A page helper needs Chrome, not input permission, so only the others ask for access.
+    if (activity is PageActivity.Automation) {
+        CourseProgressPanel(activity.progressProfile, activity.progressSummary, onProgressProfile)
+    }
+    if (activity is PageActivity.Automation && activity.manualAnswer != null) {
+        val request = activity.manualAnswer
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Save this answer to the question bank?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(request.module, style = MaterialTheme.typography.labelLarge)
+                    Text(request.question)
+                    Text("Selected answer: ${request.answer}")
+                    Text("Save only if you have checked this answer. The app has not independently verified it.", style = MaterialTheme.typography.bodySmall)
+                    activity.answerSaveError?.let { Text(it, color = colors.error) }
+                }
+            },
+            confirmButton = { TextButton(enabled = !activity.savingAnswer, onClick = { onManualAnswer(request.token, true) }) { Text(if (activity.savingAnswer) "Saving…" else "Save and continue") } },
+            dismissButton = { TextButton(enabled = !activity.savingAnswer, onClick = { onManualAnswer(request.token, false) }) { Text("Continue without saving") } },
+        )
+    }
+    if (activity is PageActivity.Automation && activity.failure != null) {
+        AssessmentReview(activity.failure, activity.savingAnswer, activity.answerSaveError, onSaveReviewedAnswers)
+    }
+    // Website automation needs Chrome; pointer-based routines also require input permission.
     val needsAccess = state.selected?.needsInputAccess() != false
     val access = if (needsAccess) state.access else InputAccess.Granted
     // Why a selected Chrome routine can't reach Chrome, such as another program holding its port.
     val chromeProblem = page.problem.takeIf { state.selected != null && state.selected !is ClickRoutine }
     val (icon, tint) = statusAppearance(state, access)
     val title = when {
-        activity is PageActivity.Helper -> "Web page helper on"
-        activity is PageActivity.Course -> "Course helper on"
+        activity is PageActivity.Automation -> "Sagar Mein Yog automation on"
         activity is PageActivity.ScrollClick -> "Round ${activity.progress.round} of ${activity.progress.rounds}"
         run is RunState.CountingDown -> "Starting in ${run.secondsLeft}…"
         run is RunState.Running -> if (run.pause != null) "Paused" else "Clicking"
@@ -78,22 +107,8 @@ internal fun RunPanel(
         else -> "Ready"
     }
     val detail = when {
-        activity is PageActivity.Helper -> buildString {
-            append(
-                when {
-                    !page.isConnected -> "Waiting for Chrome. The extension steps are in Settings."
-                    page.foundLabel != null -> "Next step: ${page.foundLabel}. Press ${state.pageClickHotKey.name} to click it."
-                    else -> "Looking for a button that matches your words."
-                },
-            )
-            if (page.isScrolling) append(" Scrolling.")
-        }
         activity is PageActivity.ScrollClick -> "${activity.routine.name} · ${scrollClickDetail(activity.progress)}"
-        activity is PageActivity.Course -> when {
-            !page.isConnected -> "Waiting for Chrome. The extension steps are in Settings."
-            page.foundLabel != null -> "Next: ${page.foundLabel}. Press ${state.pageClickHotKey.name} to open it."
-            else -> "Open sagarmeinyog.com in Chrome. The next course or part to watch is highlighted there."
-        }
+        activity is PageActivity.Automation -> activity.detail
         run is RunState.CountingDown -> "Move to the target now. ${run.routine.name} starts soon."
         run is RunState.Running -> buildString {
             append(run.routine.name).append(" · ").append(clicksLabel(run.clicks))
@@ -116,7 +131,19 @@ internal fun RunPanel(
                 Text(detail, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
             }
         }
+        if (activity is PageActivity.Automation && activity.failure != null) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("An automatic retry starts one new attempt and may consume an attempt. The retry uses this routine’s assessment mode.", style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = activity.failure.canRetry && !activity.savingAnswer, onClick = { onRetryAssessment(activity.failure.token, true) }) { Text("Start automatic retry") }
+                OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !activity.savingAnswer, onClick = { onRetryAssessment(activity.failure.token, false) }) { Text("Retry manually") }
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (activity is PageActivity.Automation && activity.approval != null) {
+                Button(onClick = { onApproveAssessment(activity.approval.token) }) {
+                    Text(if (activity.approval.kind == com.jagdeep.home.domain.CourseApprovalKind.StartAssessment) "Allow assessment attempt" else "Approve submission")
+                }
+            }
             when {
                 isActive -> Button(
                     onClick = onStop,
@@ -131,15 +158,9 @@ internal fun RunPanel(
                     Text("Start", Modifier.padding(start = 8.dp))
                 }
             }
-            if (activity is PageActivity.Helper) {
-                OutlinedButton(onClick = onToggleScrolling, enabled = page.isConnected) {
-                    Text(if (page.isScrolling) "Stop scrolling" else "Start scrolling")
-                }
-            }
             if (access == InputAccess.Granted) {
                 Text(
                     when {
-                        activity is PageActivity.Helper -> "${state.pageScrollHotKey.name} scrolls, ${state.toggleHotKey.name} stops"
                         isActive -> "Press ${state.toggleHotKey.name} in any app to stop"
                         else -> "Press ${state.toggleHotKey.name} in any app to start or stop"
                     },

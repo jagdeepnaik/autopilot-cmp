@@ -32,7 +32,7 @@ class ClickControllerTest {
             .also { runCurrent() }
     }
 
-    private val helper = PageHelperRoutine("h", "Course pages")
+    private val helper = CourseAutomationRoutine("h", "Course pages")
 
     private fun TestScope.controllerWithPage(page: FakePageRunner, selected: Routine = routine): ClickController {
         val library = RoutineLibrary(listOf(routine, helper), selected.id)

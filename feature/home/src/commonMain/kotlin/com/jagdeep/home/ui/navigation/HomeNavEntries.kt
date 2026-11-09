@@ -27,6 +27,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class RouteRoutineEditor(val routineId: String? = null, val kind: String? = null) : RouteFlow
 
+@Serializable
+data object RouteRunningRoutine : RouteFlow
+
 fun EntryProviderScope<NavKey>.homeEntryProvider(
     navigator: Navigator,
     controller: ClickController,
@@ -44,7 +47,14 @@ fun EntryProviderScope<NavKey>.homeEntryProvider(
             appIcon = appIcon,
             onNewRoutine = { kind -> navigator.navigate(RouteRoutineEditor(kind = kind.name)) },
             onEditRoutine = { navigator.navigate(RouteRoutineEditor(it.id)) },
+            onOpenRunning = { navigator.navigate(RouteRunningRoutine) },
         )
+    }
+    entry<RouteRunningRoutine> {
+        val viewModel: HomeViewModel = viewModel(factory = viewModelFactory {
+            initializer { HomeViewModel(controller, repository, routineFiles, newRoutineId) }
+        })
+        com.jagdeep.home.ui.screens.RunningRoutineScreen(viewModel, onBack = navigator::goBack)
     }
     entry<RouteRoutineEditor> { route ->
         val viewModel: RoutineEditorViewModel = viewModel(factory = viewModelFactory {
