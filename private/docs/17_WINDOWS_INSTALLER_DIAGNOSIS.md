@@ -23,6 +23,17 @@ Trusted signing (below) is still the right release step, because unsigned apps c
 
 Recorded 10 November 2026. Investigation performed through the owner's requested SSH shortcut, `home-legion`. No builds or installation retries were run, and no Windows protection settings were changed.
 
+
+### Second block: the app launcher (10 November 2026)
+
+After the installer fix, version 1.0.24 installed but wouldn't open: *"Smart App Control blocked an app that may be unsafe"*. Code Integrity event 3077 recorded `explorer.exe` trying to start `C:\Program Files\AutoPilot\AutoPilot.exe`, under the same policy `{0283ac0f-fff1-49ae-ada1-8a933130cad6}`. Launching it over SSH gave *"An Application Control policy has blocked this file"*.
+
+- `AutoPilot.exe` is jpackage's generated launcher. It's unsigned and new for every build, so it has no reputation.
+- All bundled runtime DLLs are unsigned too (`jlink` copies the JDK's pre-signing files from its jmods), and so is `skiko-windows-x64.dll`. None of them was blocked: they're identical across every app built with the same JDK.
+- The Microsoft JDK's `javaw.exe` is signed by Microsoft Corporation. Starting the installed app with it, or with a copy placed in the bundled runtime, ran with no blocks.
+
+The fix: the build copies that signed `javaw.exe` into the runtime image, and `tools/windows/Use-SignedJavaLauncher.ps1` points both MSI shortcuts at it. Verified on Legion with Smart App Control on: the install succeeded, the desktop shortcut targets the signed `runtime\bin\javaw.exe` with the AutoPilot icon, the app was running 15 seconds after opening the shortcut, and no Code Integrity blocks were logged.
+
 ## Confirmed cause
 
 **Windows Smart App Control is blocking the unsigned Java packaging custom-action DLL.** The installer’s “required DLL could not be run” message is not evidence of a missing Visual C++ runtime in this case.

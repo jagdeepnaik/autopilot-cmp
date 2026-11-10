@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask
 import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
@@ -160,21 +161,63 @@ compose.desktop {
     }
 }
 
-// Windows Smart App Control blocks jpackage's unsigned installer helper DLL, so the MSI fails
-// with Error 1723. Remove that helper from each MSI as part of packaging; the script explains
-// what it removes and refuses any MSI it doesn't recognise.
+// Windows Smart App Control blocks two unsigned files jpackage produces:
+// - its installer helper DLL, so the MSI fails with Error 1723;
+// - the generated AutoPilot.exe, which is new for every build, so the app "may be unsafe".
+// The bundled runtime's DLLs are the JDK's own files, which Smart App Control already knows. So the
+// runtime image gets the JDK's vendor-signed javaw.exe, and each MSI is then patched: the helper DLL is
+// removed and the shortcuts start the app through that javaw.exe. Each script explains what it
+// changes and refuses an MSI it doesn't recognise.
 val removeUnsignedMsiHelperScript = rootProject.file("tools/windows/Remove-UnsignedMsiHelper.ps1")
+val useSignedJavaLauncherScript = rootProject.file("tools/windows/Use-SignedJavaLauncher.ps1")
+val isWindowsBuild = System.getProperty("os.name").startsWith("Windows")
+
+// The runtime image is what both the app folder and the MSI bundle, so javaw.exe goes in there.
+tasks.withType<AbstractJLinkTask>().configureEach {
+    val javaw = javaHome.map { File(it, "bin/javaw.exe") }
+    val runtime = destinationDir
+    val windows = isWindowsBuild
+    doLast {
+        if (!windows) return@doLast
+        val source = javaw.get()
+        check(source.isFile) { "No javaw.exe in the packaging JDK at ${source.parent}." }
+        source.copyTo(runtime.get().file("bin/javaw.exe").asFile, overwrite = true)
+    }
+}
+
 tasks.withType<AbstractJPackageTask>()
     .matching { it.targetFormat == TargetFormat.Msi }
     .configureEach {
         val msiDir = destinationDir
-        val script = removeUnsignedMsiHelperScript
+        val mainClass = launcherMainClass
+        val jvmArgs = launcherJvmArgs
+        val runtime = runtimeImage
+        val launcherName = packageName
+        val launcherFile = layout.buildDirectory.file("compose/tmp/$name/launcher.txt")
+        val removeHelper = removeUnsignedMsiHelperScript
+        val signedLauncher = useSignedJavaLauncherScript
         doLast {
-            val process = ProcessBuilder(
-                "powershell.exe", "-NoProfile", "-ExecutionPolicy", "RemoteSigned",
-                "-File", script.absolutePath, "-Path", msiDir.get().asFile.absolutePath,
-            ).inheritIO().start()
-            check(process.waitFor() == 0) { "Removing the unsigned installer helper from the MSI failed." }
+            fun powershell(script: File, vararg args: String) {
+                val process = ProcessBuilder(
+                    listOf("powershell.exe", "-NoProfile", "-ExecutionPolicy", "RemoteSigned", "-File", script.absolutePath) + args,
+                ).redirectErrorStream(true).start()
+                val output = process.inputStream.bufferedReader().readText().trim()
+                if (output.isNotEmpty()) println(output)
+                check(process.waitFor() == 0) { "${script.name} failed; the MSI is not ready to install." }
+            }
+            val msi = msiDir.get().asFile.absolutePath
+            powershell(removeHelper, "-Path", msi)
+            // What jpackage's launcher would run: main class first, then one JVM option per line.
+            val launcher = launcherFile.get().asFile
+            launcher.parentFile.mkdirs()
+            // jpackage adds these two to its launcher itself, so they're not in launcherJvmArgs.
+            val packagerArgs = listOf("-Dcompose.application.resources.dir=\$APPDIR\\resources", "-Dskiko.library.path=\$APPDIR")
+            launcher.writeText((listOf(mainClass.get()) + jvmArgs.get() + packagerArgs).joinToString("\n"))
+            powershell(
+                signedLauncher, "-Path", msi, "-Launcher", launcher.absolutePath,
+                "-Javaw", runtime.get().file("bin/javaw.exe").asFile.absolutePath,
+                "-LauncherName", "${launcherName.get()}.exe",
+            )
         }
     }
 
