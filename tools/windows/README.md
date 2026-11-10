@@ -19,6 +19,16 @@ AutoPilot's Windows MSI must be built on Windows. GitHub Actions can produce it 
 3. Enable **OpenSSH Server** through Windows Settings → Optional features. Start the **OpenSSH SSH Server** service and set its startup type to Automatic. Windows may require administrator approval. Limit its firewall rule to your Mac's private-network address or subnet. Do not port-forward SSH or the debugger from your router. Use the same Windows account that will run AutoPilot. See [Microsoft's instructions](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse).
 4. On Windows, note the output of `whoami`, `hostname` and `ipconfig`. On the Mac, test `ssh WINDOWS_USER@WINDOWS_LAN_IP`. Verify the host-key fingerprint on the Windows laptop before accepting the new host. Never send passwords/private keys in chat. SSH-key authentication can be set up afterwards.
 
+## Install or update remotely from the Mac
+
+After a build, `Install-Msi.ps1` installs or updates AutoPilot silently from the newest MSI and checks the result. Close AutoPilot normally on the desktop first:
+
+```bash
+ssh WINDOWS_USER@WINDOWS_LAN_IP 'powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "C:\Users\WINDOWS_USER\Projects\autopilot-cmp\tools\windows\Install-Msi.ps1"'
+```
+
+It refuses an MSI that isn't newer than the installed version, and it never touches `%USERPROFILE%\.autopilot`.
+
 ## Build remotely from the Mac
 
 Commit and push the intended code first. In the Windows checkout use `git pull --ff-only`; do not overwrite uncommitted laptop changes. Both machines must use the same commit for reliable breakpoints.

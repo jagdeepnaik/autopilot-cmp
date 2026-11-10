@@ -122,6 +122,8 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "com.jagdeep.autopilot.MainKt"
+        // The version the desktop app shows (About, status bar): the same one the MSI carries.
+        jvmArgs += "-Dautopilot.version=$windowsMsiVersion"
 
         buildTypes.release.proguard {
             // Matches the template: shrinking is off until the dependency graph is known to survive it.
@@ -220,6 +222,11 @@ tasks.withType<AbstractJPackageTask>()
             )
         }
     }
+
+// Tests see the same version property the desktop launchers pass.
+tasks.withType<Test>().matching { it.name == "jvmTest" }.configureEach {
+    systemProperty("autopilot.version", windowsMsiVersion)
+}
 
 // Release signing comes from the git-ignored keystore.properties at the project root.
 // Without it (for example on CI) the release APK is built unsigned.

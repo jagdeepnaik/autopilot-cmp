@@ -147,7 +147,7 @@ An older MSI installed over a newer one doesn't downgrade cleanly; uninstall fir
 **Option A — Legion desktop, with installer dialogs.** In PowerShell as Administrator:
 
 ```powershell
-$msi = (Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\*.msi).FullName
+$msi = (Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
 $log = "$env:TEMP\AutoPilot-install.log"
 msiexec.exe /i "$msi" /L*V "$log" /norestart
 ```
@@ -155,7 +155,7 @@ msiexec.exe /i "$msi" /L*V "$log" /norestart
 **Option B — silently, from the Windows SSH PowerShell:**
 
 ```powershell
-$msi = (Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\*.msi).FullName
+$msi = (Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
 $log = "$env:TEMP\AutoPilot-install.log"
 $start = Get-Date
 $p = Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart /L*V `"$log`"" -Wait -PassThru
