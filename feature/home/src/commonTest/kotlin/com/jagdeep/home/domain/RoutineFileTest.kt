@@ -22,14 +22,15 @@ import com.jagdeep.shared.preferences.AppPreferences
 class RoutineFileTest {
     @Test
     fun `retired helper imports are skipped while automation and click records keep their fields`() {
-        val imported = RoutineFileCodec.decode("""{"format":"autoclicker-routines","version":1,"routines":[{"type":"pageHelper","id":"p","name":"Old page"},{"type":"courseHelper","id":"h","name":"Old course"},{"type":"click","id":"c","name":"Click"},{"type":"courseAutomation","id":"s","name":"Yoga","waitAfterClickMillis":9000,"playbackSpeed":2.0}]}""")!!
+        val imported = RoutineFileCodec.decode("""{"format":"autopilot-routines","version":1,"routines":[{"type":"pageHelper","id":"p","name":"Old page"},{"type":"courseHelper","id":"h","name":"Old course"},{"type":"click","id":"c","name":"Click"},{"type":"courseAutomation","id":"s","name":"Yoga","waitAfterClickMillis":9000,"playbackSpeed":2.0}]}""")!!
         assertEquals(2, imported.skipped)
         assertEquals(listOf("c", "s"), imported.routines.map { it.id })
         val yoga = imported.routines[1] as CourseAutomationRoutine
         assertEquals(9000, yoga.waitAfterClickMillis)
         assertEquals(2.0, yoga.playbackSpeed)
+        assertEquals(LearningOrder.AssessmentAfterModule, yoga.learningOrder, "Old files keep their existing order")
         assertEquals("Sagar Mein Yog automation", yoga.kind.label)
-        assertEquals(setOf(RoutineKind.Click, RoutineKind.Sequence, RoutineKind.ScrollClick, RoutineKind.CourseAutomation), RoutineKind.entries.toSet())
+        assertEquals(setOf(RoutineKind.Click, RoutineKind.Sequence, RoutineKind.ScrollClick, RoutineKind.CourseAutomation, RoutineKind.DgsELearning), RoutineKind.entries.toSet())
     }
 
     private val sequence = ClickRoutine(
@@ -41,13 +42,14 @@ class RoutineFileTest {
         ClickRoutine("c", "Refresh", intervalMillis = 2_000),
         sequence,
         ScrollClickRoutine("s", "Next pages", ClickPoint(640, 880), rounds = 7),
-        CourseAutomationRoutine("h", "Course", playbackSpeed = 1.5),
+        CourseAutomationRoutine("h", "Course", playbackSpeed = 1.5, learningOrder = LearningOrder.VideosFirst, answerBankFile = "my-answers.json"),
+        DgsELearningRoutine("dgs", "DGS", requiredHours=28.0, creditedHours=2.5, playbackSpeed=2.0),
     )
 
     @Test
     fun `given routines of every kind when exported and read back then each comes back the same`() {
         val text = RoutineFileCodec.encode(every)
-        assertTrue("\"format\": \"autoclicker-routines\"" in text, "The file says what it is")
+        assertTrue("\"format\": \"autopilot-routines\"" in text, "The file says what it is")
         val read = RoutineFileCodec.decode(text)!!
         assertEquals(every, read.routines)
         assertEquals(0, read.skipped)
@@ -63,7 +65,7 @@ class RoutineFileTest {
 
     @Test
     fun `given a file with routines the editor would refuse when read then those are left out and counted`() {
-        val text = """{"format":"autoclicker-routines","version":1,"routines":[
+        val text = """{"format":"autopilot-routines","version":1,"routines":[
             {"type":"click","id":"a","name":"Too fast","intervalMillis":0},
             {"type":"pageHelper","id":"b","name":"No words","words":[]},
             {"type":"mystery","id":"c","name":"Unknown kind"},
@@ -105,7 +107,7 @@ class RoutineFileTest {
         runCurrent()
         viewModel.export(sequence)
         runCurrent()
-        assertEquals("Course steps.autoclicker.json", files.saved!!.first)
+        assertEquals("Course steps.autopilot.json", files.saved!!.first)
         assertEquals(listOf<Routine>(sequence), RoutineFileCodec.decode(files.saved!!.second)!!.routines)
         assertEquals("Exported 1 routine.", viewModel.messages.first())
     }
@@ -133,7 +135,7 @@ class RoutineFileTest {
         viewModel.import()
         runCurrent()
         assertTrue(repository.library.value!!.routines.isEmpty())
-        assertEquals("That file has no routines AutoClicker can use.", viewModel.messages.first())
+        assertEquals("That file has no routines AutoPilot can use.", viewModel.messages.first())
     }
 
     @Test

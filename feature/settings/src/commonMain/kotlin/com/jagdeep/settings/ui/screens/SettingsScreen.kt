@@ -115,6 +115,11 @@ fun SettingsScreen(
                     state.transferableRoutines, state.transferringRoutines, viewModel::importRoutines, viewModel::exportRoutines,
                 )
             }
+            state.answerBankFolder?.let { folder ->
+                ListItem(modifier=Modifier.clickable(role=Role.Button) { viewModel.openAnswerBankFolder() },colors=transparent(),
+                    headlineContent={ Text("Answer-bank folder") },supportingContent={ Text("$folder\nChoose a named JSON file in each routine's options.") },
+                    trailingContent={ Icon(Icons.Default.ChevronRight,null) })
+            }
 
             if (state.access != InputAccess.Unsupported) {
                 Group("Controls")
@@ -127,7 +132,7 @@ fun SettingsScreen(
             if (desktop) {
                 Group("Browser connection")
                 ListItem(colors = transparent(), headlineContent = { Text("Chrome extension") },
-                    supportingContent = { Text(if(state.browserConnected) "Connected to AutoClicker on this computer." else "Not connected. Set up the extension to use browser routines.") },
+                    supportingContent = { Text(if(state.browserConnected) "Connected to AutoPilot on this computer." else "Not connected. Set up the extension to use browser routines.") },
                     trailingContent = { TextButton(onClick = { setupOpen = true }) { Text("Set up extension") } })
             }
 
@@ -135,8 +140,8 @@ fun SettingsScreen(
                 Group("Permissions")
                 ListItem(colors = transparent(), headlineContent = { Text("Control other apps") },
                     supportingContent = { Text(when(state.access) {
-                        InputAccess.Granted -> "Allowed. AutoClicker can send clicks to other apps."
-                        InputAccess.NeedsPermission -> "Allow AutoClicker in your system’s Accessibility settings to click in other apps."
+                        InputAccess.Granted -> "Allowed. AutoPilot can send clicks to other apps."
+                        InputAccess.NeedsPermission -> "Allow AutoPilot in your system’s Accessibility settings to click in other apps."
                         InputAccess.Unsupported -> "Direct clicking is unavailable on this desktop. Browser routines use the extension."
                     }) },
                     trailingContent = if(state.access == InputAccess.NeedsPermission) ({ TextButton(onClick = viewModel::requestAccess) { Text("Open settings") } }) else null)
@@ -165,7 +170,7 @@ fun SettingsScreen(
             Text("1. Choose Show extension folder below.")
             Text("2. Open chrome://extensions in Chrome and enable Developer mode.")
             Text("3. Choose Load unpacked and select that folder.")
-            Text("After an update, reload AutoClicker Page Helper. Refresh a course page only when no timed assessment is active.", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodySmall)
+            Text("After an update, reload AutoPilot Page Helper. Refresh a course page only when no timed assessment is active.", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodySmall)
         }
     }, confirmButton = { TextButton(onClick = { setupOpen = false }) { Text("Done") } },
         dismissButton = { TextButton(onClick = viewModel::showExtension) { Text("Show extension folder") } })

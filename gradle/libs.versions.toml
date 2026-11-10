@@ -3,14 +3,14 @@
 jna = "5.15.0"
 # --> App Configuration
 # App Name to be changed inside settings.gradle.kts & IOS/Config.xcconfig
-appName = "AutoClicker"
+appName = "AutoPilot"
 versionCode = "1"
 versionName = "1.0.0"
 
 android-minSdk = "26"
 android-targetSdk = "37"
 android-compileSdk = "37"
-androidApplicationId = "com.jagdeep.autoclicker"
+androidApplicationId = "com.jagdeep.autopilot"
 
 # --> App Build Variants
 logConfigProfile = "release"  # "debug" "release"

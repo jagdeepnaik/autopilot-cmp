@@ -33,6 +33,10 @@ data class RoutineEditorUiState(
     val progressAccounts: List<com.jagdeep.persistence.room.learning.LearningAccount> = emptyList(),
     val savedProgress: CourseProgressSummary? = null,
     val progressHistoryError: String? = null,
+    val answerBankNames: List<String> = emptyList(),
+    val answerBankFolder: String? = null,
+    val answerBankMessage: String? = null,
+    val answerBankBusy: Boolean = false,
 )
 
 class RoutineEditorViewModel(
@@ -42,12 +46,14 @@ class RoutineEditorViewModel(
     private val newId: () -> String,
     /** The kind of a new routine; an existing one keeps its own. */
     private val newKind: RoutineKind = RoutineKind.Click,
+    private val answerBanks: com.jagdeep.shared.answers.AnswerBankFiles = com.jagdeep.shared.answers.NoAnswerBankFiles,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(RoutineEditorUiState(isNew = routineId == null))
     val state = mutableState.asStateFlow()
     private var captureJob: Job? = null
 
     init {
+        refreshAnswerBanks()
         viewModelScope.launch {
             val library = repository.library.filterNotNull().first()
             val existing = routineId?.let { id -> library.routines.firstOrNull { it.id == id } }
@@ -65,6 +71,23 @@ class RoutineEditorViewModel(
     }
 
     fun loadProgressHistory(account: String) = controller.page.loadProgressHistory(account)
+    fun refreshAnswerBanks() = bankAction { null }
+    fun validateAnswerBank() = bankAction { answerBanks.validate(state.value.draft.answerBankFile) }
+    fun importAnswerBank() = bankAction { answerBanks.importFile(state.value.draft.answerBankFile) }
+    fun openAnswerBankFolder() = bankAction { answerBanks.openFolder() }
+    private fun bankAction(action: suspend () -> String?) {
+        if (!answerBanks.available || state.value.answerBankBusy) return
+        mutableState.update { it.copy(answerBankBusy=true,answerBankFolder=answerBanks.folderPath) }
+        viewModelScope.launch {
+            try {
+                val message = action()
+                val names = answerBanks.names()
+                mutableState.update { it.copy(answerBankNames=names,answerBankMessage=message) }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { mutableState.update { it.copy(answerBankMessage="Couldn't access answer-bank files. Check the folder and try again.") } }
+            finally { mutableState.update { it.copy(answerBankBusy=false) } }
+        }
+    }
 
     /** Applies an edit from a field, and clears errors so they only reappear on the next save. */
     fun updateDraft(change: (RoutineDraft) -> RoutineDraft) =
@@ -150,6 +173,7 @@ class RoutineEditorViewModel(
 
     /** A new multi-point click runs its list once until told otherwise. */
     private fun newDraft(kind: RoutineKind, name: String): RoutineDraft = when (kind) {
+        RoutineKind.DgsELearning -> RoutineDraft(kind=kind,name=name,answerBankFile=DGS_ANSWER_BANK,requiredHours="")
         RoutineKind.Sequence -> RoutineDraft(kind = kind, name = name, targetMode = TargetMode.AtPoints, limitMode = LimitMode.Passes, limitPasses = "1")
         else -> RoutineDraft(kind = kind, name = name)
     }

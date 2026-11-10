@@ -60,13 +60,16 @@ internal fun RunPanel(
     onManualAnswer: (String, Boolean) -> Unit = { _, _ -> },
     onSaveReviewedAnswers: (String, Map<String, String>) -> Unit = { _, _ -> },
     onRetryAssessment: (String, Boolean) -> Unit = { _, _ -> },
+    showStopControl: Boolean = true,
+    showProgressSummary: Boolean = true,
+    statusHeading: String? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val run = state.run
     val page = state.page
     val activity = page.activity
     if (activity is PageActivity.Automation) {
-        CourseProgressPanel(activity.progressProfile, activity.progressSummary, onProgressProfile)
+        CourseProgressPanel(activity.progressProfile, activity.progressSummary.takeIf { showProgressSummary }, onProgressProfile)
     }
     if (activity is PageActivity.Automation && activity.manualAnswer != null) {
         val request = activity.manualAnswer
@@ -96,6 +99,7 @@ internal fun RunPanel(
     val chromeProblem = page.problem.takeIf { state.selected != null && state.selected !is ClickRoutine }
     val (icon, tint) = statusAppearance(state, access)
     val title = when {
+        activity is PageActivity.Dgs -> "DGS E-Learning on"
         activity is PageActivity.Automation -> "Sagar Mein Yog automation on"
         activity is PageActivity.ScrollClick -> "Round ${activity.progress.round} of ${activity.progress.rounds}"
         run is RunState.CountingDown -> "Starting in ${run.secondsLeft}…"
@@ -108,6 +112,7 @@ internal fun RunPanel(
     }
     val detail = when {
         activity is PageActivity.ScrollClick -> "${activity.routine.name} · ${scrollClickDetail(activity.progress)}"
+        activity is PageActivity.Dgs -> activity.progress.detail
         activity is PageActivity.Automation -> activity.detail
         run is RunState.CountingDown -> "Move to the target now. ${run.routine.name} starts soon."
         run is RunState.Running -> buildString {
@@ -127,7 +132,7 @@ internal fun RunPanel(
                 Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null) }
             }
             Column(Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }) {
-                Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+                Text(statusHeading ?: title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
                 Text(detail, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
             }
         }
@@ -139,13 +144,26 @@ internal fun RunPanel(
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (activity is PageActivity.Automation && activity.approval?.kind == com.jagdeep.home.domain.CourseApprovalKind.StartAssessmentPass) {
+                AlertDialog(
+                    onDismissRequest = onStop,
+                    title = { Text("All videos finished") },
+                    text = { Text("Begin unfinished module assessments now? Already-passed assessments will be skipped. Your selected assessment mode still controls starts, answers and submissions; unknown answers pause for help.") },
+                    confirmButton = { TextButton(onClick = { onApproveAssessment(activity.approval.token) }) { Text("Begin assessments") } },
+                    dismissButton = { TextButton(onClick = onStop) { Text("Not now — stop routine") } },
+                )
+            }
             if (activity is PageActivity.Automation && activity.approval != null) {
                 Button(onClick = { onApproveAssessment(activity.approval.token) }) {
-                    Text(if (activity.approval.kind == com.jagdeep.home.domain.CourseApprovalKind.StartAssessment) "Allow assessment attempt" else "Approve submission")
+                    Text(when(activity.approval.kind) {
+                        com.jagdeep.home.domain.CourseApprovalKind.StartAssessment -> "Allow assessment attempt"
+                        com.jagdeep.home.domain.CourseApprovalKind.StartAssessmentPass -> "Begin assessment pass"
+                        com.jagdeep.home.domain.CourseApprovalKind.SubmitAssessment -> "Approve submission"
+                    })
                 }
             }
             when {
-                isActive -> Button(
+                isActive -> if (showStopControl) Button(
                     onClick = onStop,
                     colors = ButtonDefaults.buttonColors(containerColor = colors.error, contentColor = colors.onError),
                 ) {
@@ -158,7 +176,7 @@ internal fun RunPanel(
                     Text("Start", Modifier.padding(start = 8.dp))
                 }
             }
-            if (access == InputAccess.Granted) {
+            if (access == InputAccess.Granted && showStopControl) {
                 Text(
                     when {
                         isActive -> "Press ${state.toggleHotKey.name} in any app to stop"
@@ -177,6 +195,9 @@ private fun statusAppearance(state: HomeUiState, access: InputAccess): Pair<Imag
     val colors = MaterialTheme.colorScheme
     val run = state.run
     return when {
+        (state.page.activity as? PageActivity.Dgs)?.progress?.needsAttention == true -> Icons.Default.PauseCircleOutline to colors.primary
+        (state.page.activity as? PageActivity.Automation)?.failure != null -> Icons.Default.ErrorOutline to colors.error
+        (state.page.activity as? PageActivity.Automation)?.let { it.approval!=null || it.manualAnswer!=null || it.progressProfile!=null } == true -> Icons.Default.PauseCircleOutline to colors.primary
         state.page.activity != null -> Icons.Default.TravelExplore to AppColors.live
         run is RunState.CountingDown -> Icons.Default.Timer to colors.primary
         run is RunState.Running && run.pause != null -> Icons.Default.PauseCircleOutline to colors.onSurfaceVariant

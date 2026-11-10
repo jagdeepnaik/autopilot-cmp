@@ -2,8 +2,8 @@
 // and clicks requested button text once. Disabled controls are skipped. Videos are never seeked.
 // Sagar Mein Yog automation uses its own separate script and action channel.
 (() => {
-  if (window.__autoClickerHelper) return;
-  window.__autoClickerHelper = true;
+  if (window.__autoPilotHelper) return;
+  window.__autoPilotHelper = true;
 
   const ACTIVE_TICK_MILLIS = 700;
   const IDLE_TICK_MILLIS = 2000;

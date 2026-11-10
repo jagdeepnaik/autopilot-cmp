@@ -6,6 +6,45 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class CourseProgressTest {
+    @Test fun `closed page size menu is reopened and maximum is checked before saving`() = runTest {
+        val store = Store(); val runner = CourseProgressSession(store,"run",5000)
+        runner.process(snapshot(),0); runner.confirm(runner.request!!.token,"Person")
+        val table = ProgressTable(true,page=1,pages=1,total=1,rows=listOf(row()),unfiltered=true,pageSize=100,pageSizeControl="size")
+        fun page(value: ProgressTable) = snapshot(value).copy(elements=snapshot(value).elements + listOf(CourseElement("size",label="100"),CourseElement("max",label="100")))
+        runner.process(page(table),1000)
+        val first = runner.action!!.request
+        runner.acknowledge(first,true,1000)
+        runner.process(page(table),5999)
+        assertNull(runner.action,"Respect the configured wait before reopening")
+        runner.process(page(table),6000)
+        assertEquals("size",runner.action?.element)
+        assertTrue(runner.action!!.request > first)
+        assertEquals(0,store.writes)
+        runner.acknowledge(runner.action!!.request,true,6000)
+        runner.process(page(table.copy(pageSizeOpen=true,pageSizeOptions=listOf(ProgressPageSize("max",100)))),11000)
+        assertEquals("max",runner.action?.element)
+        runner.acknowledge(runner.action!!.request,true,11000)
+        runner.process(page(table),16000)
+        assertEquals(1,store.writes)
+    }
+
+    @Test fun `menu that never opens pauses after bounded retries without saving partial history`() = runTest {
+        val store = Store(); val runner = CourseProgressSession(store,"run",0)
+        runner.process(snapshot(),0); runner.confirm(runner.request!!.token,"Person")
+        val table = ProgressTable(true,page=1,pages=1,total=1,rows=listOf(row()),unfiltered=true,pageSize=100,pageSizeControl="size")
+        val page = snapshot(table).copy(elements=snapshot(table).elements+CourseElement("size",label="100"))
+        repeat(3) { index ->
+            runner.process(page,(index+1)*1000L)
+            assertEquals("size",runner.action?.element)
+            runner.acknowledge(runner.action!!.request,true,(index+1)*1000L)
+        }
+        runner.process(page,4000)
+        assertNull(runner.action)
+        assertTrue(runner.blocksActions)
+        assertTrue(runner.detail.contains("three tries"))
+        assertEquals(0,store.writes)
+    }
+
     private class Store : CourseProgressRepository {
         override val available = true
         val saved = mutableMapOf<String, LearningRecord>()

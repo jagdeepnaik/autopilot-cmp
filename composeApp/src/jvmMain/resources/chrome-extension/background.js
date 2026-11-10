@@ -168,3 +168,9 @@ pollApp();
 
 // Isolated inventory/action channel for Sagar Mein Yog automation.
 if (typeof importScripts === "function") importScripts("course-automation-background.js");
+
+// Isolated DGS e-book channel.
+if (typeof importScripts === "function") importScripts("dgs-elearning-background.js");
+
+// Per-click Chrome input, restricted to DGS e-book controls.
+if (typeof importScripts === "function") importScripts("dgs-browser-clicks.js");

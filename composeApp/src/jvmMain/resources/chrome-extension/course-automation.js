@@ -2,7 +2,12 @@
 (() => {
   if (window.__courseAutomation) return;
   window.__courseAutomation = true;
-  const documentId = crypto.randomUUID();
+  // Some embedded/non-secure frames expose getRandomValues but not randomUUID.
+  // This is an opaque document identity, never a credential or a site/session identifier.
+  const random = globalThis.crypto;
+  if (!random?.getRandomValues && !random?.randomUUID) return;
+  const documentId = typeof random.randomUUID === 'function' ? random.randomUUID() :
+    Array.from(random.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
   const ids = new WeakMap();
   let nextId = 0;
   let session = null;
@@ -203,6 +208,16 @@
         const stillAuthorized = await chrome.runtime.sendMessage({ type: 'courseHello' });
         if (stillAuthorized?.session !== session || !node.isConnected) return;
         node.click();
+        // Radix Select opens on pointer-down/keyboard, not a programmatic click. Keep this fallback
+        // restricted to the validated progress selector/options; never synthesize keys for a test.
+        if (action.kind === 'progressPageSize' && node.isConnected && visible(node)) {
+          const trigger = node.matches('[role="combobox"]');
+          if (!trigger || node.getAttribute('aria-expanded') !== 'true') {
+            node.focus();
+            const key = trigger ? 'ArrowDown' : 'Enter';
+            node.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
+          }
+        }
         return;
       }
     }

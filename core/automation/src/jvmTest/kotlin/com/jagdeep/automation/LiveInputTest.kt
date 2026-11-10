@@ -19,13 +19,13 @@ import kotlinx.coroutines.launch
 /**
  * Sends real input, so it moves the pointer and only runs when asked for:
  *
- *   AUTOCLICKER_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInputTest*' --rerun
+ *   AUTOPILOT_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInputTest*' --rerun
  *
  * It clicks only inside its own always-on-top window, and refuses to continue if that window isn't
  * focused. Keep your hands off the mouse and keyboard while it runs.
  */
 class LiveInputTest {
-    private val enabled = System.getenv("AUTOCLICKER_LIVE_INPUT_TEST") == "1"
+    private val enabled = System.getenv("AUTOPILOT_LIVE_INPUT_TEST") == "1"
 
     @Test
     fun `given a real window when the device clicks it then it receives those clicks and the hot key is seen`() {
@@ -35,7 +35,7 @@ class LiveInputTest {
         val received = CopyOnWriteArrayList<Pair<Int, Int>>()
         var frame: JFrame? = null
         EventQueue.invokeAndWait {
-            frame = JFrame("AutoClicker live input test").apply {
+            frame = JFrame("AutoPilot live input test").apply {
                 isAlwaysOnTop = true
                 preferredSize = Dimension(400, 300)
                 pack()
@@ -102,7 +102,7 @@ class LiveInputTest {
         val received = CopyOnWriteArrayList<java.awt.Point>()
         var frame: JFrame? = null
         EventQueue.invokeAndWait {
-            frame = JFrame("AutoClicker live input test").apply {
+            frame = JFrame("AutoPilot live input test").apply {
                 isAlwaysOnTop = true
                 preferredSize = Dimension(500, 400)
                 pack()

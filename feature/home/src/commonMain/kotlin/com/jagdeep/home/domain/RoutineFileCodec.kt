@@ -18,9 +18,9 @@ data class ImportedRoutines(val routines: List<Routine>, val skipped: Int)
  * so a damaged or hand-edited file can't create one the editor would refuse, such as a 0 ms interval.
  */
 object RoutineFileCodec {
-    const val FORMAT = "autoclicker-routines"
+    const val FORMAT = "autopilot-routines"
     const val VERSION = 1
-    const val FILE_SUFFIX = ".autoclicker.json"
+    const val FILE_SUFFIX = ".autopilot.json"
 
     /** Larger than any real set of routines; stops a stray huge file being read at all. */
     const val MAX_FILE_CHARACTERS = 2_000_000

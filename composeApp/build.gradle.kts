@@ -25,7 +25,7 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "ComposeApp"
             isStatic = true
-            binaryOption("bundleId", "com.jagdeep.autoclicker.composeapp")
+            binaryOption("bundleId", "com.jagdeep.autopilot.composeapp")
         }
     }
 
@@ -90,7 +90,7 @@ kotlin {
 
 compose.desktop {
     application {
-        mainClass = "com.jagdeep.autoclicker.MainKt"
+        mainClass = "com.jagdeep.autopilot.MainKt"
 
         buildTypes.release.proguard {
             // Matches the template: shrinking is off until the dependency graph is known to survive it.
@@ -99,7 +99,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "AutoClicker"
+            packageName = "AutoPilot"
             packageVersion = libs.versions.versionName.get()
             // JDK modules the packaged runtime must contain (from :composeApp:suggestRuntimeModules).
             // jdk.unsupported: sun.misc.Unsafe (libraries fail at launch without it).
@@ -111,19 +111,19 @@ compose.desktop {
                 "jdk.unsupported",
             )
             macOS {
-                iconFile.set(project.file("app-icons/AutoClicker.icns"))
-                bundleID = "com.jagdeep.autoclicker"
+                iconFile.set(project.file("app-icons/AutoPilot.icns"))
+                bundleID = "com.jagdeep.autopilot"
             }
             windows {
-                iconFile.set(project.file("src/jvmMain/resources/autoclicker-icon.ico"))
+                iconFile.set(project.file("src/jvmMain/resources/autopilot-icon.ico"))
                 // Create both common Windows entry points during MSI installation.
                 shortcut = true
-                menuGroup = "AutoClicker"
+                menuGroup = "AutoPilot"
                 // Must remain stable across releases so MSI can upgrade the installed app.
-                upgradeUuid = "ea4ff469-d036-4a9c-9b32-824d6e6e11f9"
+                upgradeUuid = "bcdbe1a6-ef5a-4214-a3b6-021a08293966"
             }
             linux {
-                iconFile.set(project.file("app-icons/autoclicker-icon-linux-512.png"))
+                iconFile.set(project.file("app-icons/autopilot-icon-linux-512.png"))
             }
         }
     }
@@ -137,7 +137,7 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.jagdeep.autoclicker"
+    namespace = "com.jagdeep.autopilot"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {

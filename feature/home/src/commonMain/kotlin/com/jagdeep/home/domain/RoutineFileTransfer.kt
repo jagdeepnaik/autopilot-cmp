@@ -20,7 +20,7 @@ class RoutineFileTransfer(
         if (!isAvailable || ids.isEmpty()) return null
         val selected = repository.library.filterNotNull().first().routines.filter { it.id in ids }
         if (selected.isEmpty()) return "No routines selected for export."
-        val name = if (selected.size == 1) selected.single().name else "AutoClicker routines"
+        val name = if (selected.size == 1) selected.single().name else "AutoPilot routines"
         val fileName = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifEmpty { "Routines" } + RoutineFileCodec.FILE_SUFFIX
         return try {
             files.save(fileName,RoutineFileCodec.encode(selected))?.let { "Exported ${count(selected.size)}." }
@@ -35,7 +35,7 @@ class RoutineFileTransfer(
         catch (error: Exception) { return (error as? RoutineFileException)?.message ?: "Couldn't read that file." } ?: return null
         if (isRunning()) return "Stop the running routine before importing."
         val imported = RoutineFileCodec.decode(text)
-        if (imported == null || imported.routines.isEmpty()) return "That file has no routines AutoClicker can use."
+        if (imported == null || imported.routines.isEmpty()) return "That file has no routines AutoPilot can use."
         val added = imported.routines.map { it.withId(newId()) }
         added.forEach { repository.save(it) }
         repository.select(added.first().id)

@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.sync.Mutex
@@ -50,7 +51,11 @@ class PreferencesRoutineRepository(
     override suspend fun select(id: String) = update { it.copy(selectedId = id) }
 
     private suspend fun update(change: (RoutineData) -> RoutineData) = lock.withLock {
-        store.save(json.encodeToString(RoutineData.serializer(), change(decode(store.data.first()))))
+        val updated = change(decode(store.data.first()))
+        store.save(json.encodeToString(RoutineData.serializer(), updated))
+        // Reopening the editor immediately after Save must see the new routine, not a stale cache.
+        library.filterNotNull().first { it == updated.toLibrary() }
+        Unit
     }
 
     private fun decode(raw: String): RoutineData {

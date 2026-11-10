@@ -22,7 +22,7 @@ internal fun RoutineTransferControls(routines: List<TransferRoutine>, busy: Bool
     var choosing by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     ListItem(modifier = Modifier.clickable(enabled = !busy, role = Role.Button, onClick = onImport),
-        headlineContent = { Text("Import routines") }, supportingContent = { Text("Add copies from an .autoclicker.json file.") },
+        headlineContent = { Text("Import routines") }, supportingContent = { Text("Add copies from an .autopilot.json file.") },
         leadingContent = { Icon(Icons.Default.FileOpen, contentDescription = null) },
         trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) }, colors = ListItemDefaults.colors(containerColor = Color.Transparent))
     ListItem(modifier = Modifier.clickable(enabled = !busy && routines.isNotEmpty(), role = Role.Button) { selected = routines.map { it.id }.toSet(); choosing = true },

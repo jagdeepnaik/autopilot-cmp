@@ -11,7 +11,7 @@ test('selected speed applies to current and subsequent videos without seeking, a
     tagName: 'VIDEO', isConnected: true, playbackRate: 1, paused: false, ended: false,
     duration: 30, currentTime: 12, loop: false, muted: false, autoplay: false,
     closest: () => null, matches: () => false, hasAttribute: () => false,
-    getAttribute: () => null, querySelector: () => null,
+    getAttribute: () => null, querySelector: () => null, querySelectorAll: () => [],
     getBoundingClientRect: () => ({ width: 100, height: 100 }),
   });
   const first = video(); videos = [first];
@@ -37,4 +37,11 @@ test('selected speed applies to current and subsequent videos without seeking, a
   speed = 2; await scheduled(); enabled = false; await scheduled();
   assert.equal(second.playbackRate, 1);
   assert.equal(second.currentTime, 12);
+});
+
+test('frames without randomUUID get an opaque identity through getRandomValues',async()=>{
+ let snapshot;
+ const context={window:{},crypto:{getRandomValues:bytes=>{bytes.fill(7);return bytes}},Map,WeakMap,URL,Uint8Array,NodeFilter:{SHOW_TEXT:4},document:{readyState:'complete',querySelectorAll:()=>[],createTreeWalker:()=>({nextNode:()=>null})},location:{pathname:'/embedded'},setTimeout:()=>{},chrome:{runtime:{id:'test',sendMessage:async m=>{if(m.type==='courseHello')return {session:'s'};snapshot=m.snapshot;return {session:'s'}}}}};
+ vm.runInNewContext(source,context);for(let i=0;i<12;i++)await Promise.resolve();
+ assert.equal(snapshot.document,'07'.repeat(16));
 });

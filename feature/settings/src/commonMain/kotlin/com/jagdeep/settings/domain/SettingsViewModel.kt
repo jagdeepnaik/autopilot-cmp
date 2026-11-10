@@ -27,6 +27,7 @@ data class SettingsUiState(
     val transferableRoutines: List<com.jagdeep.shared.routines.TransferRoutine> = emptyList(),
     val transferringRoutines: Boolean = false,
     val displayWakeProblem: String? = null,
+    val answerBankFolder: String? = null,
 )
 
 private enum class HotKeyJob(val description: String, val keyIn: (AppPreferences) -> HotKey) {
@@ -43,11 +44,17 @@ class SettingsViewModel(
     private val installExtension: suspend () -> String? = { null },
     private val routineTransfer: com.jagdeep.shared.routines.RoutineTransfer = com.jagdeep.shared.routines.NoRoutineTransfer,
     displayWakeProblem: Flow<String?> = flowOf(null),
+    private val answerBanks: com.jagdeep.shared.answers.AnswerBankFiles = com.jagdeep.shared.answers.NoAnswerBankFiles,
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(SettingsUiState(access = accessGate.access(), routineFilesAvailable = routineTransfer.isAvailable))
+    private val mutableState = MutableStateFlow(SettingsUiState(access = accessGate.access(), routineFilesAvailable = routineTransfer.isAvailable, answerBankFolder=answerBanks.folderPath))
     val state = mutableState.asStateFlow()
     private val mutableMessages = Channel<String>(Channel.BUFFERED)
     val messages: Flow<String> = mutableMessages.receiveAsFlow()
+    fun openAnswerBankFolder() { viewModelScope.launch {
+        try { answerBanks.openFolder()?.let { mutableMessages.send(it) } }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { mutableMessages.send("Couldn't open the answer-bank folder. Check folder permissions.") }
+    } }
 
     fun importRoutines() = transfer { routineTransfer.importRoutines() }
     fun exportRoutines(ids: Set<String>) = transfer { routineTransfer.exportRoutines(ids) }

@@ -21,7 +21,7 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
     private var totalPages = 0
     private var totalRows = 0
     private var sizeChecked = false
-    private var sizeOpened = false
+    private var sizeOpenAttempts = 0
     private var sizeTarget: Int? = null
     private var scanSize: Int? = null
     private val collected = mutableListOf<Map<String,String>>()
@@ -36,7 +36,7 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
         request = null
         return true
     }
-    fun requireSync() { if (!fatal) { phase = "check"; expectedPage = 1; totalPages = 0; totalRows = 0; collected.clear(); sizeChecked = false; sizeOpened = false; sizeTarget = null; scanSize = null } }
+    fun requireSync() { if (!fatal) { phase = "check"; expectedPage = 1; totalPages = 0; totalRows = 0; collected.clear(); sizeChecked = false; sizeOpenAttempts = 0; sizeTarget = null; scanSize = null } }
     fun acknowledge(id: Long, success: Boolean, now: Long): Boolean {
         if (action?.request != id) return false
         action = null
@@ -150,12 +150,14 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
                 sizeTarget = maximum.value
                 click(snapshot,maximum.id,now,"Selecting the largest available page size: ${maximum.value} rows.",kind="progressPageSize")
                 return true
-            } else if (!sizeOpened) {
-                sizeOpened = true
+            } else if (sizeOpenAttempts < 3) {
+                sizeOpenAttempts++
                 click(snapshot,table.pageSizeControl,now,"Checking the largest available Rows per page option.",kind="progressPageSize")
                 return true
             } else {
-                detail = "Waiting for Rows per page choices. Reopen that menu in Chrome if it was closed."; return true
+                fatal = true
+                detail = "Rows per page did not stay open after three tries. Stop the routine, check the page in Chrome, then restart. Saved progress is unchanged."
+                return true
             }
         }
         if (scanSize != null && table.pageSize != scanSize) { requireSync(); detail = "Page size changed. Restarting the progress check."; return true }

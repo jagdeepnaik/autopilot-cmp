@@ -34,6 +34,81 @@ private val SPOT = ScreenPoint(640, 880)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PageControllerTest {
+    @Test fun `DGS native clicks require the exact pending command and foreground Chrome and ignore duplicates`() = runTest {
+        val bridge=FakeBridge();val desktop=FakeDesktop().apply {frontApp=BROWSER_APP_NAME}
+        val controller=PageController(desktop,bridge,MutableStateFlow(AppPreferences()),backgroundScope,FakeRunHistory(),{currentTime},{"dgs"})
+        runCurrent();assertNull(controller.start(DgsELearningRoutine("r","DGS")));runCurrent()
+        fun command()=Json.decodeFromString(HelperCommand.serializer(),bridge.published.last()).dgs!!
+        val session=command().session
+        val home=DgsReading(session=session,page="home",title="DGS course list",courses=listOf(DgsCourseChoice("a","Example",available=true)))
+        bridge.messages.emit(Json.encodeToString(DgsReading.serializer(),home));runCurrent()
+        controller.selectDgsCourse("a");runCurrent()
+        val pending=command();assertTrue(pending.nativeClicks)
+        val event=DgsClickEvent("dgsClick",session,pending.request!!,"home","selectCourse",200,300)
+        bridge.messages.emit(Json.encodeToString(DgsClickEvent.serializer(),event.copy(session="old")));runCurrent()
+        bridge.messages.emit(Json.encodeToString(DgsClickEvent.serializer(),event.copy(x=100001)));runCurrent()
+        assertTrue(desktop.clicks.isEmpty())
+        bridge.messages.emit(Json.encodeToString(DgsClickEvent.serializer(),event));runCurrent()
+        bridge.messages.emit(Json.encodeToString(DgsClickEvent.serializer(),event));runCurrent()
+        assertEquals(listOf<ScreenPoint?>(ScreenPoint(200,300)),desktop.clicks.toList())
+        assertEquals(1,(controller.state.value.activity as PageActivity.Dgs).progress.clicks)
+        controller.stop();runCurrent()
+        bridge.messages.emit(Json.encodeToString(DgsClickEvent.serializer(),event));runCurrent()
+        assertEquals(1,desktop.clicks.size)
+    }
+    @Test fun `DGS refuses native mouse input while another app is foreground`() = runTest {
+        val bridge=FakeBridge();val desktop=FakeDesktop().apply {frontApp="Another app"}
+        val controller=PageController(desktop,bridge,MutableStateFlow(AppPreferences()),backgroundScope,FakeRunHistory(),{currentTime},{"dgs"})
+        runCurrent();controller.start(DgsELearningRoutine("r","DGS"));runCurrent()
+        val session=Json.decodeFromString(HelperCommand.serializer(),bridge.published.last()).dgs!!.session
+        bridge.messages.emit(Json.encodeToString(DgsReading.serializer(),DgsReading(session=session,page="home",courses=listOf(DgsCourseChoice("a","Example",available=true)))));runCurrent()
+        controller.selectDgsCourse("a");runCurrent()
+        val pending=Json.decodeFromString(HelperCommand.serializer(),bridge.published.last()).dgs!!
+        bridge.messages.emit(Json.encodeToString(DgsClickEvent.serializer(),DgsClickEvent("dgsClick",session,pending.request!!,"home","selectCourse",200,300)));runCurrent()
+        assertTrue(desktop.clicks.isEmpty());assertTrue((controller.state.value.activity as PageActivity.Dgs).progress.needsAttention)
+        controller.stop();runCurrent()
+    }
+
+    @Test fun `DGS manual opening needs no input access and isolates stale sessions and removes its commands on stop`() = runTest {
+        val bridge=FakeBridge()
+        val desktop=FakeDesktop().apply {inputAccess=InputAccess.NeedsPermission}
+        val controller=PageController(desktop,bridge,MutableStateFlow(AppPreferences()),backgroundScope,FakeRunHistory(),{currentTime},{"dgs"})
+        runCurrent()
+        assertNull(controller.start(DgsELearningRoutine("r","DGS")))
+        runCurrent()
+        val command=Json.parseToJsonElement(bridge.published.last()) as kotlinx.serialization.json.JsonObject
+        val session=(command["dgs"] as kotlinx.serialization.json.JsonObject)["session"]!!.let { (it as kotlinx.serialization.json.JsonPrimitive).content }
+        bridge.messages.emit("""{"type":"dgsReading","session":"old","page":"one","title":"Wrong","ready":true,"focused":true}""")
+        runCurrent()
+        assertEquals("Waiting for course selection",(controller.state.value.activity as PageActivity.Dgs).progress.page)
+        bridge.messages.emit("""{"type":"dgsReading","session":"$session","page":"one","title":"Selected lesson","ready":true,"focused":true,"previous":false}""")
+        runCurrent()
+        assertEquals("Selected lesson",(controller.state.value.activity as PageActivity.Dgs).progress.page)
+        assertTrue(controller.stop());runCurrent()
+        assertNull(controller.state.value.activity)
+        val stopped=Json.parseToJsonElement(bridge.published.last()) as kotlinx.serialization.json.JsonObject
+        assertEquals(kotlinx.serialization.json.JsonNull,stopped["dgs"])
+    }
+
+    @Test fun `routine binds the named answer bank before loading assessment answers`() = runTest {
+        var selected: String? = null
+        var loaded = false
+        val files = object : CourseAnswerBankStore {
+            override suspend fun load(): CourseAnswerBank? = error("Must bind the routine's named file")
+            override fun forName(name: String): CourseAnswerBankStore {
+                selected = name
+                return object : CourseAnswerBankStore { override suspend fun load(): CourseAnswerBank? { loaded=true; return null } }
+            }
+        }
+        val controller = PageController(desktop,bridge,MutableStateFlow(AppPreferences()),backgroundScope,history,{currentTime},{"run"},answerBankStore=files)
+        runCurrent()
+        assertNull(controller.start(CourseAutomationRoutine("r","Named",answerAssessments=true,answerBankFile="fleet.json")))
+        runCurrent()
+        assertEquals("fleet.json",selected)
+        assertTrue(loaded)
+        controller.stop(); runCurrent()
+    }
+
     private class FakeBridge : LocalBridge {
         override val connected = MutableStateFlow(true)
         override val problem = MutableStateFlow<String?>(null)
@@ -51,6 +126,7 @@ class PageControllerTest {
         var alerts = 0
         var alertFails = false
         var inputAccess = InputAccess.Granted
+        var frontApp: String? = null
         var position: ScreenPoint? = ScreenPoint(100, 100)
         var corners = emptySet<ScreenPoint>()
         val clicks = mutableListOf<ScreenPoint?>()
@@ -66,7 +142,7 @@ class PageControllerTest {
             override fun isOverOwnFocusedWindow(point: ScreenPoint) = false
         }
         override val apps = object : ForegroundApps {
-            override fun frontmost(): String? = null
+            override fun frontmost(): String? = frontApp
             override fun running(): List<String> = emptyList()
             override fun bringToFront(name: String) {
                 broughtForward += name
@@ -134,6 +210,11 @@ class PageControllerTest {
         controller.confirmProgressProfile(profile.token,"Person")
         send(progress); assertEquals(1,imports)
         send(progress); assertEquals("home",lastCommand().courseAutomation!!.action?.element)
+        ack(); advanceTimeBy(1000)
+        val finishedLesson = dashboard.copy(path="/dashboard/courses/abc/lesson",elements=links+listOf(
+            CourseElement("video",tag="video",ended=true),CourseElement("course-back",tag="a",href="/dashboard/courses/abc",label="Back to Course")))
+        send(finishedLesson)
+        assertEquals("course-back",lastCommand().courseAutomation!!.action?.element)
         ack(); advanceTimeBy(1000)
         val course=dashboard.copy(path="/dashboard/courses/abc",elements=links+CourseElement("done",label="Rewatch video",context="Part:1 Completed"))
         send(course); advanceTimeBy(2000); send(course)

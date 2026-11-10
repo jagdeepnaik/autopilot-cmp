@@ -33,7 +33,7 @@ data class HomeUiState(
 }
 
 /** Website automation uses the extension; pointer-based routines need native input permission. */
-fun Routine.needsInputAccess(): Boolean = this !is CourseAutomationRoutine
+fun Routine.needsInputAccess(): Boolean = this !is CourseAutomationRoutine && this !is DgsELearningRoutine
 
 class HomeViewModel(
     private val controller: ClickController,
@@ -82,6 +82,8 @@ class HomeViewModel(
     }
 
     fun stop() = controller.stop()
+
+    fun selectDgsCourse(id: String) = controller.page.selectDgsCourse(id)
 
     fun approveAssessment(token: String) = controller.page.approveAssessment(token)
     fun confirmProgressProfile(token: String, localName: String) = controller.page.confirmProgressProfile(token, localName)
@@ -139,4 +141,5 @@ internal fun Routine.withId(id: String): Routine = when (this) {
     is ClickRoutine -> copy(id = id)
     is ScrollClickRoutine -> copy(id = id)
     is CourseAutomationRoutine -> copy(id = id)
+    is DgsELearningRoutine -> copy(id = id)
 }

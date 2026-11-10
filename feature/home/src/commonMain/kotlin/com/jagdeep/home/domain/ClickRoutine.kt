@@ -10,6 +10,7 @@ enum class RoutineKind(val label: String, val description: String) {
     Click("Click routine", "Clicks wherever the pointer is, in any app, at a set interval."),
     Sequence("Multi-point click", "Clicks a list of spots in order. Each has its own wait and button, and the list can run once or repeat."),
     ScrollClick("Scroll and click", "Scrolls a Chrome page to the bottom, plays any videos, clicks your spot, and repeats."),
+    DgsELearning("DGS E-Learning", "Reads DGS e-book pages, watches videos and reviews until your active study-time target."),
     CourseAutomation("Sagar Mein Yog automation", "Automatically opens unfinished courses and video lessons on sagarmeinyog.com, watches videos, and follows the selected assessment mode."),
 }
 

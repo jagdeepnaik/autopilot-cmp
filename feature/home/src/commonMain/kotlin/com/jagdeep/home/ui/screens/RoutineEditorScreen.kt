@@ -31,8 +31,10 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -42,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -104,7 +107,8 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
     val draft = state.draft
     val errors = state.errors
     val update = viewModel::updateDraft
-    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.TopStart) {
+    Column(Modifier.fillMaxSize()) {
+    Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), contentAlignment = Alignment.TopStart) {
         Column(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(vertical = 8.dp)) {
             OutlinedTextField(
                 value = draft.name,
@@ -120,11 +124,41 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                 RoutineKind.Click -> ClickSections(state, viewModel)
                 RoutineKind.Sequence -> SequenceSections(state, viewModel)
                 RoutineKind.ScrollClick -> ScrollClickSections(state, viewModel)
+                RoutineKind.DgsELearning -> {
+                    Group("Study time")
+                    NumberField("Required course hours",draft.requiredHours,errors.studyHours,{ value -> update { it.copy(requiredHours=value) } },Modifier.fillMaxWidth().padding(horizontal=16.dp))
+                    NumberField("Hours already credited by DGS",draft.creditedHours,errors.studyHours,{ value -> update { it.copy(creditedHours=value) } },Modifier.fillMaxWidth().padding(horizontal=16.dp))
+                    Text("Use the credited hours for the account and course you will select. This run counts active time locally; DGS decides official credit. Update credited hours before resuming a later run.",Modifier.padding(16.dp),style=MaterialTheme.typography.bodySmall)
+                    Group("Reading and videos")
+                    ChoiceSetting("Scroll speed",draft.pixelsPerSecond,listOf(Triple(30,"Slow",null),Triple(60,"Normal",null),Triple(100,"Faster",null))) { speed -> update { it.copy(pixelsPerSecond=speed) } }
+                    ChoiceSetting("Playback speed",draft.playbackSpeed,listOf(Triple(1.0,"1×","Default"),Triple(1.5,"1.5×",null),Triple(2.0,"2×","When the player supports it. Study hours still use real time."))) { speed -> update { it.copy(playbackSpeed=speed) } }
+                    NumberField("Wait at page bottom (seconds)",draft.waitAfterClickSeconds,errors.waitAfterClick,{ value -> update { it.copy(waitAfterClickSeconds=value) } },Modifier.fillMaxWidth().padding(horizontal=16.dp))
+                    Group("Assessment answer bank · reserved")
+                    Text("Assessments are manual for now. You can prepare a separate JSON bank here for a future update.",Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall)
+                    AnswerBankOptions(state,viewModel)
+                    Group("Before starting")
+                    Text("Sign in at https://dgsstcwlms.aduacademy.in/form/studenthome in a single Chrome tab. Open the course and E-BOOK yourself, then start the routine. Keep Chrome in front while reading. The routine slowly scrolls, waits for videos to finish, then uses Next. It reads forward from the page you opened. At the last page, it returns to the first page and repeats while study time remains. Each page gets at least 30 seconds. Login, facial verification, unavailable videos and unchanged navigation pause the routine for you. Stop at any time.",Modifier.padding(16.dp),style=MaterialTheme.typography.bodyMedium)
+                }
                 RoutineKind.CourseAutomation -> {
+                    Group("Run preferences")
+                    ChoiceSetting("Learning order",draft.learningOrder,listOf(
+                        Triple(com.jagdeep.home.domain.LearningOrder.AssessmentAfterModule,"Assessment after each module","Finish a module's videos, then handle its unfinished assessment."),
+                        Triple(com.jagdeep.home.domain.LearningOrder.VideosFirst,"Watch all videos first","Finish all videos, then ask for confirmation before the assessment pass."),
+                    )) { order -> update { it.copy(learningOrder=order,answerAssessments=it.answerAssessments || order==com.jagdeep.home.domain.LearningOrder.VideosFirst) } }
+                    ChoiceSetting("Playback speed",draft.playbackSpeed,listOf(
+                        Triple(1.0,"1×","Normal speed · default for new routines"),Triple(1.5,"1.5×",null),Triple(2.0,"2×",null),
+                    )) { speed -> update { it.copy(playbackSpeed=speed) } }
+                    NumberField(
+                        label = "Wait after every click (seconds)",
+                        value = draft.waitAfterClickSeconds,
+                        error = errors.waitAfterClick,
+                        onChange = { value -> update { it.copy(waitAfterClickSeconds = value) } },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    )
                     Group("Assessment")
                     ListItem(
                         headlineContent = { Text("Handle module assessments") },
-                        supportingContent = { Text("Use the chosen assessment mode after videos finish. Unknown answers always pause for manual help.") },
+                        supportingContent = { Text("Skip assessments already passed in Your Progress. Unknown answers always pause for manual help.") },
                         trailingContent = { Switch(checked = draft.answerAssessments, onCheckedChange = { enabled -> update { it.copy(answerAssessments = enabled) } }) },
                     )
                     if (draft.answerAssessments) {
@@ -133,22 +167,11 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                             Triple(com.jagdeep.home.domain.AssessmentMode.Review, "Review approvals", "Use saved answers, but approve assessment starts and submissions. Existing routines keep this mode."),
                             Triple(com.jagdeep.home.domain.AssessmentMode.Automatic, "Automatic", "Authorize starts, saved-answer selection and submission for this routine. Unknown questions pause; a failed retry still needs your choice."),
                         )
-                        modes.forEach { (mode, title, supporting) -> Choice(title, supporting, draft.assessmentMode == mode) { update { it.copy(assessmentMode = mode) } } }
+                        ChoiceSetting("Assessment mode",draft.assessmentMode,modes) { mode -> update { it.copy(assessmentMode=mode) } }
                     }
-                    Group("Playback speed")
-                    listOf(1.0 to "1×", 1.5 to "1.5×", 2.0 to "2×").forEach { (speed, title) ->
-                        Choice(title, null, draft.playbackSpeed == speed) { update { it.copy(playbackSpeed = speed) } }
-                    }
-                    Group("Timing")
-                    NumberField(
-                        label = "Wait after every click (seconds)",
-                        value = draft.waitAfterClickSeconds,
-                        error = errors.waitAfterClick,
-                        onChange = { value -> update { it.copy(waitAfterClickSeconds = value) } },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    )
-                    Group("Before you start")
-                    Text("Sign in to Sagar Mein Yog in Chrome and open your dashboard. Check the assessment mode above, then keep the course tab selected and Chrome in front while running.", modifier = Modifier.padding(horizontal = 16.dp))
+                    AnswerBankOptions(state,viewModel)
+                    Group("Help and history")
+                    Text("Sign in to Sagar Mein Yog in Chrome and leave the course tab in front while running. Choose Save to apply changes.", modifier = Modifier.padding(horizontal = 16.dp),style=MaterialTheme.typography.bodySmall)
                     com.jagdeep.home.ui.components.CourseAutomationGuide()
                     com.jagdeep.home.ui.components.CourseProgressHistory(
                         state.progressAccounts, state.savedProgress, state.progressHistoryError, viewModel::loadProgressHistory,
@@ -156,12 +179,52 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                 }
             }
 
-            Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        }
+    }
+            Row(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = viewModel::save) { Text("Save") }
                 TextButton(onClick = onBack) { Text("Cancel") }
             }
-        }
     }
+}
+
+@Composable
+private fun <T> ChoiceSetting(title: String, selected: T, options: List<Triple<T,String,String?>>, onSelect: (T) -> Unit) {
+    Text(title,Modifier.padding(horizontal=16.dp,vertical=8.dp),style=MaterialTheme.typography.titleSmall)
+    Column(Modifier.selectableGroup()) {
+        options.forEach { (value,label,description) -> Choice(label,description,selected==value) { onSelect(value) } }
+    }
+}
+
+@Composable
+private fun AnswerBankOptions(state: RoutineEditorUiState, viewModel: RoutineEditorViewModel) {
+    var namesOpen by remember { mutableStateOf(false) }
+    Group("Answer bank")
+    if (state.answerBankFolder != null) TextButton(onClick=viewModel::openAnswerBankFolder,enabled=!state.answerBankBusy,
+        modifier=Modifier.padding(horizontal=8.dp)) {
+        Icon(Icons.Default.FolderOpen,null,Modifier.size(18.dp))
+        Text("Open Q&A folder",Modifier.padding(start=8.dp))
+    }
+        Column(Modifier.padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(value=state.draft.answerBankFile,onValueChange={name->viewModel.updateDraft{it.copy(answerBankFile=name)}},
+                label={Text("File name")},singleLine=true,isError=state.errors.answerBankFile!=null,
+                supportingText={Text(state.errors.answerBankFile ?: "Use a name such as my-answers.json. Save the routine to apply it.")})
+            state.answerBankFolder?.let { Text(it,style=MaterialTheme.typography.bodySmall) }
+            Text(if(state.draft.kind==RoutineKind.DgsELearning) "Reserved for future DGS assessment support. This routine does not read or answer assessments." else "Files are validated and loaded at the start of each run. Changing a file does not alter an active assessment.",style=MaterialTheme.typography.bodySmall)
+            if(state.answerBankFolder!=null) {
+                Box {
+                    TextButton(onClick={namesOpen=true},enabled=!state.answerBankBusy) { Text("Choose saved file") }
+                    DropdownMenu(expanded=namesOpen,onDismissRequest={namesOpen=false}) {
+                        state.answerBankNames.forEach { name -> DropdownMenuItem(text={Text(name)},onClick={viewModel.updateDraft{it.copy(answerBankFile=name)};namesOpen=false}) }
+                        if(state.answerBankNames.isEmpty()) DropdownMenuItem(text={Text("No JSON files yet")},onClick={},enabled=false)
+                    }
+                }
+                TextButton(onClick=viewModel::importAnswerBank,enabled=!state.answerBankBusy) { Text("Import JSON with this name") }
+                TextButton(onClick=viewModel::validateAnswerBank,enabled=!state.answerBankBusy) { Text("Validate and reload list") }
+            }
+            state.answerBankMessage?.let { Text(it,style=MaterialTheme.typography.bodySmall) }
+            if(state.answerBankBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        }
 }
 
 @Composable

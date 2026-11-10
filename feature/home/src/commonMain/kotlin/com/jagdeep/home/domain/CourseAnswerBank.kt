@@ -76,7 +76,8 @@ sealed interface AnswerBankSaveResult {
     data object Invalid : AnswerBankSaveResult
 }
 
-interface CourseAnswerBankStore {
+interface CourseAnswerBankStore : com.jagdeep.shared.answers.AnswerBankFiles {
+    fun forName(name: String): CourseAnswerBankStore = this
     suspend fun load(): CourseAnswerBank?
     suspend fun save(module: String, answer: CourseAnswer): AnswerBankSaveResult = AnswerBankSaveResult.Unavailable
     suspend fun saveReviewed(module: String, answers: List<ReviewedAnswer>): AnswerBankSaveResult = AnswerBankSaveResult.Unavailable
@@ -100,7 +101,7 @@ internal data class CourseAssessment(
     val retry: String? = null,
 )
 
-enum class CourseApprovalKind { StartAssessment, SubmitAssessment }
+enum class CourseApprovalKind { StartAssessment, SubmitAssessment, StartAssessmentPass }
 data class CourseApprovalRequest(val token: String, val kind: CourseApprovalKind, val module: String)
 data class ManualAnswerRequest(val token: String, val module: String, val question: String, val options: List<String>, val answer: String, val previousAnswer: String? = null)
 data class AssessmentReviewQuestion(val id: String, val question: String, val options: List<String>, val selectedAnswer: String?, val bankAnswer: String?)

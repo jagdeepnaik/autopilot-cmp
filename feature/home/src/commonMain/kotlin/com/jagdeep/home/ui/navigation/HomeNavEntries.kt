@@ -37,6 +37,7 @@ fun EntryProviderScope<NavKey>.homeEntryProvider(
     newRoutineId: () -> String,
     appIcon: @Composable () -> Unit,
     routineFiles: RoutineFiles = NoRoutineFiles,
+    answerBanks: com.jagdeep.shared.answers.AnswerBankFiles = com.jagdeep.shared.answers.NoAnswerBankFiles,
 ) {
     entry<RouteTopLevel.Home> {
         val viewModel: HomeViewModel = viewModel(factory = viewModelFactory {
@@ -59,7 +60,7 @@ fun EntryProviderScope<NavKey>.homeEntryProvider(
     entry<RouteRoutineEditor> { route ->
         val viewModel: RoutineEditorViewModel = viewModel(factory = viewModelFactory {
             val kind = RoutineKind.entries.firstOrNull { it.name == route.kind } ?: RoutineKind.Click
-            initializer { RoutineEditorViewModel(route.routineId, controller, repository, newRoutineId, kind) }
+            initializer { RoutineEditorViewModel(route.routineId, controller, repository, newRoutineId, kind, answerBanks) }
         })
         val state by viewModel.state.collectAsState()
         LaunchedEffect(state.isSaved) { if (state.isSaved) navigator.goBack() }

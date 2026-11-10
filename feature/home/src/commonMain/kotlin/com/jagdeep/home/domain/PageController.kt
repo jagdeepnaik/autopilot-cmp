@@ -38,6 +38,8 @@ data class CourseRunContext(val module: String? = null, val lesson: String? = nu
 sealed interface PageActivity {
     val routine: Routine
 
+    data class Dgs(override val routine: DgsELearningRoutine, val progress: DgsProgress) : PageActivity
+
     data class ScrollClick(override val routine: ScrollClickRoutine, val progress: ScrollClickProgress) : PageActivity
 
     data class Automation(
@@ -91,6 +93,7 @@ interface PageRunner {
     fun confirmProgressProfile(token: String, localName: String) = Unit
     fun saveReviewedAnswers(token: String, answers: Map<String, String>) = Unit
     fun retryAssessment(token: String, automatic: Boolean) = Unit
+    fun selectDgsCourse(id: String) = Unit
 }
 
 /** Where there's no Chrome link, as in tests of other routines. */
@@ -119,6 +122,7 @@ internal data class HelperCommand(
     /** Always false; retained until older installed extensions have been reloaded. */
     val course: Boolean = false,
     val courseAutomation: CourseCommand? = null,
+    val dgs: DgsCommand? = null,
 )
 
 @Serializable
@@ -174,13 +178,14 @@ class PageController(
     }
     override fun confirmManualAnswer(token: String, save: Boolean) {
         val runner = courseAutomation ?: return
+        val bankStore = activeAnswerBankStore
         val request = runner.manualAnswer?.takeIf { it.token == token } ?: return
         val activity = state.value.activity as? PageActivity.Automation ?: return
         if (activity.savingAnswer) return
         mutableState.update { it.copy(activity = activity.copy(savingAnswer = save, answerSaveError = null)) }
         scope.launch {
             val result = if (save) try {
-                answerBankStore.saveReviewed(request.module, listOf(ReviewedAnswer(CourseAnswer(request.question, request.options, request.answer), request.previousAnswer)))
+                bankStore.saveReviewed(request.module, listOf(ReviewedAnswer(CourseAnswer(request.question, request.options, request.answer), request.previousAnswer)))
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (_: Exception) { AnswerBankSaveResult.Unavailable }
             else null
@@ -202,6 +207,7 @@ class PageController(
 
     override fun saveReviewedAnswers(token: String, answers: Map<String, String>) {
         val runner = courseAutomation ?: return
+        val bankStore = activeAnswerBankStore
         val failure = runner.failure?.takeIf { it.token == token } ?: return
         val activity = state.value.activity as? PageActivity.Automation ?: return
         if (activity.savingAnswer || answers.isEmpty()) return
@@ -212,7 +218,7 @@ class PageController(
         }
         mutableState.update { it.copy(activity = activity.copy(savingAnswer = true, answerSaveError = null)) }
         scope.launch {
-            val result = try { answerBankStore.saveReviewed(failure.module, reviewed) }
+            val result = try { bankStore.saveReviewed(failure.module, reviewed) }
             catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (_: Exception) { AnswerBankSaveResult.Unavailable }
             if (courseAutomation !== runner || runner.failure?.token != token) return@launch
@@ -266,6 +272,7 @@ class PageController(
     private var textRequest = 0L
     private var pendingText: String? = null
     private var courseAutomation: CourseAutomationSession? = null
+    private var activeAnswerBankStore: CourseAnswerBankStore = answerBankStore
     private var courseProgress: CourseProgressSession? = null
     private var progressCheckpoint = 0
     private val courseChunks = CourseSnapshotAssembler()
@@ -319,6 +326,17 @@ class PageController(
         }
     }
 
+    override fun selectDgsCourse(id: String) {
+        val runner=dgsSession ?: return
+        runner.selectCourse(id,now())
+        val activity=state.value.activity as? PageActivity.Dgs ?: return
+        mutableState.update { it.copy(activity=activity.copy(progress=runner.progress)) }; publish()
+        automation.apps.bringToFront(BROWSER_APP_NAME)
+    }
+
+    private var dgsSession: DgsSession? = null
+    private var dgsLastReading = 0L
+
     override fun start(routine: Routine): String? {
         if (isActive) return null
         val refusal = startOrRefuse(routine)
@@ -332,9 +350,17 @@ class PageController(
         state.value.problem?.let { return it }
         if (!state.value.isConnected) return NOT_CONNECTED
         return when (routine) {
+            is DgsELearningRoutine -> {
+                val runner = DgsSession("${newId()}:${now()}",routine,nativeClicks=automation.access.access()==InputAccess.Granted)
+                dgsSession=runner; dgsLastReading=now()
+                launchActivity(PageActivity.Dgs(routine,runner.progress),scrolling=false) { performDgs(routine,runner) }
+                automation.apps.bringToFront(BROWSER_APP_NAME)
+                null
+            }
             is CourseAutomationRoutine -> {
+                activeAnswerBankStore = answerBankStore.forName(routine.answerBankFile)
                 lastCourseInventoryAt = now()
-                courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode)
+                courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode, routine.learningOrder, routine.answerBankFile)
                 courseProgress = if (progressRepository.available) CourseProgressSession(progressRepository, courseAutomation!!.session, routine.waitAfterClickMillis) else null
                 progressCheckpoint = 0
                 courseChunks.clear()
@@ -355,6 +381,7 @@ class PageController(
 
     override fun stop(): Boolean {
         val active = isActive
+        if(dgsSession!=null) { dgsSession=null; publish() }
         if (state.value.activity is PageActivity.Automation) {
             courseAutomation = null
             courseProgress = null
@@ -372,7 +399,7 @@ class PageController(
                 live.log(LiveSource.Keys) { "Scroll key: stopping scroll and click" }
                 stop()
             }
-            is PageActivity.Automation, null -> Unit
+            is PageActivity.Automation, is PageActivity.Dgs, null -> Unit
         }
     }
 
@@ -427,13 +454,31 @@ class PageController(
         }
     }
 
+    private suspend fun performDgs(routine: DgsELearningRoutine, runner: DgsSession) {
+        val started=now()
+        var outcome=RunOutcome.StoppedByUser
+        try {
+            while(true) {
+                if(!state.value.isConnected) { outcome=RunOutcome.BrowserDisconnected; break }
+                if(runner.completed) { outcome=RunOutcome.Completed; break }
+                if(now()-dgsLastReading>4_000) {
+                    runner.stale()
+                    mutableState.update { it.copy(activity=PageActivity.Dgs(routine,runner.progress)) }; publish()
+                }
+                val position=automation.pointer.position()
+                if(currentPreferences.value.stopAtScreenCorner && position!=null && automation.pointer.isScreenCorner(position)) { outcome=RunOutcome.ScreenCorner; break }
+                kotlinx.coroutines.delay(250)
+            }
+        } finally { withContext(NonCancellable) { endActivity(); record(routine.name,started,runner.progress.clicks,outcome) } }
+    }
+
     private suspend fun performCourseAutomation(routine: CourseAutomationRoutine) {
         val startedAt = now()
         val runner = courseAutomation
         var outcome = RunOutcome.StoppedByUser
         try {
             if (routine.answerAssessments) {
-                val bank = try { answerBankStore.load() }
+                val bank = try { activeAnswerBankStore.load() }
                 catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                 catch (_: Exception) { null }
                 runner?.configureAnswers(bank)
@@ -445,7 +490,10 @@ class PageController(
                 if (runner != null && now() - lastCourseInventoryAt > 5_000 && runner.approval == null && runner.attention == null && runner.failure == null && runner.manualAnswer == null) {
                     mutableState.update { state ->
                         val activity = state.activity as? PageActivity.Automation ?: return@update state
-                        state.copy(activity = activity.copy(detail = "Waiting for page updates. Keep the course tab active in Chrome."))
+                        val progressStep = courseProgress?.takeIf { it.isChecking }?.detail
+                        val detail = if (progressStep != null) "Waiting for page updates. Keep the course tab active in Chrome. Last progress step: $progressStep"
+                            else "Waiting for page updates. Keep the course tab active in Chrome."
+                        state.copy(activity = activity.copy(detail = detail))
                     }
                 }
                 val prefs = currentPreferences.value
@@ -479,6 +527,7 @@ class PageController(
     }
 
     private fun endActivity() {
+        dgsSession=null
         courseAutomation = null
         courseProgress = null
         courseChunks.clear()
@@ -491,6 +540,41 @@ class PageController(
     }
 
     private suspend fun onMessage(raw: String) {
+        if(raw.length<=4_000) {
+            val event=runCatching {json.decodeFromString(DgsBrowserAction.serializer(),raw)}.getOrNull()
+            if(event?.type=="dgsBrowserAction") {
+                val runner=dgsSession ?: return
+                runner.acknowledgeBrowserAction(event)
+                val activity=state.value.activity as? PageActivity.Dgs ?: return
+                mutableState.update {it.copy(activity=activity.copy(progress=runner.progress))};publish();return
+            }
+        }
+
+        if(raw.length<=4_000) {
+            val event=runCatching { json.decodeFromString(DgsClickEvent.serializer(),raw) }.getOrNull()
+            if(event?.type=="dgsClick") {
+                val runner=dgsSession ?: return
+                if(event.x !in -100_000..100_000 || event.y !in -100_000..100_000 || !runner.claimNativeClick(event)) return
+                val point=ScreenPoint(event.x,event.y)
+                val safe=state.value.isConnected && automation.access.access()==InputAccess.Granted && automation.apps.frontmost()==BROWSER_APP_NAME && !automation.pointer.isOverOwnFocusedWindow(point)
+                if(!safe || !automation.pointer.click(point,com.jagdeep.automation.PointerButton.Left,1)) runner.nativeClickFailed("Couldn't click DGS. Keep its Chrome window in front, check Accessibility access and select the course again, or use the page button manually.")
+                else {runner.nativeClickSucceeded(); live.log(LiveSource.Click) { "DGS native click: ${event.action}" }}
+                val activity=state.value.activity as? PageActivity.Dgs ?: return
+                mutableState.update { it.copy(activity=activity.copy(progress=runner.progress)) }; publish(); return
+            }
+        }
+
+        if(raw.length<=16_000) {
+            val reading=runCatching { json.decodeFromString(DgsReading.serializer(),raw) }.getOrNull()
+            if(reading?.type=="dgsReading") {
+                val runner=dgsSession ?: return
+                if(reading.session!=runner.session) return
+                dgsLastReading=now(); runner.read(reading,now())
+                val activity=state.value.activity as? PageActivity.Dgs ?: return
+                if(activity.progress.detail!=runner.progress.detail) live.log(LiveSource.Chrome) { "DGS · ${runner.progress.page}: ${runner.progress.detail}" }
+                mutableState.update { it.copy(activity=activity.copy(progress=runner.progress)) }; publish(); return
+            }
+        }
         if (handleCourseMessage(raw)) return
         live.log(LiveSource.Chrome) { "← ${raw.take(MAX_LOGGED_MESSAGE)}" }
         val event = try {
@@ -524,7 +608,7 @@ class PageController(
             pixelsPerSecond = when (activity) {
                 is PageActivity.ScrollClick -> activity.routine.pixelsPerSecond
                 null -> DEFAULT_PIXELS_PER_SECOND
-                is PageActivity.Automation -> DEFAULT_PIXELS_PER_SECOND
+                is PageActivity.Automation, is PageActivity.Dgs -> DEFAULT_PIXELS_PER_SECOND
             },
             words = emptyList(),
             advance = 0,
@@ -533,6 +617,7 @@ class PageController(
             clickText = pendingText.takeIf { activity is PageActivity.ScrollClick },
             clickRequest = textRequest,
             course = false,
+            dgs = dgsSession?.command,
             courseAutomation = courseAutomation?.let { CourseCommand(it.session, if (courseProgress?.blocksActions == true) null else courseProgress?.action ?: it.action, it.playbackSpeed) },
         )
         val encoded = json.encodeToString(HelperCommand.serializer(), command)
@@ -563,7 +648,7 @@ class PageController(
                 val current = state.activity as? PageActivity.Automation ?: return@update state
                 val modulePath = snapshot.path.split('/').take(4).joinToString("/")
                 val module = snapshot.assessment?.module?.takeIf { it.isNotBlank() }
-                    ?: snapshot.elements.firstOrNull { it.href == modulePath && it.label.isNotBlank() }?.label
+                    ?: snapshot.elements.firstOrNull { Regex("/dashboard/courses/[A-Za-z0-9_-]+").matches(modulePath) && it.href == modulePath && it.label.isNotBlank() }?.label
                     ?: current.context.module.takeIf { snapshot.path.startsWith("/dashboard/courses/") }
                 val lesson = snapshot.elements.firstOrNull { it.tag in setOf("h1","h2","h3","h4") && Regex("^Part\\s*:",RegexOption.IGNORE_CASE).containsMatchIn(it.label) }?.label
                 val question = snapshot.assessment?.questions?.firstOrNull { q -> q.options.none { it.selected } }?.text
@@ -593,6 +678,7 @@ class PageController(
         val key = runner.attention ?: runner.failure?.token
         val detail = (courseProgress?.takeIf { it.action != null || it.request != null || it.isChecking }?.detail ?: runner.detail) + if (key != null && key == failedAudioAttention) " Sound unavailable; check the audio output." else ""
         mutableState.update { it.copy(activity = activity.copy(detail = detail, clicks = runner.clicks, approval = runner.approval,
+            context = activity.context.copy(module = runner.currentModule ?: activity.context.module),
             manualAnswer = runner.manualAnswer, failure = runner.failure,
             progressProfile = courseProgress?.request, progressSummary = courseProgress?.summary,
             savingAnswer = activity.savingAnswer && activity.manualAnswer?.token == runner.manualAnswer?.token,

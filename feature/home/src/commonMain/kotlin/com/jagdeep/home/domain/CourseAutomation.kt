@@ -12,12 +12,17 @@ data class CourseAutomationRoutine(
     val playbackSpeed: Double = 1.0,
     val answerAssessments: Boolean = false,
     val assessmentMode: AssessmentMode = AssessmentMode.Review,
+    val learningOrder: LearningOrder = LearningOrder.AssessmentAfterModule,
+    val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE,
 ) : Routine {
     override val kind: RoutineKind get() = RoutineKind.CourseAutomation
 }
 
 @Serializable
 enum class AssessmentMode { Manual, Review, Automatic }
+
+@Serializable
+enum class LearningOrder { AssessmentAfterModule, VideosFirst }
 
 /** Only compact semantic descriptions cross the bridge, never form values or page HTML. */
 @Serializable
@@ -59,8 +64,16 @@ internal data class CourseCommand(val session: String, val action: CourseAction?
 
 /** App-owned decisions; the extension only describes elements and executes a specific command. */
 internal class CourseAutomationSession(val session: String, private val waitAfterClickMillis: Long = 0, playbackSpeed: Double = 1.0, private val answerAssessments: Boolean = false,
-    private val assessmentMode: AssessmentMode = AssessmentMode.Review) {
+    private val assessmentMode: AssessmentMode = AssessmentMode.Review,
+    private val learningOrder: LearningOrder = LearningOrder.AssessmentAfterModule,
+    private val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE) {
     var progressCheckpoint = 0; private set
+    var currentModule: String? = null; private set
+    private val moduleTitles = mutableMapOf<String, String>()
+    private val newlyWatchedCourses = mutableSetOf<String>()
+    private var assessmentPass = false
+    private var waitingForAssessmentPass = false
+    private var rewindDashboard = false
     private var savedPassedTitles = emptySet<String>()
     private var savedUnsubmittedTitles = emptySet<String>()
     fun configureProgress(summary: CourseProgressSummary?) {
@@ -114,7 +127,21 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var approvedSubmission: String? = null
     fun approveAssessment(token: String) {
         val request = approval?.takeIf { it.token == token } ?: return
-        if (request.kind == CourseApprovalKind.StartAssessment) approvedStarts.add(coursePath ?: return)
+        if (request.kind == CourseApprovalKind.StartAssessmentPass) {
+            if (!waitingForAssessmentPass) return
+            waitingForAssessmentPass = false
+            assessmentPass = true
+            rewindDashboard = true
+            completedCourses.removeAll { it !in passedAssessments }
+            completedCards.clear()
+            finishedDashboardPages.clear()
+            attempted.clear()
+            blockedPath = null
+            blockedDocument = null
+            lastPath = null
+            currentModule = null
+            detail = "Assessment pass approved. Finding unfinished assessments."
+        } else if (request.kind == CourseApprovalKind.StartAssessment) approvedStarts.add(coursePath ?: return)
         else approvedSubmission = token
         approval = null
     }
@@ -190,6 +217,11 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
 
     fun read(snapshot: CourseSnapshot, now: Long) {
         if (snapshot.session != session || !snapshot.ready) return
+        if (waitingForAssessmentPass) {
+            approval = CourseApprovalRequest("$session:assessment-pass", CourseApprovalKind.StartAssessmentPass, "Unfinished module assessments")
+            detail = "All available videos finished. Confirm in the app before beginning unfinished assessments."
+            return
+        }
         if (snapshot.truncated) { detail = "This page has too many controls to read safely. Stop and continue in Chrome."; return }
         val reportedPath = snapshot.path.trimEnd('/')
         if (!Regex("/dashboard(?:/courses(?:/[A-Za-z0-9_-]+(?:/(?:test/[A-Za-z0-9_-]+|assessment/result/[A-Za-z0-9_-]+|[A-Za-z0-9_-]+))?)?)?").matches(reportedPath)) return
@@ -203,6 +235,12 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             coursePath = breadcrumb ?: reportedPath.split('/').takeIf { it.size >= 4 }?.take(4)?.joinToString("/") ?: coursePath
         }
         val path = coursePath ?: reportedPath
+        if (view != CourseView.Dashboard) {
+            val title = snapshot.assessment?.module?.takeIf { it.isNotBlank() }
+                ?: moduleTitles[path]
+                ?: snapshot.elements.firstOrNull { it.href == path && it.label.isNotBlank() }?.label
+            if (title != null) { currentModule = title; moduleTitles[path] = title }
+        }
         // Part numbers repeat between chapters. A real lesson breadcrumb is stronger identity
         // than Part:1 or Chrome's potentially stale sender URL.
         val lessonPage = snapshot.elements.firstOrNull {
@@ -267,6 +305,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             return false
         }
         if (view == CourseView.Assessment) {
+            if (learningOrder == LearningOrder.VideosFirst && !assessmentPass) {
+                detail = "This run watches videos only. Assessments are left for a later run. Return to the course in Chrome to continue videos."
+                return
+            }
             val assessment = snapshot.assessment ?: return
             assessment.questions.forEach { observedQuestions.getOrPut(path) { mutableMapOf() }[CourseAnswerBank.normalize(it.text) + it.options.map { option -> CourseAnswerBank.optionText(option.text) }.sorted().joinToString("|")] = it }
             if (assessment.result == "failed") {
@@ -442,6 +484,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             if (!completionScreen && videos.values.any { !it.ended }) { detail = "Waiting for the video to finish. Press play in Chrome if paused."; return }
             lastLesson?.let(completedLessons::add)
             lessonPage?.let(completedLessonPages::add)
+            coursePath?.let(newlyWatchedCourses::add)
             val courseReturn = elements.firstOrNull { it.label.equals("Back to Course", true) }
                 ?: elements.firstOrNull { it.tag == "a" && it.href == coursePath }
             if (returnToCourseAfterLesson && courseReturn != null && snapshot.top) {
@@ -512,9 +555,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             }
             if (!settled(snapshot, now)) return
             videoFinishedCourses.add(path)
-            if (elements.any { it.href == path && CourseAnswerBank.normalize(it.label) in savedPassedTitles }) passedAssessments.add(path)
-            if (answerAssessments && path !in passedAssessments) {
-                if (answerBank == null) { detail = "Videos finished. Add a valid sagarmeinyog.json answer bank before starting the assessment."; return }
+            val moduleTitle = moduleTitles[path] ?: currentModule
+            if (moduleTitle != null && CourseAnswerBank.normalize(moduleTitle) in savedPassedTitles) passedAssessments.add(path)
+            if (answerAssessments && (learningOrder == LearningOrder.AssessmentAfterModule || assessmentPass) && path !in passedAssessments) {
+                if (answerBank == null) { detail = "Videos finished. Validate $answerBankFile in the routine options before starting the assessment."; return }
                 val assessment = elements.firstOrNull { it.label.trim().equals("Assessment", true) }
                 if (assessment != null) {
                     val module = elements.firstOrNull { it.href == path }?.label?.takeIf { it.isNotBlank() } ?: path
@@ -524,7 +568,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 } else detail = "Videos finished. Waiting for this module's Assessment button."
                 return
             }
-            if (completedCourses.add(path)) progressCheckpoint++
+            if (completedCourses.add(path) && newlyWatchedCourses.remove(path)) progressCheckpoint++
             openedCard?.let(completedCards::add)
             val back = elements.firstOrNull { it.href in setOf("/dashboard", "/dashboard/courses") && !forbidden(it.label) }
                 ?: elements.firstOrNull { it.label.lowercase() in setOf("back to dashboard", "dashboard", "back to courses", "all courses") }
@@ -533,6 +577,15 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             return
         }
         // This only retries loading the dashboard, never a failed assessment attempt.
+        if (rewindDashboard) {
+            val previous = elements.firstOrNull { it.tag in setOf("button","a") && it.label.trim().lowercase() in setOf("first","previous","previous page") }
+            if (previous != null) {
+                issue(previous, message = "Returning to the first dashboard page for unfinished assessments.", repeat = true)
+                blockedPath = pageId
+                return
+            }
+            rewindDashboard = false
+        }
         val loadRetry = elements.firstOrNull { it.tag == "button" && it.label.trim().equals("Try again", true) }
         if (loadRetry != null) {
             issue(loadRetry, repeat = true, message = "Course list unavailable. Retrying; waiting at least 10 seconds between retries. Stop to cancel.")
@@ -540,20 +593,35 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             return
         }
         val allCards = elements.filter { !forbidden(it.label) && isSingleCourse(it.context) }
-        val cards = allCards.filter { !done(it.context) && it.context !in completedCards }
+        val finishedTitles = completedCourses.mapNotNull(moduleTitles::get).map(CourseAnswerBank::normalize).toSet()
+        val cards = allCards.filter { (!done(it.context) || assessmentPass) && it.context !in completedCards &&
+            (it.courseTitle == null || CourseAnswerBank.normalize(it.courseTitle) !in finishedTitles) &&
+            (!assessmentPass || it.courseTitle?.let { title -> CourseAnswerBank.normalize(title) !in savedPassedTitles } != false) }
         val next = cards.groupBy { it.context }.values.firstNotNullOfOrNull { controls ->
             controls.firstOrNull { it.href?.let { href -> href !in completedCourses && Regex("/dashboard/courses/[A-Za-z0-9_-]+").matches(href) } == true }
                 ?: controls.lastOrNull { it.svg && it.label.isBlank() }
         }
-        if (next != null) { openedCard = next.context; issue(next, message = "Opening the next unfinished course."); blockedPath = pageId }
+        if (next != null) {
+            openedCard = next.context
+            currentModule = next.courseTitle?.takeIf { it.isNotBlank() }
+            next.href?.let { href -> currentModule?.let { moduleTitles[href] = it } }
+            issue(next, message = "Opening the next unfinished course."); blockedPath = pageId
+        }
         else if (allCards.isNotEmpty() && cards.isEmpty() && settled(snapshot, now)) {
             val nextPage = elements.firstOrNull { it.label.trim().equals("Next", true) && it.tag in setOf("button", "a") }
             if (nextPage != null && finishedDashboardPages.add(pageId)) {
                 issue(nextPage, message = "This dashboard page is finished. Opening the next page of modules.")
                 blockedPath = pageId
             } else {
+                if (learningOrder == LearningOrder.VideosFirst && answerAssessments && !assessmentPass && videoFinishedCourses.any { it !in passedAssessments }) {
+                    waitingForAssessmentPass = true
+                    approval = CourseApprovalRequest("$session:assessment-pass", CourseApprovalKind.StartAssessmentPass, "Unfinished module assessments")
+                    detail = "All available videos finished. Confirm in the app before beginning unfinished assessments."
+                    return
+                }
                 completed = true
-                detail = if (answerAssessments) "Available modules and assessments finished." else "Available course videos finished. Quizzes and assessments remain manual."
+                detail = if (learningOrder == LearningOrder.VideosFirst && !assessmentPass) "All available videos finished. No unfinished assessments are enabled for this run."
+                    else if (answerAssessments) "Available modules and assessments finished." else "Available course videos finished. Quizzes and assessments remain manual."
             }
         }
         else detail = if (elements.any { it.label.trim().equals("Try again", true) })

@@ -19,7 +19,7 @@ internal fun CourseAutomationGuide() {
         text = {
             Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 GuideSection("You: prepare Chrome",
-                    "1. In this app’s Settings, find Chrome extension and choose Show extension folder. In Chrome, open chrome://extensions, enable Developer mode, choose Load unpacked and select that folder. If already installed, reload AutoClicker Page Helper after an app update.",
+                    "1. In this app’s Settings, find Chrome extension and choose Show extension folder. In Chrome, open chrome://extensions, enable Developer mode, choose Load unpacked and select that folder. If already installed, reload AutoPilot Page Helper after an app update.",
                     "2. Open https://sagarmeinyog.com/dashboard in Chrome and sign in yourself. Wait until your courses are visible. The app does not sign in for you.",
                     "3. Select a Sagar Mein Yog automation routine. Check its assessment mode, playback speed and wait after each click. Start the routine, then leave the course tab selected with Chrome in front. Keep the app running.")
                 GuideSection("Progress for each user",

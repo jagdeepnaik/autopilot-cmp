@@ -9,6 +9,68 @@ import kotlin.test.assertTrue
 
 class CourseAssessmentTest {
     @Test
+    fun `videos first pauses even in automatic mode then revisits only unfinished assessments after approval`() {
+        val runner = CourseAutomationSession("s",0,answerAssessments=true,assessmentMode=AssessmentMode.Automatic,learningOrder=LearningOrder.VideosFirst)
+        runner.configureAnswers(bank)
+        runner.configureProgress(CourseProgressSummary("user","User",1,listOf(
+            com.jagdeep.persistence.room.learning.LearningRecord("user","passed","Passed module","assessment","Course Assessment","passed",90.0,observedAt=1))))
+        val done = page(home,CourseElement("module",tag="a",href=course,label="Wellness"),CourseElement("done",label="Rewatch video",context="Part:1 Completed"),CourseElement("assessment",label="Assessment"))
+        runner.read(done,0); runner.read(done,2000)
+        assertEquals("home",runner.action?.element)
+        runner.acknowledge(runner.action!!.request,true)
+        val dashboard = CourseSnapshot("s","dash","/dashboard",elements=listOf(
+            CourseElement("passed",tag="a",href="/dashboard/courses/passed",courseTitle="Passed module",context="Passed module Completed Min. Pass 75% Duration 20min"),
+            CourseElement("pending",tag="a",href=course,courseTitle="Wellness",context="Wellness In Progress Min. Pass 75% Duration 20min")))
+        runner.read(dashboard,3000); runner.read(dashboard,5000)
+        assertEquals(CourseApprovalKind.StartAssessmentPass,runner.approval?.kind)
+        assertNull(runner.action)
+        assertFalse(runner.completed)
+        val token = runner.approval!!.token
+        runner.approveAssessment("stale")
+        runner.read(dashboard,6000)
+        assertEquals(token,runner.approval?.token)
+        runner.approveAssessment(token)
+        runner.read(dashboard,7000)
+        assertEquals("pending",runner.action?.element,"A saved pass must not be revisited for assessment")
+        runner.acknowledge(runner.action!!.request,true)
+        runner.read(done,8000); runner.read(done,10000)
+        assertEquals("assessmentOpen",runner.action?.kind)
+        assertEquals("assessment",runner.action?.element)
+    }
+
+    @Test
+    fun `videos first never opens an assessment or asks for answers after module videos are done`() {
+        val runner = CourseAutomationSession("s",0,answerAssessments=true,learningOrder=LearningOrder.VideosFirst)
+        val done = page(home,CourseElement("done",label="Rewatch video",context="Part:1 Completed"),CourseElement("assessment",label="Assessment"))
+        runner.read(done,0); runner.read(done,2000)
+        assertEquals("home",runner.action?.element)
+        assertNull(runner.approval)
+        assertNull(runner.attention)
+        assertEquals(0,runner.progressCheckpoint)
+        runner.acknowledge(runner.action!!.request,true)
+        runner.read(page(home,assessment=CourseAssessment("Wellness",start="start")),3000)
+        assertNull(runner.action)
+        assertNull(runner.approval)
+    }
+
+    @Test
+    fun `dashboard module title identifies an existing pass without relying on course breadcrumbs`() {
+        val runner = CourseAutomationSession("s",0,answerAssessments=true)
+        runner.configureAnswers(bank)
+        runner.configureProgress(CourseProgressSummary("user","User",1,listOf(
+            com.jagdeep.persistence.room.learning.LearningRecord("user","old","Wellness","assessment","Course Assessment","passed",90.0,observedAt=1))))
+        runner.read(CourseSnapshot("s","dash","/dashboard",elements=listOf(
+            CourseElement("card",tag="a",href=course,context="Wellness Min. Pass 75% Duration 20min",courseTitle="Wellness"))),0)
+        assertEquals("Wellness",runner.currentModule)
+        runner.acknowledge(runner.action!!.request,true)
+        val done = page(home,CourseElement("done",label="Rewatch video",context="Part:1 Completed"),CourseElement("assessment",label="Assessment"))
+        runner.read(done,1000); runner.read(done,3000)
+        assertNull(runner.approval)
+        assertEquals("home",runner.action?.element)
+        assertEquals(0,runner.progressCheckpoint)
+    }
+
+    @Test
     fun `given history confirms pass and course confirms videos done then skip a new assessment`() {
         val runner=CourseAutomationSession("s",0,answerAssessments=true)
         runner.configureAnswers(bank)
@@ -20,7 +82,7 @@ class CourseAssessmentTest {
         runner.read(snapshot,0); runner.read(snapshot,2000)
         assertNull(runner.approval)
         assertEquals("home",runner.action?.element)
-        assertEquals(1,runner.progressCheckpoint)
+        assertEquals(0,runner.progressCheckpoint,"Skipping an existing pass must not trigger another progress scan")
     }
 
     @Test

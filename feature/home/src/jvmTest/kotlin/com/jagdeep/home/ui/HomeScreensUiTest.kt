@@ -4,11 +4,13 @@ import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.jagdeep.automation.InputAccess
@@ -48,6 +50,109 @@ import kotlinx.coroutines.runBlocking
 
 @OptIn(ExperimentalTestApi::class)
 class HomeScreensUiTest {
+    @Test fun `DGS options expose hours default speed and reserved bank and save without starting`() = runDesktopComposeUiTest(1000,800) {
+        val repo=FakeRoutineRepository(RoutineLibrary())
+        val vm=RoutineEditorViewModel(null,controller(),repo,{"dgs"},RoutineKind.DgsELearning)
+        setContent { AppTheme { RoutineEditorScreen(vm,onBack={}) } }
+        onNodeWithText("Required course hours").performTextInput("18")
+        onNodeWithText("Hours already credited by DGS").assertExists()
+        onNodeWithText("2×").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Save").performClick()
+        waitUntil { vm.state.value.isSaved }
+        runOnIdle {
+            val saved=repo.library.value!!.selected as com.jagdeep.home.domain.DgsELearningRoutine
+            assertEquals(1.0,saved.playbackSpeed)
+            assertEquals("dgs-elearning.json",saved.answerBankFile)
+        }
+    }
+
+    @Test fun `routine chooses a named bank and validates without starting a run`() = runDesktopComposeUiTest(1000,800) {
+        var validated: String? = null
+        var opened = 0
+        val files=object : com.jagdeep.shared.answers.AnswerBankFiles {
+            override val available=true
+            override val folderPath="/example/answer-banks"
+            override suspend fun names()=listOf("fleet.json")
+            override suspend fun validate(name:String):String {validated=name;return "Valid file"}
+            override suspend fun openFolder():String? { opened++;return null }
+        }
+        val vm=RoutineEditorViewModel(null,controller(),FakeRoutineRepository(RoutineLibrary()),{"new"},RoutineKind.CourseAutomation,files)
+        setContent { AppTheme { RoutineEditorScreen(vm,onBack={}) } }
+        onNodeWithText("File name").assertExists()
+        waitUntil { !vm.state.value.answerBankBusy }
+        onNodeWithText("Choose saved file").performScrollTo().performClick()
+        onNodeWithText("fleet.json").performClick()
+        onNodeWithText("Validate and reload list").performScrollTo().performClick()
+        waitUntil { validated=="fleet.json" }
+        onNodeWithText("Valid file").assertExists()
+        runOnIdle { assertEquals("fleet.json",vm.state.value.draft.answerBankFile) }
+        onNodeWithText("Save").assertIsDisplayed()
+        onNodeWithText("Open Q&A folder").performScrollTo().performClick()
+        waitUntil { opened == 1 }
+    }
+
+    @Test
+    fun `speed selection saves through production repository and reopens at one times`() = runDesktopComposeUiTest(1000,700) {
+        val store = com.jagdeep.persistence.preferences.InMemoryPreferencesStore("")
+        val repository = com.jagdeep.home.data.PreferencesRoutineRepository(store,scope)
+        runBlocking { repository.save(CourseAutomationRoutine("speed","Speed",playbackSpeed=2.0)) }
+        val vm = RoutineEditorViewModel("speed",controller(),repository,{"new"})
+        setContent { AppTheme { RoutineEditorScreen(vm,onBack={}) } }
+        waitUntil { !vm.state.value.isLoading }
+        onNodeWithText("Save").assertIsDisplayed()
+        onNodeWithText("1×").performScrollTo().performClick()
+        onNodeWithText("Save").assertIsDisplayed().performClick()
+        waitUntil { vm.state.value.isSaved }
+        val reloaded = com.jagdeep.home.data.PreferencesRoutineRepository(store,scope)
+        val reopened = RoutineEditorViewModel("speed",controller(),reloaded,{"new"})
+        waitUntil { !reopened.state.value.isLoading }
+        runOnIdle { assertEquals(1.0,reopened.state.value.draft.playbackSpeed) }
+        val fresh = RoutineEditorViewModel(null,controller(),reloaded,{"new"},newKind=RoutineKind.CourseAutomation)
+        waitUntil { !fresh.state.value.isLoading }
+        runOnIdle { assertEquals(1.0,fresh.state.value.draft.playbackSpeed) }
+    }
+
+    @Test
+    fun `completed video pass shows confirmation and only explicit begin approves assessments`() = runDesktopComposeUiTest(1000,900) {
+        val page = FakePageRunner()
+        var approved: String? = null
+        val runner = object : com.jagdeep.home.domain.PageRunner by page {
+            override fun approveAssessment(token: String) {
+                approved = token
+                page.state.value = page.state.value.copy(activity=(page.state.value.activity as com.jagdeep.home.domain.PageActivity.Automation).copy(approval=null))
+            }
+        }
+        val routine = CourseAutomationRoutine("course","Course",answerAssessments=true,learningOrder=com.jagdeep.home.domain.LearningOrder.VideosFirst)
+        val library = FakeRoutineRepository(RoutineLibrary(listOf(routine),"course"))
+        val controller = ClickController(automation,library,MutableStateFlow(AppPreferences()),FakeRunHistory(),scope,{System.currentTimeMillis()},{"run"},page=runner)
+        fun pending(token: String) = com.jagdeep.home.domain.PageActivity.Automation(routine,"All videos finished",approval=com.jagdeep.home.domain.CourseApprovalRequest(token,com.jagdeep.home.domain.CourseApprovalKind.StartAssessmentPass,"Unfinished assessments"))
+        page.state.value = page.state.value.copy(activity=pending("pass"))
+        val viewModel = HomeViewModel(controller,library)
+        setContent { AppTheme { androidx.compose.material3.Surface { com.jagdeep.home.ui.screens.RunningRoutineScreen(viewModel) {} } } }
+        onNodeWithText("Begin assessments").assertExists()
+        runOnIdle { assertEquals(null,approved) }
+        onNodeWithText("Begin assessments").performClick()
+        waitUntil { approved == "pass" }
+        runOnIdle { approved=null; page.state.value=page.state.value.copy(activity=pending("another")) }
+        onNodeWithText("Not now — stop routine").performClick()
+        waitUntil { page.state.value.activity == null }
+        runOnIdle { assertEquals(null,approved) }
+    }
+
+    @Test
+    fun `videos first choice enables assessment settings and can return to per module flow`() = runDesktopComposeUiTest(1000,1200) {
+        val viewModel = RoutineEditorViewModel(null,controller(),FakeRoutineRepository(RoutineLibrary()),newId={"new"},newKind=RoutineKind.CourseAutomation)
+        setContent { AppTheme { RoutineEditorScreen(viewModel,onBack={}) } }
+        onNodeWithText("Watch all videos first").performScrollTo().performClick()
+        onNodeWithText("Handle module assessments").assertExists()
+        runOnIdle {
+            assertEquals(com.jagdeep.home.domain.LearningOrder.VideosFirst,viewModel.state.value.draft.learningOrder)
+            assertTrue(viewModel.state.value.draft.answerAssessments)
+        }
+        onNodeWithText("Assessment after each module").performScrollTo().performClick()
+        onNodeWithText("Handle module assessments").assertExists()
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val automation = FakeAutomation()
     private val atPoints = ClickRoutine(
@@ -121,12 +226,16 @@ class HomeScreensUiTest {
             approval=com.jagdeep.home.domain.CourseApprovalRequest("approval",com.jagdeep.home.domain.CourseApprovalKind.SubmitAssessment,"Wellness"),
             context=com.jagdeep.home.domain.CourseRunContext(module="Wellness",question="Which option?")))
         val viewModel=HomeViewModel(controller,library)
-        setContent { AppTheme { com.jagdeep.home.ui.screens.RunningRoutineScreen(viewModel) {} } }
+        setContent { AppTheme { androidx.compose.material3.Surface { com.jagdeep.home.ui.screens.RunningRoutineScreen(viewModel) {} } } }
         onNodeWithText("All answers reviewed").assertExists()
+        onNodeWithText("Needs your attention").assertExists()
+        onNodeWithText("Current module: Wellness").assertExists()
         onNodeWithText("Setup and how it works").assertDoesNotExist()
         onNodeWithText("Saved progress by user").assertDoesNotExist()
-        onNodeWithText("Wellness").assertExists()
+        onNodeWithText("Current activity").assertExists()
+        onNodeWithText("Run progress").assertExists()
         onNodeWithText("Which option?").assertExists()
+        saveShot("running-grouped")
         onNodeWithText("Approve submission").performClick()
         runOnIdle { assertEquals("approval",approved) }
     }
@@ -157,7 +266,8 @@ class HomeScreensUiTest {
         runOnIdle { viewModel.start() }
         waitUntil(timeoutMillis = 5_000) { automation.clicks.isNotEmpty() }
         onNodeWithText("Clicking").assertExists()
-        onNodeWithText("Run details").assertExists()
+        onNodeWithText("Run details").performScrollTo()
+        onNodeWithText("Stop").assertIsDisplayed()
         onNodeWithContentDescription("Edit Chrome button").assertDoesNotExist()
         onNodeWithText("Stop").performClick()
         waitUntil(timeoutMillis = 5_000) { viewModel.state.value.lastRun != null }
@@ -247,7 +357,7 @@ class HomeScreensUiTest {
         setContent { AppTheme(darkTheme = false) { RoutineEditorScreen(viewModel, onBack = {}) } }
         onNodeWithText("Pick steps on screen").assertExists()
         saveShot("editor-scroll-click")
-        onNodeWithText("Save").performScrollTo().performClick()
+        onNodeWithText("Save").performClick()
         onNodeWithText("Add at least one step to click at the bottom.").assertExists()
         assertTrue(empty.library.value!!.routines.isEmpty())
     }
@@ -259,7 +369,7 @@ class HomeScreensUiTest {
         setContent { AppTheme(darkTheme = false) { RoutineEditorScreen(viewModel, onBack = {}) } }
         saveShot("editor")
         viewModel.updateDraft { it.copy(name = " ") }
-        onNodeWithText("Save").performScrollTo().performClick()
+        onNodeWithText("Save").performClick()
         onNodeWithText("Enter a name.").assertExists()
         assertEquals("Chrome button", runBlocking { repository.library.value!!.routines.last().name })
     }

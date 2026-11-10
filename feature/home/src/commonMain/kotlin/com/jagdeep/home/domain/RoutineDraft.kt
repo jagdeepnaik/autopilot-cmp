@@ -73,10 +73,14 @@ data class RoutineDraft(
     val pixelsPerSecond: Int = DEFAULT_PIXELS_PER_SECOND,
     val rounds: String = DEFAULT_SCROLL_CLICK_ROUNDS.toString(),
     val watchVideos: Boolean = true,
+    val requiredHours: String = "18",
+    val creditedHours: String = "0",
     val waitAfterClickSeconds: String = "5",
     val playbackSpeed: Double = 1.0,
     val answerAssessments: Boolean = false,
     val assessmentMode: AssessmentMode = AssessmentMode.Review,
+    val learningOrder: LearningOrder = LearningOrder.AssessmentAfterModule,
+    val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE,
 )
 
 /** Field-level problems; a null field is fine. */
@@ -90,8 +94,10 @@ data class DraftErrors(
     val rounds: String? = null,
     val waitAfterClick: String? = null,
     val playbackSpeed: String? = null,
+    val answerBankFile: String? = null,
+    val studyHours: String? = null,
 ) {
-    val hasAny: Boolean get() = listOf(name, points, interval, randomExtra, limit, startDelay, rounds, waitAfterClick, playbackSpeed).any { it != null }
+    val hasAny: Boolean get() = listOf(name, points, interval, randomExtra, limit, startDelay, rounds, waitAfterClick, playbackSpeed, answerBankFile, studyHours).any { it != null }
 }
 
 internal const val MIN_INTERVAL_MILLIS = 10L
@@ -123,7 +129,8 @@ fun Routine.toDraft(): RoutineDraft = when (this) {
         rounds = rounds.toString(),
         watchVideos = watchVideos,
     )
-    is CourseAutomationRoutine -> RoutineDraft(kind = RoutineKind.CourseAutomation, name = name, waitAfterClickSeconds = (waitAfterClickMillis / 1000).toString(), playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode)
+    is DgsELearningRoutine -> RoutineDraft(kind=kind,name=name,requiredHours=requiredHours.toString(),creditedHours=creditedHours.toString(),pixelsPerSecond=pixelsPerSecond,playbackSpeed=playbackSpeed,waitAfterClickSeconds=(waitAfterClickMillis/1000).toString(),answerBankFile=answerBankFile)
+    is CourseAutomationRoutine -> RoutineDraft(kind = RoutineKind.CourseAutomation, name = name, waitAfterClickSeconds = (waitAfterClickMillis / 1000).toString(), playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode, learningOrder = learningOrder, answerBankFile = answerBankFile)
 }
 
 fun ClickRoutine.toDraft(): RoutineDraft {
@@ -175,7 +182,15 @@ fun RoutineDraft.validate(): DraftErrors = when (kind) {
             if (it == null || it !in MIN_SCROLL_CLICK_ROUNDS..MAX_SCROLL_CLICK_ROUNDS) "Use between $MIN_SCROLL_CLICK_ROUNDS and $MAX_SCROLL_CLICK_ROUNDS rounds." else null
         },
     )
+    RoutineKind.DgsELearning -> DraftErrors(
+        name=nameError(),
+        studyHours=if(requiredHours.toDoubleOrNull()?.let { it.isFinite() && it>0 && it<=1000 }==true && creditedHours.toDoubleOrNull()?.let { it.isFinite() && it>=0 && it<=requiredHours.toDouble() }==true) null else "Enter required hours (up to 1000) and credited hours from 0 to the required hours.",
+        playbackSpeed=if(playbackSpeed in setOf(1.0,1.5,2.0)) null else "Choose 1×, 1.5× or 2×.",
+        waitAfterClick=if(waitAfterClickSeconds.toLongOrNull()?.let { it in 1..86400 }==true) null else "Enter whole seconds from 1 to 86400.",
+        answerBankFile=if(com.jagdeep.shared.answers.answerBankFileName(answerBankFile)!=null) null else "Use a simple JSON file name.",
+    )
     RoutineKind.CourseAutomation -> DraftErrors(
+        answerBankFile = if (com.jagdeep.shared.answers.answerBankFileName(answerBankFile) == null) "Use a simple file name, for example my-answers.json." else null,
         name = nameError(),
         playbackSpeed = if (playbackSpeed in setOf(1.0, 1.5, 2.0)) null else "Choose 1×, 1.5× or 2×.",
         waitAfterClick = if (waitAfterClickSeconds.trim().toLongOrNull()?.let { it in 0..86_400 } == true) null else "Enter whole seconds from 0 to 86400.",
@@ -244,7 +259,8 @@ fun RoutineDraft.toRoutine(id: String): Routine = when (kind) {
         pixelsPerSecond = pixelsPerSecond.coerceIn(MIN_PIXELS_PER_SECOND, MAX_PIXELS_PER_SECOND),
         watchVideos = watchVideos,
     )
-    RoutineKind.CourseAutomation -> CourseAutomationRoutine(id = id, name = name.trim(), waitAfterClickMillis = waitAfterClickSeconds.trim().toLong() * 1000, playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode)
+    RoutineKind.DgsELearning -> DgsELearningRoutine(id,name.trim(),requiredHours.toDouble(),creditedHours.toDouble(),pixelsPerSecond.coerceIn(MIN_PIXELS_PER_SECOND,MAX_PIXELS_PER_SECOND),playbackSpeed,waitAfterClickSeconds.toLong()*1000,requireNotNull(com.jagdeep.shared.answers.answerBankFileName(answerBankFile)))
+    RoutineKind.CourseAutomation -> CourseAutomationRoutine(id = id, name = name.trim(), waitAfterClickMillis = waitAfterClickSeconds.trim().toLong() * 1000, playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode, learningOrder = learningOrder, answerBankFile = requireNotNull(com.jagdeep.shared.answers.answerBankFileName(answerBankFile)))
 }
 
 private fun RoutineDraft.toClickRoutine(id: String): ClickRoutine = ClickRoutine(

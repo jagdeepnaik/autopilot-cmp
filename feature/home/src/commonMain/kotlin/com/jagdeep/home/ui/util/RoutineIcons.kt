@@ -14,5 +14,6 @@ fun RoutineKind.icon(): ImageVector = when (this) {
     RoutineKind.Click -> Icons.Default.AdsClick
     RoutineKind.Sequence -> Icons.Default.FormatListNumbered
     RoutineKind.ScrollClick -> Icons.Default.VerticalAlignBottom
+    RoutineKind.DgsELearning -> Icons.Default.TravelExplore
     RoutineKind.CourseAutomation -> Icons.Default.School
 }

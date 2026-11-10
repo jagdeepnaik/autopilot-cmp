@@ -60,7 +60,7 @@ class FileCourseAnswerBankStoreTest {
 
     @Test
     fun `given an explicitly supplied real bank then every question and answer round trips through exact matching`() = runTest {
-        val path = System.getenv("AUTOCLICKER_ANSWER_BANK_TEST") ?: return@runTest
+        val path = System.getenv("AUTOPILOT_ANSWER_BANK_TEST") ?: return@runTest
         val file = java.io.File(path)
         val bank = FileCourseAnswerBankStore(listOf(file)).load()
         assertNotNull(bank)

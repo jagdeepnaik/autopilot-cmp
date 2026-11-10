@@ -1,6 +1,6 @@
-# AutoClicker
+# AutoPilot
 
-AutoClicker clicks for you, on Chrome pages and in any other app. Save a routine that says where to click, how often, and when to stop, then start and stop it from any app with a hot key.
+AutoPilot clicks for you, on Chrome pages and in any other app. Save a routine that says where to click, how often, and when to stop, then start and stop it from any app with a hot key.
 
 Built with Kotlin Multiplatform and Compose Multiplatform. macOS and Windows come first.
 
@@ -15,7 +15,7 @@ Built with Kotlin Multiplatform and Compose Multiplatform. macOS and Windows com
 - **Activity:** what ran, how many clicks it made, and why it stopped.
 - **One page for every routine:** the Routines page holds click routines, multi-point clicks, scroll and click routines and Sagar Mein Yog automation routines. Choose the kind with **New routine**. Only one routine runs at a time.
 - **Desktop layout:** the current page icon/Back button, title and page actions live in the window toolbar beside the routine picker and Start/Stop controls. The page has no duplicate title row. Hover over the sidebar’s empty middle area for a horizontal resize cursor; click to toggle, or use keyboard focus and Enter. Its colours follow the app’s theme.
-- **Share routines:** use **Settings → Routine files** to import files or export selected routines (all are selected by default) to a `.autoclicker.json` file, and import a file someone sent you. Imported routines are added alongside yours, and anything the editor wouldn't accept is left out. Spots are screen positions, so check them on a different screen.
+- **Share routines:** use **Settings → Routine files** to import files or export selected routines (all are selected by default) to a `.autopilot.json` file, and import a file someone sent you. Imported routines are added alongside yours, and anything the editor wouldn't accept is left out. Spots are screen positions, so check them on a different screen.
 - **Developer mode:** a Settings switch that turns Activity into a live log of what the app does, including every message to and from Chrome. Copy it to report a problem.
 - **Keep the display on:** an optional Settings switch that stops the display sleeping while something is running.
 
@@ -36,7 +36,7 @@ It stops after the last round, or if a click leaves the page unchanged for 15 se
 
 ### Running a routine
 
-Starting a routine from Home, the desktop toolbar, or a hot key opens **Running routine**. This screen contains live status, click counts, course/module/question details when available, user progress, assessment settings, approvals, manual-answer prompts and Stop. Home remains the routine library. Back keeps the routine running; use **View running routine** on Home to return. After stopping or finishing, the running screen shows the result and a **Back to routines** action. Changing screens does not restart or stop a routine.
+Starting a routine from Home, the desktop toolbar, or a hot key opens **Running routine**. This screen groups live status and approvals, current lesson/question, run progress, saved user progress and run configuration. The current module is prominent, attention states are explicit, and Stop stays fixed at the bottom while details scroll. Home remains the routine library. Back keeps the routine running; use **View running routine** on Home to return. After stopping or finishing, the running screen shows the result and a **Back to routines** action. Changing screens does not restart or stop a routine.
 
 ### Sagar Mein Yog automation
 
@@ -48,13 +48,21 @@ Choose **New routine > Sagar Mein Yog automation** to automate the Sagar Mein Yo
 
 The routine editor offers **Playback speed: 1×, 1.5× or 2×**. New routines default to 1×; existing routines keep their saved selection. Speed applies to each video while the routine is authorized, without seeking or faking completion; stopping restores the previous speed. Reload extension **1.8.3** and refresh course tabs after updating to enable speed control.
 
+#### Learning order
+
+In the Sagar Mein Yog routine editor, choose **Assessment after each module** to finish a module's videos and handle its unfinished assessment with the selected assessment mode. Passed assessments in saved progress are skipped, even when a newer attempt is unsubmitted. Existing routines keep this order.
+
+Choose **Watch all videos first** to watch every available unfinished video without opening assessments or asking for answers. When videos finish, a confirmation popup offers **Begin assessments** or **Not now — stop routine**. Only explicit confirmation starts a second pass for unfinished assessments, using the selected assessment mode and skipping saved passes. Automatic mode also requires this confirmation. Completed videos remain skipped. The running screen prominently shows the current module. Routine options stay expanded inline, including learning order, playback speed, assessment mode and answer-bank controls. Save/Cancel stay visible below the scrolling form. Playback defaults to 1× for new routines; saved speed choices persist.
+
+Progress is checked at startup and after newly completed learning/assessment work. Merely visiting or skipping a module that was already finished does not trigger another full progress check.
+
 #### Assessments and saved progress (extension 1.9.8)
 
 In the course routine editor, enable **Handle module assessments**, then choose **Manual**, **Review approvals** or **Automatic**. Manual lets you choose answers in Chrome, with approval before starts/submissions. Review approvals selects exact saved answers and asks before each start and submission; existing routines retain this mode. Automatic authorizes starts, saved-answer selection and submission when you start the routine. Unknown questions always pause. A failed or unsubmitted attempt found in saved progress still requires an explicit start approval; failed results offer one explicitly chosen retry or manual takeover. Chapter quizzes remain manual.
 
-The desktop app loads `private/course-q&a/sagarmeinyog.json` when launched from the project (or its composeApp directory), otherwise `~/.autoclicker/sagarmeinyog.json`. The file is a JSON object keyed by module title; each entry contains `question`, `options` and `answer` (null when unanswered). Unanswered entries are retained but never selected automatically. An unknown question, changed option set, or missing answer pauses the run, plays a short two-note sound through normal desktop audio output once for that distinct question, and shows the question in the bottom status bar. Repeated inventories, recreated controls and option reordering do not repeat the sound. If audio cannot start, the status also says Sound unavailable. If inventories stop arriving, the run shows Waiting for page updates and asks you to keep the course tab active in Chrome; existing unanswered-question warnings stay visible. The whole bank is validated: identical question/options entries are deduplicated, conflicting non-null answers reject the file, and option variants are matched separately by their complete option set. Captured unanswered entries with repeated option labels remain unanswerable without rejecting other valid entries. Missing/ambiguous questions, changed option sets, unknown page layouts, failed results and unconfirmed selections pause the routine. No fuzzy matching, AI calls or automatic retakes. File answers are user-supplied, not independently verified as correct. The live question pool contains questions missing from this file. Every question instance in the website's displayed total must be observed, matched and confirmed selected before requesting submission approval; without a displayed total, coverage of the entire module bank is required. Repeated question text at different positions is tracked separately.
+The desktop app stores named answer banks in `~/.autopilot/answer-banks/` (inside the current user’s home folder on every desktop platform). The default file is `sagarmeinyog.json`. A valid legacy bank is copied there once without overwriting an existing permanent file. Use **Settings → Routine files → Answer-bank folder**, or the direct **Open Q&A folder** button inside routine options, to open the folder. In the expanded routine options, name a JSON file, import it, choose an existing file, or validate and refresh the file list. Imports never overwrite an existing name. Each routine saves its selected filename, and approved corrections are written to that same file. Updated files are loaded on the next run; an active assessment keeps its existing answer snapshot. The file is a JSON object keyed by module title; each entry contains `question`, `options` and `answer` (null when unanswered). Unanswered entries are retained but never selected automatically. An unknown question, changed option set, or missing answer pauses the run, plays a short two-note sound through normal desktop audio output once for that distinct question, and shows the question in the bottom status bar. Repeated inventories, recreated controls and option reordering do not repeat the sound. If audio cannot start, the status also says Sound unavailable. If inventories stop arriving, the run shows Waiting for page updates and asks you to keep the course tab active in Chrome; existing unanswered-question warnings stay visible. The whole bank is validated: identical question/options entries are deduplicated, conflicting non-null answers reject the file, and option variants are matched separately by their complete option set. Captured unanswered entries with repeated option labels remain unanswerable without rejecting other valid entries. Missing/ambiguous questions, changed option sets, unknown page layouts, failed results and unconfirmed selections pause the routine. No fuzzy matching, AI calls or automatic retakes. File answers are user-supplied, not independently verified as correct. The live question pool contains questions missing from this file. Every question instance in the website's displayed total must be observed, matched and confirmed selected before requesting submission approval; without a displayed total, coverage of the entire module bank is required. Repeated question text at different positions is tracked separately.
 
-After updating, reload **AutoClicker Page Helper 1.9.8**, refresh course tabs before starting an attempt, restart the rebuilt desktop app and save the opt-in setting. Do not refresh an assessment already in progress. The shared extension retains scrolling, video watching and requested text clicks; retired highlighting and key-click paths are removed in version 1.9.9. The assessment collector supports ordinary radio groups/fieldsets and the observed Sagar Mein Yog `/test/<attempt>` layout, including its start modal, generic question text, question counter, End Test/Submit confirmation and explicit CLEARED/NOT CLEARED result pages. Failed assessments are shown clearly; a retry starts only after you explicitly choose it. Unexpected live layouts require inspection, not a blind click.
+After updating, reload **AutoPilot Page Helper 1.9.8**, refresh course tabs before starting an attempt, restart the rebuilt desktop app and save the opt-in setting. Do not refresh an assessment already in progress. The shared extension retains scrolling, video watching and requested text clicks; retired highlighting and key-click paths are removed in version 1.9.9. The assessment collector supports ordinary radio groups/fieldsets and the observed Sagar Mein Yog `/test/<attempt>` layout, including its start modal, generic question text, question counter, End Test/Submit confirmation and explicit CLEARED/NOT CLEARED result pages. Failed assessments are shown clearly; a retry starts only after you explicitly choose it. Unexpected live layouts require inspection, not a blind click.
 
 #### Per-user progress
 
@@ -62,7 +70,7 @@ Before course navigation, the desktop routine asks you to confirm a local profil
 
 The routine selects the largest numeric **Rows per page** option offered by the website (currently 100), waits for the new page size to load, then reads every page of **Your Progress** before continuing and after a completed module. Keep **All Time** selected and clear table filters; if required columns are hidden, the status message lists what to show. Only a complete validated import updates the last-check timestamp. Earlier passes and attempt history survive newer unsubmitted attempts and failed refreshes. Passed assessments are matched by exact course title and skipped after the course page confirms its videos are complete. A test pass alone does not mark videos complete. Individual video completion is checked on course pages and saved as observed, including chapter identity; video progress is not inferred from the test table. Active timed tests are never left to perform a progress check.
 
-**Saved progress by user** inside the course routine editor shows stored users, attempts, scores, timestamps and observed lessons, even after an app restart. Data is local at `~/.autoclicker/course-progress.db`, in a separate Room database (schema version 1); existing app databases are unchanged. A local save failure pauses further course actions. No credentials are stored. This progress feature is currently implemented and tested for Desktop/JVM.
+**Saved progress by user** inside the course routine editor shows stored users, attempts, scores, timestamps and observed lessons, even after an app restart. Data is local at `~/.autopilot/course-progress.db`, in a separate Room database (schema version 1); existing app databases are unchanged. A local save failure pauses further course actions. No credentials are stored. This progress feature is currently implemented and tested for Desktop/JVM.
 
 This routine uses separate extension scripts; the retired Web page helper and Course helper routines have been removed. Other routine types retain their behavior. While it runs, the extension reports semantic page elements (controls, headings, status context and videos, including hidden/disabled controls) to the local app. The app chooses the action and the extension executes it once against that document's element ID. Input values and full page HTML are excluded. Very large or unrecognized pages pause for manual handling. A course without a dashboard-return control finishes after its available videos.
 
@@ -77,7 +85,7 @@ Some pages ignore scripted clicks, or use a player the helper can't read, such a
 - Press **F6** in any app. On a Mac keyboard you may need to hold fn. It stops a scroll and click run too.
 - Push the pointer into any **corner of a screen**.
 - Move the pointer by hand, for a routine with specific points or a scroll and click run that has made its first click.
-- A click that would land on AutoClicker's own focused window waits instead, so Stop stays reachable.
+- A click that would land on AutoPilot's own focused window waits instead, so Stop stays reachable.
 
 The hot keys and both pointer stops can be changed in Settings.
 
@@ -119,10 +127,10 @@ Use `.\gradlew.bat` on Windows.
 Three extras are opt-in:
 
 - `UI_TEST_SHOT_DIR=/some/dir` saves what each UI test rendered.
-- `AUTOCLICKER_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInputTest*' --rerun` sends real clicks and a key press to its own window. It moves your pointer, so keep your hands off while it runs.
-- `AUTOCLICKER_LIVE_CHROME_TEST="<path to Chrome>" ./gradlew :composeApp:jvmTest --tests '*LiveChromeExtensionTest*' --rerun` runs the extension's scripts in headless Chrome with a throwaway profile.
+- `AUTOPILOT_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInputTest*' --rerun` sends real clicks and a key press to its own window. It moves your pointer, so keep your hands off while it runs.
+- `AUTOPILOT_LIVE_CHROME_TEST="<path to Chrome>" ./gradlew :composeApp:jvmTest --tests '*LiveChromeExtensionTest*' --rerun` runs the extension's scripts in headless Chrome with a throwaway profile.
 
-For the new routine, use `AUTOCLICKER_LIVE_CHROME_TEST="<path to Chrome>" ./gradlew :composeApp:jvmTest --tests '*LiveCourseAutomationTest*' --rerun`. Its protocol tests also run with `node --test composeApp/src/jvmTest/resources/course-automation-background.test.cjs`.
+For the new routine, use `AUTOPILOT_LIVE_CHROME_TEST="<path to Chrome>" ./gradlew :composeApp:jvmTest --tests '*LiveCourseAutomationTest*' --rerun`. Its protocol tests also run with `node --test composeApp/src/jvmTest/resources/course-automation-background.test.cjs`.
 
 ## Release builds
 
@@ -135,6 +143,14 @@ Version name and code live in [`gradle/libs.versions.toml`](./gradle/libs.versio
 | Linux DEB, macOS DMG (Intel) | GitHub Actions | `gh workflow run desktop-packages.yml -f platforms=all` | Run artifacts |
 
 The installers are not code-signed yet, so macOS Gatekeeper and Windows SmartScreen warn on first launch.
+
+## DGS E-Learning
+
+Create a **DGS E-Learning** routine and enter the course’s required hours and the hours already credited by DGS. Sign in at https://dgsstcwlms.aduacademy.in/form/studenthome in a single Chrome tab, then start the routine. Choose an available course in the app popup and press Open course. Unavailable courses are hidden. The app opens the selected e-book and reads forward from the page restored by DGS. You can also start with an e-book already open. Keep Chrome in front while reading.
+
+The routine slowly scrolls each page, watches encountered videos to their actual end, then uses Next. It starts reading forward from the page you opened. Short pages receive at least 30 seconds of reading time. When all pages are read but time remains, it returns to the first outline page and repeats forward. Local active time is an estimate, not DGS’s official credited hours; update the credited-hours setting before a later run. Login, verification, unsupported videos, and unchanged navigation pause for manual help. Playback defaults to 1×; faster rates are attempted only through the player, with the actual rate shown in Running routine.
+
+DGS assessments remain manual. `dgs-elearning.json` is the reserved bank name in `~/.autopilot/answer-banks/`; routine options include import and Open Q&A folder. Extension **1.13.0** adds Chrome-native input for the selected available course link on DGS Home and for e-book Next and first-page controls. It requires explicit approval of Chrome’s broader `debugger` permission before installation. The implementation attaches only to the bound, foreground DGS tab for an exact pending navigation request, verifies the page and current control position, then detaches immediately. It does not use this permission for page evaluation or network capture. An existing debugger/DevTools connection pauses navigation rather than being disconnected. After approving and reloading an update, refresh the DGS tab and reopen the e-book if DGS returns to its home page.
 
 ## Project structure
 
@@ -157,3 +173,7 @@ iosApp/            iOS entry point (Xcode project)
 ```
 
 Features depend only on core modules and `feature:shared`, never on each other. [How it works](private/docs/HOW_IT_WORKS.md) explains every step, including how the app talks to Chrome. Coding and architecture conventions are in [AGENTS.md](./AGENTS.md).
+
+## AutoPilot identity
+
+The application namespace is `com.jagdeep.autopilot`; desktop data and the unpacked extension live in `~/.autopilot/`. Routine exports use `.autopilot.json` and the `autopilot-routines` format. This identity is separate from earlier installations, including mobile app sandboxes and OS permissions.

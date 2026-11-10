@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		4BC1806AF58F791BF8BE71EA /* AutoClicker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AutoClicker.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4BC1806AF58F791BF8BE71EA /* AutoPilot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AutoPilot.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -59,7 +59,7 @@
 		263A3E2DD04391679F946F06 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				4BC1806AF58F791BF8BE71EA /* AutoClicker.app */,
+				4BC1806AF58F791BF8BE71EA /* AutoPilot.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,7 +87,7 @@
 			packageProductDependencies = (
 			);
 			productName = iosApp;
-			productReference = 4BC1806AF58F791BF8BE71EA /* AutoClicker.app */;
+			productReference = 4BC1806AF58F791BF8BE71EA /* AutoPilot.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */

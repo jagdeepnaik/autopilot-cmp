@@ -155,7 +155,7 @@ class RoutineDraftTest {
             "s", "Pages", rounds = 7, pixelsPerSecond = 120, watchVideos = false,
             points = listOf(ClickPoint(640, 880, 0, PointerButton.Left, "Next"), ClickPoint(10, 20, 1_500, PointerButton.Right, "Point 2")),
         )
-        val helper = CourseAutomationRoutine("h", "Course", playbackSpeed = 1.5)
+        val helper = CourseAutomationRoutine("h", "Course", playbackSpeed = 1.5, learningOrder = LearningOrder.VideosFirst, answerBankFile = "my-answers.json")
         assertEquals(scroll, scroll.toDraft().toRoutine("s"))
         assertEquals(helper, helper.toDraft().toRoutine("h"))
     }

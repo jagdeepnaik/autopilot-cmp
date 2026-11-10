@@ -21,6 +21,7 @@ internal fun routineSummary(routine: Routine): String = "${routine.kind.label} �
         add(if (routine.rounds == 1) "1 round" else "${routine.rounds} rounds")
         if (routine.watchVideos) add("stops for videos")
     }.joinToString(" · ")
+    is com.jagdeep.home.domain.DgsELearningRoutine -> "DGS e-book · ${routine.requiredHours} hours required · videos before Next"
     is CourseAutomationRoutine -> "sagarmeinyog.com · automatically watches unfinished video lessons"
 }
 

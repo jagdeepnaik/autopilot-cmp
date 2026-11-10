@@ -44,7 +44,7 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v6
         with:
-          name: AutoClicker-windows-x64
+          name: AutoPilot-windows-x64
           path: composeApp/build/compose/binaries/main-release/msi/*.msi
           if-no-files-found: error
 
@@ -60,13 +60,13 @@ jobs:
             os: ubuntu-latest
             java_architecture: x64
             gradle_task: :composeApp:packageReleaseDeb
-            artifact_name: AutoClicker-linux-x64
+            artifact_name: AutoPilot-linux-x64
             artifact_path: composeApp/build/compose/binaries/main-release/deb/*.deb
           - name: macOS Intel
             os: macos-15-intel
             java_architecture: x64
             gradle_task: :composeApp:packageReleaseDmg
-            artifact_name: AutoClicker-macos-x64
+            artifact_name: AutoPilot-macos-x64
             artifact_path: composeApp/build/compose/binaries/main-release/dmg/*.dmg
     steps:
       - name: Check out source

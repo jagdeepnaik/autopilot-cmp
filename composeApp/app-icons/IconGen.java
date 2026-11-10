@@ -30,10 +30,10 @@ public class IconGen {
 
     public static void main(String[] args) throws Exception {
         write(draw(1024, false), Path.of("iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png"));
-        write(draw(512, true), ICONS.resolve("autoclicker-icon-linux-512.png"));
-        write(draw(512, true), Path.of("composeApp/src/jvmMain/resources/autoclicker-icon.png"));
-        write(draw(256, true), Path.of("composeApp/src/commonMain/composeResources/drawable/autoclicker_logo.png"));
-        ico(Path.of("composeApp/src/jvmMain/resources/autoclicker-icon.ico"));
+        write(draw(512, true), ICONS.resolve("autopilot-icon-linux-512.png"));
+        write(draw(512, true), Path.of("composeApp/src/jvmMain/resources/autopilot-icon.png"));
+        write(draw(256, true), Path.of("composeApp/src/commonMain/composeResources/drawable/autopilot_logo.png"));
+        ico(Path.of("composeApp/src/jvmMain/resources/autopilot-icon.ico"));
         icns();
         String[][] densities = {{"mdpi", "48"}, {"hdpi", "72"}, {"xhdpi", "96"}, {"xxhdpi", "144"}, {"xxxhdpi", "192"}};
         for (String[] d : densities) {
@@ -91,13 +91,13 @@ public class IconGen {
     }
 
     static void icns() throws Exception {
-        Path set = Files.createTempDirectory("autoclicker").resolve("AutoClicker.iconset");
+        Path set = Files.createTempDirectory("autopilot").resolve("AutoPilot.iconset");
         Files.createDirectories(set);
         for (int size : new int[] {16, 32, 128, 256, 512}) {
             write(draw(size, true), set.resolve("icon_" + size + "x" + size + ".png"));
             write(draw(size * 2, true), set.resolve("icon_" + size + "x" + size + "@2x.png"));
         }
-        Process process = new ProcessBuilder("iconutil", "-c", "icns", set.toString(), "-o", ICONS.resolve("AutoClicker.icns").toString())
+        Process process = new ProcessBuilder("iconutil", "-c", "icns", set.toString(), "-o", ICONS.resolve("AutoPilot.icns").toString())
             .inheritIO().start();
         if (process.waitFor() != 0) throw new IllegalStateException("iconutil failed");
     }

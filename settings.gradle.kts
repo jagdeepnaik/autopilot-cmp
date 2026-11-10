@@ -1,4 +1,4 @@
-rootProject.name = "AutoClicker"
+rootProject.name = "AutoPilot"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
