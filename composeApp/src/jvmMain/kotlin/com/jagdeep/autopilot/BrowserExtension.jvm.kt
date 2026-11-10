@@ -19,6 +19,37 @@ internal fun writeBrowserExtension(folder: File) {
     }
 }
 
+/**
+ * Brings the extension folder up to date with this app's bundled copy, rewriting only changed files.
+ * Runs at start-up so the folder exists before Chrome is pointed at it, and so an app update also
+ * updates the extension; Chrome picks up changes after a reload on its extensions page.
+ */
+internal fun syncBrowserExtension(folder: File): Int {
+    folder.mkdirs()
+    var written = 0
+    BROWSER_EXTENSION_FILES.forEach { name ->
+        val bundled = object {}.javaClass.getResourceAsStream("/chrome-extension/$name")?.use { it.readBytes() }
+            ?: throw IOException("Missing $name")
+        val target = File(folder, name)
+        if (!target.isFile || !target.readBytes().contentEquals(bundled)) {
+            target.writeBytes(bundled)
+            written++
+        }
+    }
+    return written
+}
+
+internal fun syncBrowserExtensionInBackground() {
+    Thread({
+        try {
+            val written = syncBrowserExtension(desktopDataPaths.chromeExtension())
+            if (written > 0) Log.i("Extension folder updated ($written files)", "BrowserExtension")
+        } catch (e: IOException) {
+            Log.w("Extension folder not updated: ${e.message}", "BrowserExtension")
+        }
+    }, "extension-sync").apply { isDaemon = true }.start()
+}
+
 actual suspend fun installBrowserExtension(): String? = withContext(Dispatchers.IO) {
     val folder = desktopDataPaths.chromeExtension()
     try {

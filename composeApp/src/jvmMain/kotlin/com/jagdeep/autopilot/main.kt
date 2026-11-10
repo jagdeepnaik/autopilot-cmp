@@ -34,6 +34,8 @@ fun main() {
     System.setProperty("apple.awt.application.appearance", "system")
     initLoggerJvm()
     Log.i("-------------> Desktop App Start <-------------", "Desktop App")
+    // Write the bundled Chrome extension to its folder now, not only when Settings asks for it.
+    syncBrowserExtensionInBackground()
 
     application {
         DesktopWindow()

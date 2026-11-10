@@ -44,4 +44,27 @@ class DirectoryCourseAnswerBanksTest {
             assertNull(answerBankFileName("../outside.json"))
         } finally {root.deleteRecursively()}
     }
+    @Test fun `given a bundled bank when the folder has none then it is copied and later user edits are kept`() = runTest {
+        val root=Files.createTempDirectory("bundled-banks").toFile()
+        try {
+            val folder=root.resolve("banks")
+            val banks=DirectoryCourseAnswerBanks(folder,bundled=mapOf(DEFAULT_ANSWER_BANK_FILE to {content},"extra.json" to {content}))
+            assertEquals(listOf("extra.json",DEFAULT_ANSWER_BANK_FILE),banks.names())
+            assertEquals(content,folder.resolve(DEFAULT_ANSWER_BANK_FILE).readText())
+            val edited=content.replace("\"answer\":\"A\"","\"answer\":\"B\"")
+            folder.resolve(DEFAULT_ANSWER_BANK_FILE).writeText(edited)
+            assertNotNull(banks.load())
+            assertEquals(edited,folder.resolve(DEFAULT_ANSWER_BANK_FILE).readText())
+        } finally {root.deleteRecursively()}
+    }
+    @Test fun `given an invalid or unsafe bundled bank when preparing then nothing is written`() = runTest {
+        val root=Files.createTempDirectory("bundled-banks").toFile()
+        try {
+            val folder=root.resolve("banks")
+            val banks=DirectoryCourseAnswerBanks(folder,bundled=mapOf(DEFAULT_ANSWER_BANK_FILE to {"invalid"},"../outside.json" to {content},"missing.json" to {null}))
+            assertEquals(emptyList(),banks.names())
+            assertFalse(root.resolve("outside.json").exists())
+            assertEquals(emptyList(),folder.list()!!.toList())
+        } finally {root.deleteRecursively()}
+    }
 }

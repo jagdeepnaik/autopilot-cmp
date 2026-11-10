@@ -9,10 +9,16 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Installed app data, independent of its executable or working directory. */
+/**
+ * Installed app data, independent of its executable or working directory.
+ *
+ * [bundled] maps a bank file name to a reader for the copy shipped inside the app. A bundled bank is
+ * written to [folder] only when no file of that name exists, so answers the user saved are never replaced.
+ */
 class DirectoryCourseAnswerBanks(
     private val folder: File,
     private val legacy: List<File> = emptyList(),
+    private val bundled: Map<String, () -> String?> = emptyMap(),
     private val chooseFile: suspend () -> File? = { null },
     private val showFolder: suspend (File) -> Unit = {},
 ) : CourseAnswerBankStore {
@@ -29,7 +35,19 @@ class DirectoryCourseAnswerBanks(
                 // Never overwrite a bank already placed in the permanent folder.
                 if (source != null) Files.copy(source.toPath(), target.toPath())
             }
+            bundled.forEach { (name, read) -> seed(name, read) }
         }
+    }
+    private fun seed(name: String, read: () -> String?) {
+        if (answerBankFileName(name) != name) return
+        val target = File(folder, name)
+        if (target.exists()) return
+        val text = runCatching(read).getOrNull() ?: return
+        if (text.length > MAX_BYTES || CourseAnswerBank.decode(text) == null) return
+        // Written beside the target and moved into place, so a crash never leaves a half-written bank.
+        val partial = File(folder, "$name.tmp")
+        partial.writeText(text)
+        Files.move(partial.toPath(), target.toPath())
     }
     override fun forName(name: String): CourseAnswerBankStore {
         val fileName = answerBankFileName(name) ?: return NoCourseAnswerBankStore

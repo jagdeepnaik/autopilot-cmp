@@ -11,6 +11,7 @@ internal actual fun createCourseAnswerBankStore(): CourseAnswerBankStore = Direc
     File("private/course-q&a/sagarmeinyog.json"),
     File("../private/course-q&a/sagarmeinyog.json"),
     ),
+    bundled = BUNDLED_ANSWER_BANKS.associateWith { name -> { bundledAnswerBank(name) } },
     chooseFile = { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Swing) {
         val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Import answer bank", java.awt.FileDialog.LOAD)
         try {
@@ -21,3 +22,9 @@ internal actual fun createCourseAnswerBankStore(): CourseAnswerBankStore = Direc
     } },
     showFolder = { folder -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { java.awt.Desktop.getDesktop().open(folder) } },
 )
+
+/** Answer banks shipped in the app (`resources/answer-banks`), copied to the bank folder on first use. */
+internal val BUNDLED_ANSWER_BANKS = listOf(com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE)
+
+internal fun bundledAnswerBank(name: String): String? =
+    object {}.javaClass.getResourceAsStream("/answer-banks/$name")?.bufferedReader()?.use { it.readText() }

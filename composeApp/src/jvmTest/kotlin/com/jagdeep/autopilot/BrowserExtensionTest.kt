@@ -53,4 +53,28 @@ class BrowserExtensionTest {
         val urls = Regex("https?://[^\"`\\s]+").findAll(bundled("background.js") + bundled("content.js")).map { it.value }.toSet()
         assertEquals(setOf("http://127.0.0.1:47613"), urls)
     }
+
+    @Test
+    fun `given an outdated extension folder when syncing then only changed files are rewritten`() {
+        val folder = Files.createTempDirectory("extension").toFile()
+        try {
+            assertEquals(BROWSER_EXTENSION_FILES.size, syncBrowserExtension(folder))
+            assertEquals(0, syncBrowserExtension(folder))
+            File(folder, "content.js").writeText("old")
+            File(folder, "manifest.json").delete()
+            assertEquals(2, syncBrowserExtension(folder))
+            assertEquals(bundled("content.js"), File(folder, "content.js").readText())
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `given the app bundle when reading each bundled answer bank then it is a valid bank`() {
+        BUNDLED_ANSWER_BANKS.forEach { name ->
+            val text = checkNotNull(bundledAnswerBank(name)) { "Missing bundled answer bank $name" }
+            assertTrue(text.length <= 2_000_000, "$name is over the 2 MB bank limit")
+            kotlin.test.assertNotNull(com.jagdeep.home.domain.CourseAnswerBank.decode(text), "$name is not a valid bank")
+        }
+    }
 }
