@@ -18,6 +18,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.jagdeep.common.config.AppConfig
@@ -72,6 +73,7 @@ private fun ApplicationScope.DesktopWindow() {
         },
         title = AppConfig.APP_NAME,
         state = windowState,
+        undecorated = DesktopTitleBar.isWindows,
         icon = painterResource("autopilot-icon.png"),
     ) {
         remember(window) { DesktopTitleBar.prepare(window) }
@@ -89,8 +91,17 @@ private fun ApplicationScope.DesktopWindow() {
         App(
             onThemeApplied = { dark, background, content -> theme = AppliedTheme(dark, background, content) },
             toolbarStartInset = DesktopTitleBar.toolbarStartInset,
-            toolbarDragArea = { toolbar -> if (DesktopTitleBar.isMac) WindowDraggableArea { toolbar() } else toolbar() },
-            toolbarHeight = if (tallTitleBar) MAC_TALL_TITLE_BAR_HEIGHT else DesktopToolbarHeight,
+            toolbarDragArea = { toolbar -> if (DesktopTitleBar.isMac || DesktopTitleBar.isWindows) WindowDraggableArea { toolbar() } else toolbar() },
+            toolbarHeight = if (tallTitleBar || DesktopTitleBar.isWindows) MAC_TALL_TITLE_BAR_HEIGHT else DesktopToolbarHeight,
+            windowIdentity = { if (DesktopTitleBar.isWindows) WindowsWindowIdentity() },
+            windowControls = {
+                if (DesktopTitleBar.isWindows) WindowsWindowControls(
+                    maximized = windowState.placement == WindowPlacement.Maximized,
+                    onMinimize = { windowState.isMinimized = true },
+                    onMaximize = { windowState.placement = if (windowState.placement == WindowPlacement.Maximized) WindowPlacement.Floating else WindowPlacement.Maximized },
+                    onClose = { window.dispatchEvent(java.awt.event.WindowEvent(window, java.awt.event.WindowEvent.WINDOW_CLOSING)) },
+                )
+            },
         )
     }
 }

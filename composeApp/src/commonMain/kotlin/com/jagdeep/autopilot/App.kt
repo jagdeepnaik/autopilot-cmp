@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdsClick
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material3.Icon
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
@@ -67,6 +69,8 @@ fun App(
     toolbarStartInset: Dp = 0.dp,
     toolbarDragArea: @Composable (@Composable () -> Unit) -> Unit = { it() },
     toolbarHeight: Dp = DesktopToolbarHeight,
+    windowControls: @Composable () -> Unit = {},
+    windowIdentity: @Composable () -> Unit = {},
 ) {
     // Services outlive this composition (activity recreation must not stop a run).
     val services = remember { AppServices.get() }
@@ -126,7 +130,7 @@ fun App(
                         appVersion = AppConfig.APP_VERSION_NAME,
                         now = AppClock::nowMillis,
                         newId = AppServices::newId,
-                        appIcon = { AppLogo() },
+                        appIcon = { if (isDesktopPlatform()) Icon(Icons.Default.Home, "Home", Modifier.size(20.dp)) else AppLogo() },
                         modifier = hostModifier,
                     )
                 }
@@ -150,6 +154,10 @@ fun App(
                         toolbarDragArea = toolbarDragArea,
                         toolbarHeight = toolbarHeight,
                         topBar = { topAppBar.content() },
+                        appIcon = { AppLogo(24.dp) },
+                        appName = AppConfig.APP_NAME,
+                        windowControls = windowControls,
+                        windowIdentity = windowIdentity,
                     ) { navHost(Modifier.fillMaxSize()) }
                 } else {
                     AdaptiveNavigationScaffold(

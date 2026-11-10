@@ -53,9 +53,66 @@ class DesktopShellUiTest {
                     selectedRoute = RouteTopLevel.Home, navigationItems = items, footerItems = footerItems, onNavigate = onNavigate, now = { 1_000L },
                     appVersion = "1.0.0",
                     toolbarStartInset = 0.dp, toolbarDragArea = { it() }, topBar = header,
+                    appIcon = { Icon(Icons.Default.History, "AutoPilot app logo", Modifier.size(24.dp)) },
+                    appName = "AutoPilot",
                 ) { Text("Page content") }
             }
         }
+
+    @Test
+    fun `given expanded sidebar then app name is shown and opens Home`() = runDesktopComposeUiTest(1000,600) {
+        var destination: NavKey? = null
+        setContent(ui(ShellUiState(), onNavigate = { destination = it }))
+        onNodeWithText("AutoPilot").assertDoesNotExist()
+        onNodeWithContentDescription("Expand sidebar from toolbar").performClick()
+        onNodeWithText("AutoPilot").performClick()
+        assertEquals<NavKey?>(RouteTopLevel.Home, destination)
+        onNodeWithContentDescription("Collapse sidebar from toolbar").performClick()
+        onNodeWithText("AutoPilot").assertDoesNotExist()
+    }
+
+    @Test
+    fun `given app logo when clicked then navigates home`() = runDesktopComposeUiTest(1000,600) {
+        var destination: NavKey? = null
+        setContent(ui(ShellUiState(), onNavigate = { destination = it }))
+        onNodeWithContentDescription("Open Home").performClick()
+        assertEquals<NavKey?>(RouteTopLevel.Home, destination)
+    }
+
+    @Test
+    fun `given Windows captions then page toolbar and window buttons occupy the same row`() = runDesktopComposeUiTest(800,600) {
+        setContent {
+            AppTheme(darkTheme = false) {
+                DesktopShell(
+                    state = ShellUiState(), onSelectRoutine = {}, onStart = {}, onStop = {},
+                    selectedRoute = RouteTopLevel.Home, navigationItems = items, footerItems = footerItems,
+                    onNavigate = {}, now = { 0L }, appVersion = "1.0.0",
+                    toolbarStartInset = 0.dp, toolbarHeight = 38.dp, toolbarDragArea = { it() },
+                    topBar = { com.jagdeep.ui.components.AppBarTop("Home", RouteTopLevel.Home, {}, {}, {}) },
+                    windowControls = { com.jagdeep.autopilot.WindowsWindowControls(false, {}, {}, {}) },
+                    windowIdentity = { com.jagdeep.autopilot.WindowsWindowIdentity() },
+                ) { Text("Page content") }
+            }
+        }
+        val identity = onNodeWithText("AutoPilot").getUnclippedBoundsInRoot()
+        val toggle = onNodeWithContentDescription("Expand sidebar from toolbar").getUnclippedBoundsInRoot()
+        assertTrue(identity.right < toggle.left, "Windows app name precedes toolbar actions")
+        onNodeWithContentDescription("AutoPilot window icon").assertExists()
+        val page = onNodeWithText("Home").getUnclippedBoundsInRoot()
+        val close = onNodeWithContentDescription("Close window").getUnclippedBoundsInRoot()
+        val body = onNodeWithText("Page content").getUnclippedBoundsInRoot()
+        assertTrue(page.top >= close.top && page.bottom <= close.bottom)
+        assertEquals(800.dp, close.right, "Close button must meet the right window edge")
+        assertTrue(body.top >= close.bottom)
+    }
+
+    @Test
+    fun `given desktop sidebar then app logo precedes navigation entries`() = runDesktopComposeUiTest(1000,600) {
+        setContent(ui(ShellUiState()))
+        val logo = onNodeWithContentDescription("Open Home").getUnclippedBoundsInRoot()
+        val destination = onNodeWithContentDescription("Routines").getUnclippedBoundsInRoot()
+        assertTrue(logo.bottom < destination.top)
+    }
 
     @Test
     fun `toolbar retains original icon and toggles sidebar`() = runDesktopComposeUiTest(1000,600) {

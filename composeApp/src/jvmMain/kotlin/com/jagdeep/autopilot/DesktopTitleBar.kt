@@ -15,13 +15,13 @@ import com.sun.jna.ptr.IntByReference
 /**
  * Fits the window to the Android Studio-like shell. macOS: as in Android Studio, the app's toolbar
  * shares the title bar's row with the system's own window buttons, so the bar is see-through, the
- * content runs under it, and the window name gives way to the toolbar. Windows: the system title bar
- * stays, in the theme's colours through DWM, with the toolbar below it. Linux keeps its own bar.
+ * content runs under it, and the window name gives way to the toolbar. Windows: the app supplies a single toolbar row with caption controls in an undecorated,
+ * resizable Compose window. Linux keeps its system bar.
  */
 internal object DesktopTitleBar {
     private val osName = System.getProperty("os.name").orEmpty()
     val isMac = osName.contains("Mac", ignoreCase = true)
-    private val isWindows = osName.contains("Windows", ignoreCase = true)
+    val isWindows = osName.contains("Windows", ignoreCase = true)
 
     /** Room the Mac window buttons take at the start of the toolbar's row. */
     val toolbarStartInset: Dp = if (isMac) 72.dp else 0.dp

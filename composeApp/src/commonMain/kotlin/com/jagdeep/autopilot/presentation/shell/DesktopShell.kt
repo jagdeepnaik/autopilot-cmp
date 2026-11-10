@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
@@ -49,6 +50,8 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import com.jagdeep.ui.navigation.RouteTopLevel
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
@@ -105,6 +108,10 @@ internal fun DesktopShell(
      */
     toolbarHeight: Dp = DesktopToolbarHeight,
     topBar: @Composable () -> Unit,
+    appIcon: @Composable () -> Unit = {},
+    appName: String = "",
+    windowControls: @Composable () -> Unit = {},
+    windowIdentity: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -113,13 +120,13 @@ internal fun DesktopShell(
     Column(Modifier.fillMaxSize().background(colors.surfaceContainer)) {
         toolbarDragArea {
             Column {
-                Toolbar(state, onSelectRoutine, onStart, onStop, toolbarStartInset, toolbarHeight, stripExpanded, { stripExpanded = !stripExpanded }, topBar)
+                Toolbar(state, onSelectRoutine, onStart, onStop, toolbarStartInset, toolbarHeight, stripExpanded, { stripExpanded = !stripExpanded }, topBar, windowControls, windowIdentity)
                 // A little more bar below a standard-height row, which stays in line with the Mac window buttons.
                 if (toolbarHeight <= DesktopToolbarHeight) Spacer(Modifier.fillMaxWidth().height(DesktopToolbarBottomSpace))
             }
         }
         Row(Modifier.weight(1f).fillMaxWidth()) {
-            ToolStripe(selectedRoute, navigationItems, footerItems, stripExpanded, onNavigate) { stripExpanded = !stripExpanded }
+            ToolStripe(selectedRoute, navigationItems, footerItems, stripExpanded, onNavigate, appIcon, appName) { stripExpanded = !stripExpanded }
             // The page as a rounded panel on the darker frame.
             Column(
                 Modifier.weight(1f).fillMaxHeight().padding(end = 6.dp)
@@ -143,13 +150,17 @@ private fun Toolbar(
     sidebarExpanded: Boolean,
     onToggleSidebar: () -> Unit,
     topBar: @Composable () -> Unit,
+    windowControls: @Composable () -> Unit,
+    windowIdentity: @Composable () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     Row(
-        Modifier.fillMaxWidth().height(height).padding(start = startInset + 4.dp, end = 12.dp),
+        Modifier.fillMaxWidth().height(height).padding(start = startInset + 4.dp, end = 0.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        windowIdentity()
         ToolbarIcon(SidebarIcon, if (sidebarExpanded) "Collapse sidebar from toolbar" else "Expand sidebar from toolbar", colors.onSurfaceVariant, enabled = true, selected = sidebarExpanded, onClick = onToggleSidebar)
         Box(Modifier.weight(1f, fill = false).widthIn(max = 340.dp).height(height)) {
             DesktopPageHeader(topBar)
@@ -159,8 +170,11 @@ private fun Toolbar(
         ToolbarIcon(Icons.Default.PlayArrow, "Start ${state.selected?.name.orEmpty()}".trim(), AppColors.live, enabled = !state.isActive && state.selected != null, onClick = onStart)
         ToolbarIcon(Icons.Default.Stop, "Stop", colors.error, enabled = state.isActive, onClick = onStop)
         state.runningName?.let {
-            Text("Running $it", style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("Running $it", modifier = Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        Spacer(Modifier.weight(1f))
+        }
+        windowControls()
     }
 }
 
@@ -253,6 +267,8 @@ private fun ToolStripe(
     footerItems: Map<NavKey, MainNavigationItem>,
     expanded: Boolean,
     onNavigate: (NavKey) -> Unit,
+    appIcon: @Composable () -> Unit,
+    appName: String,
     onToggle: () -> Unit,
 ) {
     val width by animateDpAsState(if (expanded) 168.dp else 44.dp)
@@ -260,6 +276,17 @@ private fun ToolStripe(
         Modifier.width(width).fillMaxHeight().padding(top = 8.dp, bottom = 6.dp, start = 6.dp, end = 6.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        Row(Modifier.height(36.dp).fillMaxWidth().clip(RoundedCornerShape(6.dp))
+            .clickable(role = Role.Button, onClickLabel = "Open Home") { onNavigate(RouteTopLevel.Home) }
+            .semantics { contentDescription = "Open Home" },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { appIcon() }
+            if (expanded) Text(appName, style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        HorizontalDivider(Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
         items.forEach { (route, item) -> StripEntry(item, route == selectedRoute, expanded) { onNavigate(route) } }
         SidebarToggleArea(expanded, onToggle, Modifier.weight(1f))
         footerItems.forEach { (route, item) -> StripEntry(item, route == selectedRoute, expanded) { onNavigate(route) } }
