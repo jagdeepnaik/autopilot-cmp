@@ -23,7 +23,6 @@ node_modules/
 
 # Local research, assessment captures, answer banks and working plans stay off GitHub.
 # Already tracked project documentation is unaffected.
-/private/
 
 # Read-only reference copy of the template
 /private/zynk-cmp-main/
@@ -33,3 +32,8 @@ node_modules/
 keystore.properties
 *.jks
 *.keystore
+/private/plans/
+/private/reports/
+/private/research_notes/
+/private/screenshoot/
+/private/plans/
