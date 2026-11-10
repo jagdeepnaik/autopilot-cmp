@@ -189,7 +189,7 @@ settings/           appearance, hotkeys and other preferences
 routines/           saved routines
 history/            general run history
 databases/          per-user learning progress database and journals
-answer-banks/       named question banks; legacy/ preserves older imports
+answer-banks/       named question banks
 extensions/chrome/ unpacked AutoPilot Page Helper
 ```
 

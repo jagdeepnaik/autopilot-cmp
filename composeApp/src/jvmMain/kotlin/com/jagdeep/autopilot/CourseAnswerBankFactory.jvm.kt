@@ -10,7 +10,6 @@ internal actual fun createCourseAnswerBankStore(): CourseAnswerBankStore = Direc
     legacy = listOf(
     File("private/course-q&a/sagarmeinyog.json"),
     File("../private/course-q&a/sagarmeinyog.json"),
-    desktopDataPaths.file("answer-banks/legacy","sagarmeinyog.json"),
     ),
     chooseFile = { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Swing) {
         val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Import answer bank", java.awt.FileDialog.LOAD)
