@@ -12,7 +12,7 @@ AutoPilot's Windows MSI must be built on Windows. GitHub Actions can produce it 
    Set-Location "$env:USERPROFILE\Projects"
    git clone https://github.com/jagdeepnaik/autopilot-cmp.git
    Set-Location autopilot-cmp
-   powershell.exe -NoProfile -File .\tools\windows\Build-Distribution.ps1
+   powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tools\windows\Build-Distribution.ps1
    ```
 
    If PowerShell blocks locally reviewed scripts, use `Set-ExecutionPolicy -Scope Process RemoteSigned` in this window only. Do not disable machine-wide script policies. Do not use this to override an organization-managed policy. The build script runs native-automation unit tests, DGS persistence tests, folder migration tests, and creates an MSI plus its SHA-256 output. Full UI and live browser tests are separate.
@@ -36,10 +36,10 @@ MSI output: `composeApp/build/compose/binaries/main-release/msi/`. Copy the exac
 1. On the signed-in Windows desktop, close any installed/running AutoPilot copy to avoid port and database conflicts. Keep Chrome and AutoPilot in the same user session. Run once:
 
    ```powershell
-   powershell.exe -NoProfile -File .\tools\windows\Register-DebugLauncher.ps1
+   powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tools\windows\Register-DebugLauncher.ps1
    ```
 
-   This registers an on-demand, non-elevated task for the interactive user. No password, automatic trigger, SSH setting or firewall rule is created. Re-register it if the checkout moves. If Windows restricts task registration, run `Start-Debug.ps1` manually in the desktop PowerShell instead.
+   This registers an on-demand, non-elevated task for the interactive user. Its PowerShell process uses RemoteSigned for the reviewed local project scripts; machine-wide execution policy is unchanged. No password, automatic trigger, SSH setting or firewall rule is created. Re-register it if the checkout moves. If Windows restricts task registration, run `Start-Debug.ps1` manually in the desktop PowerShell instead.
 2. From the Mac, start the task:
 
    ```bash

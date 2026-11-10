@@ -11,7 +11,7 @@ if ($Remove) {
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $scriptPath = Join-Path $PSScriptRoot 'Start-Debug.ps1'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -File "' + $scriptPath + '"') -WorkingDirectory $projectRoot
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -ExecutionPolicy RemoteSigned -File "' + $scriptPath + '"') -WorkingDirectory $projectRoot
 $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 4) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Settings $settings -Description 'On-demand AutoPilot desktop debug run for the currently signed-in user' -Force | Out-Null
