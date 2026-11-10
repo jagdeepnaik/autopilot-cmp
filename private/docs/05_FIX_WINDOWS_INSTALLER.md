@@ -91,18 +91,37 @@ To patch an MSI built before the fix, without rebuilding:
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tools\windows\Remove-UnsignedMsiHelper.ps1 -Path .\composeApp\build\compose\binaries\main-release\msi
 ```
 
-### H5. Remove the installed copy (same version only)
+### H5. Updating an installed copy
 
-Builds that keep the same version (for example `1.0.0`) get the same MSI product code. Windows then opens repair/remove instead of installing the new build. Uninstall the existing copy first. This leaves your data in `%USERPROFILE%\.autopilot` alone.
+Since commit `c11518c`, each commit builds a higher MSI version: `<major>.<minor>.<commit count>`, for example `1.0.22`. The major and minor parts come from `versionName` in `gradle/libs.versions.toml`. Running a newer MSI (H6) **upgrades the installed app in place**: the normal installer dialogs appear, the old version is removed and the new one installed. You don't need to uninstall.
 
-Close AutoPilot normally first. Then, in **Legion desktop PowerShell as Administrator** (or the SSH window, which on Legion runs with admin rights):
+What an update keeps and what it changes:
+
+| Data | On update |
+| --- | --- |
+| `%USERPROFILE%\.autopilot` (settings, routines, history, course database, logs) | Kept. The installer never touches this folder. |
+| Answer banks in `%USERPROFILE%\.autopilot\answer-banks` | Kept. A bank the app ships is added only if no file of that name exists, so new bundled banks appear and your saved answers stay. |
+| Chrome extension in `%USERPROFILE%\.autopilot\extensions\chrome` | Replaced with the new version's files at the app's next start. Press reload on the extension card in `chrome://extensions`. |
+| Window size and position | Kept (stored in the user registry). |
+| `C:\Program Files\AutoPilot\` | Replaced with the new version. |
+
+Close AutoPilot before updating, so the installer doesn't have to ask about files in use.
+
+To see the installed and new versions:
+
+```powershell
+(Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' | Where-Object DisplayName -eq 'AutoPilot').DisplayVersion
+Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\*.msi | Select-Object Name
+```
+
+**When you still need to uninstall:** the installer opens repair/remove instead of updating when the new MSI has the **same** version as the installed one. That happens when you rebuild the same commit, or when the installed copy was built from local uncommitted changes. Commit, or uninstall first. Uninstalling also leaves `.autopilot` alone:
 
 ```powershell
 $app = Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' | Where-Object DisplayName -eq 'AutoPilot'
 if ($app) { msiexec.exe /x $app.PSChildName /norestart }
 ```
 
-Skip this step when `versionName` in `gradle/libs.versions.toml` (the MSI version) is higher than the installed version. The MSI then upgrades in place.
+An older MSI installed over a newer one doesn't downgrade cleanly; uninstall first if you need to go back.
 
 ### H6. Install
 
@@ -166,7 +185,7 @@ Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='MsiInstalle
 
 - **Error 1723 naming a `Jp…` action:** the MSI still has the helper. Repeat H4.
 - **Error 1723 naming another action:** a different unsigned DLL is involved. Check the H7 events to find the file. Don't turn off Smart App Control.
-- **Repair/remove dialog instead of install:** the same version is already installed. Do H5.
+- **"Already installed", or a repair/remove dialog instead of an update:** the new MSI has the same version as the installed copy. See H5.
 
 ### H10. Using the fix in another Compose app
 

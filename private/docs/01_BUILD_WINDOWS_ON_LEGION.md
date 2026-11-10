@@ -76,4 +76,4 @@ Record its hash separately if needed:
 Get-ChildItem .\composeApp\build\compose\binaries\main-release\msi\AutoPilot-*.msi | Get-FileHash -Algorithm SHA256
 ```
 
-The filename contains the configured version, for example `AutoPilot-1.0.0.msi`. Use the actual output of this build. A matching hash verifies copying, not signing.
+The filename contains the MSI version, `<major>.<minor>.<commit count>`, for example `AutoPilot-1.0.22.msi` (commit `c11518c` is the 22nd). A newer version updates an installed copy in place. Use the actual output of this build. A matching hash verifies copying, not signing.
