@@ -157,6 +157,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var sequence = 0L
     private var pendingAt = 0L
     private var nextActionAt = 0L
+    private val lastVideoPlayAt = mutableMapOf<String, Long>()
     private var blockedDocument: String? = null
     private var blockedPath: String? = null
     private var lastPath: String? = null
@@ -260,6 +261,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             approvedSubmission = null
             lastPath = pageId
             videos.clear()
+            lastVideoPlayAt.clear()
             blockedDocument = null
             blockedPath = null
             action = null
@@ -286,7 +288,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         val elements = snapshot.elements.filter { it.visible && it.enabled }
         fun issue(element: CourseElement, kind: String = "click", message: String, repeat: Boolean = false) {
             val key = "$pageId:${snapshot.document}:${element.id}:$kind"
-            if (!repeat && !attempted.add(key)) { detail = if (kind == "play") "Press play in Chrome to continue. Paused videos are left paused." else "Waiting for the page to change. Stop and start again if it stays here."; return }
+            if (!repeat && !attempted.add(key)) { detail = "Waiting for the page to change. Stop and start again if it stays here."; return }
             action = CourseAction(++sequence, snapshot.document, element.id, kind, element.label.takeIf { kind.startsWith("assessment") })
             pendingAt = now
             detail = message
@@ -472,7 +474,16 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     issue(playButton, message = "Starting the video with its player control.")
                     return
                 }
-                issue(video, "play", "Starting the video. If Chrome refuses, press play in Chrome.")
+                // Playback is repeatable: an unfinished lesson can pause again after it starts.
+                // Throttle retries independently of click delays, including refused play requests.
+                val playKey = "${snapshot.document}:${video.id}"
+                val lastPlayAt = lastVideoPlayAt[playKey]
+                if (lastPlayAt != null && now - lastPlayAt < 5_000) {
+                    detail = "Video is paused. Retrying playback shortly. Press play in Chrome if playback is blocked."
+                    return
+                }
+                lastVideoPlayAt[playKey] = now
+                issue(video, "play", "Resuming the video. If Chrome refuses, press play in Chrome.", repeat = true)
                 return
             }
             if (videos.isEmpty() && !completionScreen) {

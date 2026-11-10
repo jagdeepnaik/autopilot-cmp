@@ -127,7 +127,56 @@ class CourseAutomationTest {
         assertEquals("play", runner.action?.kind)
         runner.ack(false)
         runner.read(snapshot(lesson, video, play), 3000)
-        assertNull(runner.action, "Do not repeatedly override a paused or refused player")
+        assertNull(runner.action, "Wait before retrying a paused or refused player")
+    }
+
+    @Test
+    fun `given a video pauses again when retry interval passes then resume without advancing`() {
+        val runner = CourseAutomationSession("session")
+        val video = CourseElement("video", tag = "video", paused = true)
+        val next = CourseElement("next", label = "Next")
+        runner.read(snapshot(lesson, video, next), 0)
+        assertEquals("play", runner.action?.kind)
+        runner.ack()
+        runner.read(snapshot(lesson, video.copy(paused = false), next), 1000)
+        assertNull(runner.action)
+        runner.read(snapshot(lesson, video, next), 4999)
+        assertNull(runner.action)
+        runner.read(snapshot(lesson, video, next), 5000)
+        assertEquals("video", runner.action?.element)
+        assertEquals("play", runner.action?.kind)
+        runner.ack()
+        runner.read(snapshot(lesson, video.copy(ended = true), next), 6000)
+        assertEquals("next", runner.action?.element, "Advance only after completion")
+    }
+
+    @Test
+    fun `given refused playback then retry at intervals and respect configured wait`() {
+        val runner = CourseAutomationSession("session", waitAfterClickMillis = 8000)
+        val page = snapshot(lesson, CourseElement("video", tag = "video", paused = true))
+        runner.read(page, 0)
+        runner.ack(false)
+        runner.read(page, 4999)
+        assertNull(runner.action)
+        runner.read(page, 5000)
+        assertEquals("play", runner.action?.kind)
+        runner.ack()
+        runner.read(page, 12999)
+        assertNull(runner.action)
+        runner.read(page, 13000)
+        assertEquals("play", runner.action?.kind)
+    }
+
+    @Test
+    fun `given decorative or hidden paused videos then never resume them`() {
+        val runner = CourseAutomationSession("session")
+        val page = snapshot(lesson,
+            CourseElement("decorative", tag = "video", paused = true, decorative = true),
+            CourseElement("hidden", tag = "video", paused = true, visible = false))
+        runner.read(page, 0)
+        assertNull(runner.action)
+        runner.read(page, 5000)
+        assertNull(runner.action)
     }
 
     @Test
