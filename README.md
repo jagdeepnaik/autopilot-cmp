@@ -194,3 +194,5 @@ extensions/chrome/ unpacked AutoPilot Page Helper
 ```
 
 Existing files are moved before their stores open. Conflicting destinations are never overwritten. After moving the extension folder, load the folder shown above through Chrome’s Load unpacked option; the extension ID and permissions stay unchanged. No website passwords are stored.
+
+Windows MSI builds and Mac-to-Windows debugging: [setup and commands](tools/windows/README.md).

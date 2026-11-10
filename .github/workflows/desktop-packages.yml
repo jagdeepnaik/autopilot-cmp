@@ -37,9 +37,13 @@ jobs:
           architecture: x64
           cache: gradle
 
-      - name: Build Windows package
+      - name: Validate Windows helper scripts
         shell: pwsh
-        run: .\gradlew.bat --no-daemon :composeApp:packageReleaseMsi
+        run: .\tools\windows\Validate-Scripts.ps1
+
+      - name: Test and build Windows package
+        shell: pwsh
+        run: .\tools\windows\Build-Distribution.ps1
 
       - name: Upload installer
         uses: actions/upload-artifact@v6
