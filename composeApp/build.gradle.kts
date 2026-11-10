@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
@@ -128,6 +129,24 @@ compose.desktop {
         }
     }
 }
+
+// Windows Smart App Control blocks jpackage's unsigned installer helper DLL, so the MSI fails
+// with Error 1723. Remove that helper from each MSI as part of packaging; the script explains
+// what it removes and refuses any MSI it doesn't recognise.
+val removeUnsignedMsiHelperScript = rootProject.file("tools/windows/Remove-UnsignedMsiHelper.ps1")
+tasks.withType<AbstractJPackageTask>()
+    .matching { it.targetFormat == TargetFormat.Msi }
+    .configureEach {
+        val msiDir = destinationDir
+        val script = removeUnsignedMsiHelperScript
+        doLast {
+            val process = ProcessBuilder(
+                "powershell.exe", "-NoProfile", "-ExecutionPolicy", "RemoteSigned",
+                "-File", script.absolutePath, "-Path", msiDir.get().asFile.absolutePath,
+            ).inheritIO().start()
+            check(process.waitFor() == 0) { "Removing the unsigned installer helper from the MSI failed." }
+        }
+    }
 
 // Release signing comes from the git-ignored keystore.properties at the project root.
 // Without it (for example on CI) the release APK is built unsigned.

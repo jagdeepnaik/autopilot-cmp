@@ -1,6 +1,6 @@
 # Windows distribution and debugging from a Mac
 
-AutoPilot's Windows MSI must be built on Windows. GitHub Actions can produce it without a laptop; the laptop is for testing the installed app, Chrome integration and Windows-specific behavior. Windows x64 is the current distribution target. MSI bundles a Java runtime; recipients do not need a separate JDK. The current package is unsigned: do not present it as code-signed or bypass Windows security warnings. Distribution signing requires a separately configured trusted Windows code-signing certificate.
+AutoPilot's Windows MSI must be built on Windows. GitHub Actions can produce it without a laptop; the laptop is for testing the installed app, Chrome integration and Windows-specific behavior. Windows x64 is the current distribution target. MSI bundles a Java runtime; recipients do not need a separate JDK. The current package is unsigned: do not present it as code-signed or bypass Windows security warnings. Packaging also removes jpackage's unsigned installer helper (`Remove-UnsignedMsiHelper.ps1`), because Smart App Control blocks it and the install fails with Error 1723. Distribution signing requires a separately configured trusted Windows code-signing certificate.
 
 ## Prepare the laptop once
 
