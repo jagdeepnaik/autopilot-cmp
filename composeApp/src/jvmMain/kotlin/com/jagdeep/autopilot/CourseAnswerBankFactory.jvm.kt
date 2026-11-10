@@ -23,8 +23,16 @@ internal actual fun createCourseAnswerBankStore(): CourseAnswerBankStore = Direc
     showFolder = { folder -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { java.awt.Desktop.getDesktop().open(folder) } },
 )
 
-/** Answer banks shipped in the app (`resources/answer-banks`), copied to the bank folder on first use. */
-internal val BUNDLED_ANSWER_BANKS = listOf(com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE)
+/**
+ * Answer banks shipped in the app (`resources/answer-banks`), read from the list the build writes.
+ * Each is copied to the bank folder when no file of that name is there, so an update adds new banks
+ * and never replaces a bank the user already has.
+ */
+internal val BUNDLED_ANSWER_BANKS: List<String> by lazy {
+    object {}.javaClass.getResourceAsStream("/answer-banks/index.txt")?.bufferedReader()?.use { reader ->
+        reader.readLines().map(String::trim).filter(String::isNotEmpty)
+    }.orEmpty()
+}
 
 internal fun bundledAnswerBank(name: String): String? =
     object {}.javaClass.getResourceAsStream("/answer-banks/$name")?.bufferedReader()?.use { it.readText() }

@@ -12,6 +12,33 @@ plugins {
     alias(libs.plugins.serialization)
 }
 
+// The app can't list its own resource folder from inside a jar, so the build writes the list.
+val generateAnswerBankIndex by tasks.registering {
+    val banks = layout.projectDirectory.dir("src/jvmMain/resources/answer-banks")
+    val output = layout.buildDirectory.dir("generated/answer-bank-index")
+    inputs.files(fileTree(banks) { include("*.json") }).withPropertyName("banks")
+    outputs.dir(output)
+    doLast {
+        val names = banks.asFile.listFiles().orEmpty().filter { it.isFile && it.name.endsWith(".json") }.map { it.name }.sorted()
+        output.get().file("answer-banks/index.txt").asFile.apply { parentFile.mkdirs(); writeText(names.joinToString("\n")) }
+    }
+}
+
+// Windows Installer only upgrades in place when the version rises, and it compares the first three
+// parts. Each commit therefore gets its own MSI version, <major>.<minor>.<commit count>, so a new
+// MSI replaces the installed app instead of stopping with "already installed". App data lives in
+// %USERPROFILE%\.autopilot, which the installer never touches.
+val windowsMsiVersion: String = run {
+    val (major, minor) = libs.versions.versionName.get().split('.').map(String::toInt)
+    val commits = providers.exec {
+        commandLine("git", "rev-list", "--count", "HEAD")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().toIntOrNull()
+        ?: error("Windows MSI version needs the Git history: run the build inside a Git checkout.")
+    check(major in 0..255 && minor in 0..255 && commits in 1..65535) { "MSI version $major.$minor.$commits is out of range" }
+    "$major.$minor.$commits"
+}
+
 kotlin {
     androidTarget {
         compilerOptions {
@@ -86,6 +113,8 @@ kotlin {
         jvmTest.dependencies {
             implementation(compose.desktop.uiTestJUnit4)
         }
+        // answer-banks/index.txt: lists every bank in resources/answer-banks, so adding a bank file is enough.
+        jvmMain { resources.srcDir(generateAnswerBankIndex) }
     }
 }
 
@@ -122,6 +151,7 @@ compose.desktop {
                 menuGroup = "AutoPilot"
                 // Must remain stable across releases so MSI can upgrade the installed app.
                 upgradeUuid = "bcdbe1a6-ef5a-4214-a3b6-021a08293966"
+                msiPackageVersion = windowsMsiVersion
             }
             linux {
                 iconFile.set(project.file("app-icons/autopilot-icon-linux-512.png"))

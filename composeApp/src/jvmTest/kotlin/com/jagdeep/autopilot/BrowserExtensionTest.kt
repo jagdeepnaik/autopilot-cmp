@@ -71,6 +71,7 @@ class BrowserExtensionTest {
 
     @Test
     fun `given the app bundle when reading each bundled answer bank then it is a valid bank`() {
+        assertTrue(com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE in BUNDLED_ANSWER_BANKS, "Bank list: $BUNDLED_ANSWER_BANKS")
         BUNDLED_ANSWER_BANKS.forEach { name ->
             val text = checkNotNull(bundledAnswerBank(name)) { "Missing bundled answer bank $name" }
             assertTrue(text.length <= 2_000_000, "$name is over the 2 MB bank limit")
