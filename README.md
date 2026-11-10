@@ -70,7 +70,7 @@ Before course navigation, the desktop routine asks you to confirm a local profil
 
 The routine selects the largest numeric **Rows per page** option offered by the website (currently 100), waits for the new page size to load, then reads every page of **Your Progress** before continuing and after a completed module. Keep **All Time** selected and clear table filters; if required columns are hidden, the status message lists what to show. Only a complete validated import updates the last-check timestamp. Earlier passes and attempt history survive newer unsubmitted attempts and failed refreshes. Passed assessments are matched by exact course title and skipped after the course page confirms its videos are complete. A test pass alone does not mark videos complete. Individual video completion is checked on course pages and saved as observed, including chapter identity; video progress is not inferred from the test table. Active timed tests are never left to perform a progress check.
 
-**Saved progress by user** inside the course routine editor shows stored users, attempts, scores, timestamps and observed lessons, even after an app restart. Data is local at `~/.autopilot/course-progress.db`, in a separate Room database (schema version 1); existing app databases are unchanged. A local save failure pauses further course actions. No credentials are stored. This progress feature is currently implemented and tested for Desktop/JVM.
+**Saved progress by user** inside the course routine editor shows stored users, attempts, scores, timestamps and observed lessons, even after an app restart. Data is local at `~/.autopilot/databases/course-progress.db`, in a separate Room database (schema version 1); existing app databases are unchanged. A local save failure pauses further course actions. No credentials are stored. This progress feature is currently implemented and tested for Desktop/JVM.
 
 This routine uses separate extension scripts; the retired Web page helper and Course helper routines have been removed. Other routine types retain their behavior. While it runs, the extension reports semantic page elements (controls, headings, status context and videos, including hidden/disabled controls) to the local app. The app chooses the action and the extension executes it once against that document's element ID. Input values and full page HTML are excluded. Very large or unrecognized pages pause for manual handling. A course without a dashboard-return control finishes after its available videos.
 
@@ -148,9 +148,9 @@ The installers are not code-signed yet, so macOS Gatekeeper and Windows SmartScr
 
 Create a **DGS E-Learning** routine and enter the course’s required hours and the hours already credited by DGS. Sign in at https://dgsstcwlms.aduacademy.in/form/studenthome in a single Chrome tab, then start the routine. Choose an available course in the app popup and press Open course. Unavailable courses are hidden. The app opens the selected e-book and reads forward from the page restored by DGS. You can also start with an e-book already open. Keep Chrome in front while reading.
 
-The routine slowly scrolls each page, watches encountered videos to their actual end, then uses Next. It starts reading forward from the page you opened. Short pages receive at least 30 seconds of reading time. When all pages are read but time remains, it returns to the first outline page and repeats forward. Local active time is an estimate, not DGS’s official credited hours; update the credited-hours setting before a later run. Login, verification, unsupported videos, and unchanged navigation pause for manual help. Playback defaults to 1×; faster rates are attempted only through the player, with the actual rate shown in Running routine.
+The routine slowly scrolls each page, watches encountered videos to their actual end, then uses Next. It starts reading forward from the page you opened. Short pages receive at least 30 seconds of reading time. When all pages are read but time remains, it returns to the first outline page and repeats forward. Study time is saved locally under the DGS display name and stable course ID, alongside the course name. Restarting a routine or the app resumes the cumulative total. The required hours and externally credited baseline are saved on the first run; later routine defaults do not overwrite them. Local active time remains an estimate, separate from DGS’s official credit. Login, verification, unsupported videos, and unchanged navigation pause for manual help. Playback defaults to 1×; faster rates are attempted only through the player, with the actual rate shown in Running routine.
 
-DGS assessments remain manual. `dgs-elearning.json` is the reserved bank name in `~/.autopilot/answer-banks/`; routine options include import and Open Q&A folder. Extension **1.13.0** adds Chrome-native input for the selected available course link on DGS Home and for e-book Next and first-page controls. It requires explicit approval of Chrome’s broader `debugger` permission before installation. The implementation attaches only to the bound, foreground DGS tab for an exact pending navigation request, verifies the page and current control position, then detaches immediately. It does not use this permission for page evaluation or network capture. An existing debugger/DevTools connection pauses navigation rather than being disconnected. After approving and reloading an update, refresh the DGS tab and reopen the e-book if DGS returns to its home page.
+DGS assessments remain manual. `dgs-elearning.json` is the reserved bank name in `~/.autopilot/answer-banks/`; routine options include import and Open Q&A folder. Extension **1.14.0** adds Chrome-native input for the selected available course link on DGS Home and for e-book Next and first-page controls. It requires explicit approval of Chrome’s broader `debugger` permission before installation. The implementation attaches only to the bound, foreground DGS tab for an exact pending navigation request, verifies the page and current control position, then detaches immediately. It does not use this permission for page evaluation or network capture. An existing debugger/DevTools connection pauses navigation rather than being disconnected. After approving and reloading an update, refresh the DGS tab and reopen the e-book if DGS returns to its home page.
 
 ## Project structure
 
@@ -177,3 +177,20 @@ Features depend only on core modules and `feature:shared`, never on each other. 
 ## AutoPilot identity
 
 The application namespace is `com.jagdeep.autopilot`; desktop data and the unpacked extension live in `~/.autopilot/`. Routine exports use `.autopilot.json` and the `autopilot-routines` format. This identity is separate from earlier installations, including mobile app sandboxes and OS permissions.
+
+## Saved DGS progress and desktop files
+
+DGS progress is recorded automatically using the signed-in DGS name and selected course. Routine options → Saved progress by user shows course totals, session count, first/last study times, pages read and video completion. Running routine shows cumulative and current-run time separately. Checkpoints save every five seconds and when pages change; Stop and normal app shutdown flush the final checkpoint. A forced process kill may lose up to five seconds. Inactive Chrome, stale readings, verification and buffering do not add study time. A changed account/course or storage failure pauses the routine. Assessments remain manual.
+
+Desktop files are grouped under `~/.autopilot/`:
+
+```text
+settings/           appearance, hotkeys and other preferences
+routines/           saved routines
+history/            general run history
+databases/          per-user learning progress database and journals
+answer-banks/       named question banks; legacy/ preserves older imports
+extensions/chrome/ unpacked AutoPilot Page Helper
+```
+
+Existing files are moved before their stores open. Conflicting destinations are never overwritten. After moving the extension folder, load the folder shown above through Chrome’s Load unpacked option; the extension ID and permissions stay unchanged. No website passwords are stored.

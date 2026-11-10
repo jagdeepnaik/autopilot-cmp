@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jagdeep.autopilot.presentation.shell.DesktopToolbarHeight
 import javax.swing.SwingUtilities
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.res.painterResource
@@ -41,6 +43,8 @@ fun main() {
 @OptIn(FlowPreview::class)
 @Suppress("DEPRECATION") // JVM classpath resource used for the native desktop window icon.
 private fun ApplicationScope.DesktopWindow() {
+    val closeScope=rememberCoroutineScope()
+    var closing by remember {mutableStateOf(false)}
     val windowPreferences = remember { DesktopWindowPreferences() }
     val restoredWindow = remember(windowPreferences) { windowPreferences.restore() }
     val windowState = rememberWindowState(
@@ -58,9 +62,13 @@ private fun ApplicationScope.DesktopWindow() {
 
     Window(
         onCloseRequest = {
-            windowPreferences.save(windowState)
-            AppServices.shutdown()
-            exitApplication()
+            if(!closing) {
+                closing=true
+                closeScope.launch {
+                    windowPreferences.save(windowState)
+                    try {AppServices.shutdown()} finally {exitApplication()}
+                }
+            }
         },
         title = AppConfig.APP_NAME,
         state = windowState,

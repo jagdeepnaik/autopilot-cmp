@@ -60,10 +60,15 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                 if(page is PageActivity.Dgs) {
                     RunSection("DGS study progress")
                     page.progress.courseName?.let { Detail("Selected course",it) }
+                    Detail("DGS profile",page.progress.accountName.ifBlank {"Checking DGS"})
                     Detail("Current page",page.progress.page)
                     Detail("Pages read",page.progress.pagesRead.toString())
-                    Detail("Active time this run","${page.progress.activeMillis/3_600_000} h ${(page.progress.activeMillis/60_000)%60} min")
-                    Detail("Required / previously credited","${page.routine.requiredHours} h / ${page.routine.creditedHours} h")
+                    Detail("Total study time","${page.progress.activeMillis/3_600_000} h ${(page.progress.activeMillis/60_000)%60} min ${page.progress.activeMillis/1000%60} sec")
+                    Detail("This run","${page.progress.currentRunMillis/60_000} min ${page.progress.currentRunMillis/1000%60} sec")
+                    Detail("Saving",if(page.progress.lastSavedAt!=null) "Checkpoint saved · every 5 seconds" else "Waiting for first checkpoint")
+                    Detail("Required / previously credited","${page.progress.requiredHours} h / ${page.progress.baselineHours} h")
+                    Detail("Videos completed","${page.progress.completedVideos} / ${page.progress.observedVideos} observed")
+                    Detail("Remaining study estimate","${(((page.progress.requiredHours-page.progress.baselineHours)*3_600_000).toLong()-page.progress.activeMillis).coerceAtLeast(0)/60_000} min")
                     Detail("Actual video speed",page.progress.actualSpeed?.let { "$it×" } ?: "No active video")
                     Detail("Reading pass",if(page.progress.reviewing) "Reviewing while time remains" else "Reading course content")
                     Detail("Assessments","Manual · not automated")

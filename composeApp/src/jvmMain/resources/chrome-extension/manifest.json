@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AutoPilot Page Helper",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "Scroll-and-click, Sagar Mein Yog and DGS E-Learning routines controlled by your local app.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAugXSp4lz26vAB/5z9q2rdcMdG7uFGMT3pJZwNI8FtuGa7JF3TkAzSXBSHpP/DzjdHXzEve6uxFWUKipjXuxwRFXlWzLRXXaQIH5foalUqWsAajO147eaPN51yPNLpqwMoSbL+IbdUhK6rGc1/PbN6Qu8Y4+KdMMWxJREdkNP68Tq8YDttowQ1za/Fqu87D8FO4xpSoXU/ESRtYz+dlOQif24LnYqSSPaax/dZW/akH5bcGkfZENPUneqYrEtV2437b1SBdpg+xgBs7HzTJQwNj7ZahUEiPU0m+qjtW2YkzFC609eHKhWlhmwP3GM6pVr+vM5bUdpaSRW7Vq0TOFjtwIDAQAB",
   "permissions": [

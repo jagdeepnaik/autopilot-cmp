@@ -6,16 +6,15 @@ import com.jagdeep.persistence.preferences.PreferencesStore
 import com.jagdeep.shared.preferences.AppPreferences
 import java.io.File
 
-private val storeDirectory: File by lazy { File(System.getProperty("user.home"), ".autopilot").also(File::mkdirs) }
 
 actual fun createAppPreferencesStore(): PreferencesStore<AppPreferences> = DataStorePreferencesStore(
-    dataStore = PreferenceDataStoreFactory.create { File(storeDirectory, APP_PREFERENCES_FILE) },
+    dataStore = PreferenceDataStoreFactory.create { desktopDataPaths.file("settings",APP_PREFERENCES_FILE) },
     read = ::readAppPreferences,
     write = ::writeAppPreferences,
 )
 
 actual fun createDocumentStore(name: String): PreferencesStore<String> = DataStorePreferencesStore(
-    dataStore = PreferenceDataStoreFactory.create { File(storeDirectory, documentFileName(name)) },
+    dataStore = PreferenceDataStoreFactory.create { desktopDataPaths.file(when(name) {"routines"->"routines";"run_history"->"history";else->"settings"},documentFileName(name)) },
     read = { it[DOCUMENT_KEY].orEmpty() },
     write = { value, preferences -> preferences[DOCUMENT_KEY] = value },
 )

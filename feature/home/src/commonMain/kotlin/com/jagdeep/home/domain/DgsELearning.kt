@@ -30,6 +30,11 @@ internal data class DgsReading(
     val title: String = "",
     val course: String = "",
     val courses: List<DgsCourseChoice> = emptyList(),
+    val accountName: String = "",
+    val courseId: String = "",
+    val courseName: String = "",
+    val scroll: Double = 0.0,
+    val videos: List<DgsVideoProgress> = emptyList(),
     val ready: Boolean = false,
     val focused: Boolean = false,
     val atBottom: Boolean = false,
@@ -53,6 +58,14 @@ internal data class DgsClickEvent(val type: String, val session: String, val req
 data class DgsProgress(
     val detail: String = "Sign in to DGS in one Chrome tab. Open your course and its E-BOOK manually. Assessments stay manual.",
     val page: String = "Waiting for course selection",
+    val username: String = "",
+    val accountName: String = "",
+    val currentRunMillis: Long = 0,
+    val lastSavedAt: Long? = null,
+    val observedVideos:Int=0,
+    val completedVideos:Int=0,
+    val baselineHours: Double = 0.0,
+    val requiredHours: Double = 18.0,
     val activeMillis: Long = 0,
     val pagesRead: Int = 0,
     val clicks: Long = 0,
@@ -65,9 +78,23 @@ data class DgsProgress(
 
 /** Real foreground time only. Missing snapshots, verification, page loads and blocked videos earn no local time. */
 internal class DgsSession(val session: String, private val routine: DgsELearningRoutine, private val nativeClicks: Boolean = false) {
-    var progress = DgsProgress(); private set
+    var progress = DgsProgress(baselineHours=routine.creditedHours,requiredHours=routine.requiredHours); private set
     var completed = false; private set
     var navigations = 0L; private set
+    private var restoredMillis=0L
+    private var studyBaseline=routine.creditedHours
+    private var studyRequired=routine.requiredHours
+    private val pageRecords=linkedMapOf<String,DgsPageProgress>()
+    val selectedCourseId get()=selectedCourse?.id
+    fun persistencePause(message:String) {stale();progress=progress.copy(detail=message,needsAttention=true)}
+    fun videoCounts(total:Int,completed:Int) {progress=progress.copy(observedVideos=total,completedVideos=completed)}
+    fun savedAt(now:Long) {progress=progress.copy(lastSavedAt=now)}
+    fun restoreStudy(username:String,display:String,name:String,total:Long,baseline:Double,required:Double,pages:List<DgsPageProgress>) {
+        restoredMillis=total;studyBaseline=baseline;studyRequired=required
+        pages.forEach {pageRecords[it.id]=it;if(it.read)readPages.add(it.id)}
+        progress=progress.copy(username=username,accountName=display,courseName=name,activeMillis=total,baselineHours=baseline,requiredHours=required,pagesRead=readPages.size)
+    }
+    fun savedPages():List<DgsPageProgress> = pageRecords.values.toList()
     private var course: String? = null
     private var selectionPage: String? = null
     private var selectedCourse: DgsCourseChoice? = null
@@ -147,8 +174,9 @@ internal class DgsSession(val session: String, private val routine: DgsELearning
         val active = usable && value.media in setOf("none", "playing", "ended") && pendingPage == null
         val delta = lastAt?.let { (now-it).takeIf { d -> d in 0..2_000 } } ?: 0L
         if (active && previousActive && page == value.page) {
-            progress = progress.copy(activeMillis = progress.activeMillis + delta)
+            progress = progress.copy(activeMillis = progress.activeMillis + delta,currentRunMillis=progress.activeMillis+delta-restoredMillis)
             pageActive += delta
+            pageRecords[value.page]?.let { pageRecords[value.page]=it.copy(activeMillis=it.activeMillis+delta) }
         }
         if(pendingPage!=null && usable && lastUsable && page==value.page) pendingWaitMillis+=delta
         lastUsable=usable
@@ -161,8 +189,9 @@ internal class DgsSession(val session: String, private val routine: DgsELearning
         }
         if (page != value.page) {
             if(pendingPage!=null) navigations++
-            page = value.page; pageActive = 0; bottomAt = null; pendingPage = null; pendingAction=null; nativeFailure=null
+            val firstObservation=page==null; page = value.page; pageActive = if(firstObservation) pageRecords[value.page]?.activeMillis ?: 0 else 0; bottomAt = null; pendingPage = null; pendingAction=null; nativeFailure=null
         }
+        pageRecords[value.page]=DgsPageProgress(value.page,value.title,pageRecords[value.page]?.activeMillis ?: pageActive,value.page in readPages,value.scroll)
         progress = progress.copy(page = value.title.ifBlank { "E-book page" }, actualSpeed = value.speed, needsAttention = false)
         nativeFailure?.let { progress=progress.copy(detail=it,needsAttention=true); return }
         if (pendingPage != null) {
@@ -183,8 +212,9 @@ internal class DgsSession(val session: String, private val routine: DgsELearning
             progress = progress.copy(detail = "At the bottom. Allowing reading time before continuing."); return
         }
         readPages += value.page
+        pageRecords[value.page]=DgsPageProgress(value.page,value.title,pageRecords[value.page]?.activeMillis ?: pageActive,true,value.scroll)
         progress = progress.copy(pagesRead = readPages.size)
-        val target = ((routine.requiredHours-routine.creditedHours).coerceAtLeast(0.0)*3_600_000).toLong()
+        val target = ((studyRequired-studyBaseline).coerceAtLeast(0.0)*3_600_000).toLong()
         if (value.next == false) {
             if (progress.activeMillis >= target) {
                 completed = true; action = "pause"

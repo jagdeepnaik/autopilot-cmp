@@ -33,13 +33,16 @@ internal fun CourseProgressHistory(accounts: List<LearningAccount>, summary: Cou
     if(open) AlertDialog(onDismissRequest = { open = false }, title = { Text("Saved learning progress") }, text = {
         Column(Modifier.heightIn(max = 500.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if(accounts.isEmpty()) Text("No saved profiles yet. Start a course routine to check progress.")
-            accounts.forEach { profile -> TextButton(onClick = { selected = profile.key; load(profile.key) }) { Text(profile.displayName + " · " + profile.key.removePrefix("sagarmeinyog:")) } }
+            accounts.forEach { profile -> TextButton(onClick = { selected = profile.key; load(profile.key) }) { Text(if(profile.key.startsWith("dgs:")) profile.displayName else profile.displayName + " · " + profile.key.removePrefix("sagarmeinyog:")) } }
             error?.let { Text(it) }
             summary?.takeIf { it.account == selected }?.let { history ->
                 Text(history.displayName, style = MaterialTheme.typography.titleMedium)
                 Text("Last progress check: ${com.jagdeep.home.ui.util.progressCheckedLabel(history.checkedAt)}")
                 history.records.groupBy { it.course }.forEach { (course, rows) ->
                     HorizontalDivider()
+                    if(rows.any {it.kind=="dgs-study"}) {
+                        Text(com.jagdeep.home.ui.util.dgsHistoryText(rows),style=MaterialTheme.typography.bodySmall)
+                    } else {
                     Text(course, style = MaterialTheme.typography.titleSmall)
                     rows.forEach { row -> Text(buildString {
                         append("${row.kind}: ${row.status}")
@@ -47,6 +50,7 @@ internal fun CourseProgressHistory(accounts: List<LearningAccount>, summary: Cou
                         append("\n${row.title}")
                         if(row.kind != "lesson") append("\n${row.details}")
                     }, style = MaterialTheme.typography.bodySmall) }
+                    }
                 }
             }
         }

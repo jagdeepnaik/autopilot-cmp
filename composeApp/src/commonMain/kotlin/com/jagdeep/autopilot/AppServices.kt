@@ -47,6 +47,7 @@ internal class AppServices private constructor() {
     private val bridge: LocalBridge = createLocalBridge(BROWSER_LINK_PORT, BROWSER_EXTENSION_ORIGIN)
     private val courseProgress = createCourseProgressRepository()
     val answerBanks = createCourseAnswerBankStore()
+    private val dgsTimeOrigin=kotlin.time.TimeSource.Monotonic.markNow()
     val page = PageController(
         automation = automation,
         bridge = bridge,
@@ -59,6 +60,8 @@ internal class AppServices private constructor() {
         answerBankStore = answerBanks,
         assessmentAlerts = createAssessmentAlerts(automation),
         progressRepository = courseProgress,
+        dgsStudyRepository = com.jagdeep.home.data.StoredDgsStudyRepository(courseProgress),
+        dgsElapsedMillis = {dgsTimeOrigin.elapsedNow().inWholeMilliseconds},
     )
 
     // Runs every kind of routine, one at a time, handing Chrome routines to [page].
@@ -106,9 +109,11 @@ internal class AppServices private constructor() {
         }
     }
 
-    private fun close() {
+    private suspend fun close() {
         // A run interrupted here is recorded on a best-effort basis: the process is exiting.
         controller.stop()
+        page.stop()
+        page.awaitStopped()
         scope.cancel()
         bridge.close()
         courseProgress.close()
@@ -124,7 +129,7 @@ internal class AppServices private constructor() {
         fun get(): AppServices = instance ?: AppServices().also { instance = it }
 
         /** Stops any run and the hot keys; called when the desktop window closes. */
-        fun shutdown() {
+        suspend fun shutdown() {
             instance?.close()
             instance = null
         }

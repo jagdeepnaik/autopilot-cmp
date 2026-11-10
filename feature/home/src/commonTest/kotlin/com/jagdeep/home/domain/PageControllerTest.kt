@@ -83,7 +83,8 @@ class PageControllerTest {
         assertEquals("Waiting for course selection",(controller.state.value.activity as PageActivity.Dgs).progress.page)
         bridge.messages.emit("""{"type":"dgsReading","session":"$session","page":"one","title":"Selected lesson","ready":true,"focused":true,"previous":false}""")
         runCurrent()
-        assertEquals("Selected lesson",(controller.state.value.activity as PageActivity.Dgs).progress.page)
+        assertTrue((controller.state.value.activity as PageActivity.Dgs).progress.needsAttention)
+        assertEquals("pause",Json.decodeFromString(HelperCommand.serializer(),bridge.published.last()).dgs!!.action)
         assertTrue(controller.stop());runCurrent()
         assertNull(controller.state.value.activity)
         val stopped=Json.parseToJsonElement(bridge.published.last()) as kotlinx.serialization.json.JsonObject

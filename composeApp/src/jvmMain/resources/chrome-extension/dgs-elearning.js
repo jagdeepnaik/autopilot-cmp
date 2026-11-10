@@ -8,6 +8,11 @@
   function diagnostic(message) { if(message!==lastDiagnostic) {lastDiagnostic=message;console.info("[AutoPilot DGS]",message);} }
   let ended=new WeakSet();
   let lastCommand=null;
+  let observedCourseName='';
+  if(!youtube) document.addEventListener('click',event=>{
+    const node=event.target.closest?.('span[data-crs="1"]');
+    if(node && node.closest('fieldset').querySelector('legend[data-act="1"]')) observedCourseName=node.textContent.trim().slice(0,500);
+  },true);
   const originalRates=new Map();
   function restoreRates() { for(const [v,rate] of originalRates) { try { if(v.isConnected) v.playbackRate=rate; } catch {} } originalRates.clear(); }
   const visible=n=>{ if(!n) return false; const r=n.getBoundingClientRect(),s=n.ownerDocument.defaultView.getComputedStyle(n); return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden'; };
@@ -20,6 +25,7 @@
     if(video.paused) { try { await video.play(); } catch {} }
   }
   async function clickControl(node,command,frame=null) {
+    if(command?.action==='selectCourse') observedCourseName=command.courseLabel || '';
     if(command?.browserClicks) {
       await chrome.runtime.sendMessage({type:'dgsBrowserClick',session:command.session,request:command.request,page:command.page,action:command.action,courseId:command.courseId,courseLabel:command.courseLabel,path:location.pathname,viewportHeight:window.innerHeight});
       return;
@@ -78,6 +84,9 @@
     const overlay=[...document.querySelectorAll('[role="dialog"],dialog[open],#frapopup,#frareport')].some(visible);
     const next=doc.querySelector('#ninext'), previous=doc.querySelector('#niprevious');
     const text=root.innerText || '';
+    const accountName=[...(document.querySelector('[data-username]')?.childNodes || [])].filter(n=>n.nodeType===3).map(n=>n.textContent).join(' ').trim().replace(/\s+/g,' ').slice(0,200);
+    let courseId='';try {courseId=new URL(doc.URL).searchParams.get('pcc') || new URL(ebook.src).searchParams.get('pcc') || '';} catch {}
+    const videos=[...root.querySelectorAll('video')].map(v=>({page:'',id:hash(v.getAttribute('src') || v.currentSrc || v.id),position:Number.isFinite(v.currentTime)?v.currentTime:0,duration:Number.isFinite(v.duration)?v.duration:null,ended:v.ended,speed:v.playbackRate}));
     const outlinePages=[...document.querySelectorAll('li[data-node="0"] > span[data-v]')];
     const selectedPage=outlinePages.find(n=>n.hasAttribute('data-sel'));
     const outlineIndex=selectedPage ? outlinePages.indexOf(selectedPage) : -1;
@@ -106,7 +115,7 @@
       }
     } else if(media) problem='This media player needs manual review; automatic scrolling is paused.';
     if(video?.ended) ended.add(media);
-    return {doc,root,ebook,next,previous,media,video,source,reading:{page,title,course,ready:!problem,atBottom:atBottom && pendingMedia.length===0,next:outlineIndex>=0 ? outlineIndex<outlinePages.length-1 : enabled(next),previous:outlineIndex>=0 ? outlineIndex>0 : enabled(previous),first:outlinePages.length>0,media:source?'waiting':video?state(video):'none',speed:video?.playbackRate??null,problem}};
+    return {doc,root,ebook,next,previous,media,video,source,reading:{page,title,course,accountName,courseId,courseName:observedCourseName,scroll:root.scrollTop,videos,ready:!problem,atBottom:atBottom && pendingMedia.length===0,next:outlineIndex>=0 ? outlineIndex<outlinePages.length-1 : enabled(next),previous:outlineIndex>=0 ? outlineIndex>0 : enabled(previous),first:outlinePages.length>0,media:source?'waiting':video?state(video):'none',speed:video?.playbackRate??null,problem}};
   }
   async function tick() {
     if(busy || !chrome.runtime?.id) return;

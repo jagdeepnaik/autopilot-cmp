@@ -20,7 +20,7 @@ internal fun writeBrowserExtension(folder: File) {
 }
 
 actual suspend fun installBrowserExtension(): String? = withContext(Dispatchers.IO) {
-    val folder = File(File(System.getProperty("user.home"), ".autopilot"), "chrome-extension")
+    val folder = desktopDataPaths.chromeExtension()
     try {
         writeBrowserExtension(folder)
     } catch (e: IOException) {

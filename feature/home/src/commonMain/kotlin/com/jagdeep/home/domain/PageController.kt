@@ -155,6 +155,8 @@ class PageController(
     private val answerBankStore: CourseAnswerBankStore = NoCourseAnswerBankStore,
     private val assessmentAlerts: AssessmentAlerts = AssessmentAlerts { automation.playAlert() },
     private val progressRepository: CourseProgressRepository = NoCourseProgressRepository,
+    private val dgsStudyRepository:DgsStudyRepository = NoDgsStudyRepository,
+    private val dgsElapsedMillis:()->Long = now,
 ) : PageRunner {
     private var historySelection = ""
     override fun loadProgressHistory(account: String) {
@@ -328,12 +330,13 @@ class PageController(
 
     override fun selectDgsCourse(id: String) {
         val runner=dgsSession ?: return
-        runner.selectCourse(id,now())
+        runner.selectCourse(id,dgsElapsedMillis())
         val activity=state.value.activity as? PageActivity.Dgs ?: return
         mutableState.update { it.copy(activity=activity.copy(progress=runner.progress)) }; publish()
         automation.apps.bringToFront(BROWSER_APP_NAME)
     }
 
+    private var dgsStudy:DgsStudyCoordinator? = null
     private var dgsSession: DgsSession? = null
     private var dgsLastReading = 0L
 
@@ -352,7 +355,7 @@ class PageController(
         return when (routine) {
             is DgsELearningRoutine -> {
                 val runner = DgsSession("${newId()}:${now()}",routine,nativeClicks=automation.access.access()==InputAccess.Granted)
-                dgsSession=runner; dgsLastReading=now()
+                dgsSession=runner; dgsStudy=DgsStudyCoordinator(dgsStudyRepository,runner,routine,now()); dgsLastReading=dgsElapsedMillis()
                 launchActivity(PageActivity.Dgs(routine,runner.progress),scrolling=false) { performDgs(routine,runner) }
                 automation.apps.bringToFront(BROWSER_APP_NAME)
                 null
@@ -378,6 +381,8 @@ class PageController(
             is ClickRoutine -> "A click routine doesn't run in Chrome."
         }
     }
+
+    suspend fun awaitStopped() {job?.join()}
 
     override fun stop(): Boolean {
         val active = isActive
@@ -456,20 +461,22 @@ class PageController(
 
     private suspend fun performDgs(routine: DgsELearningRoutine, runner: DgsSession) {
         val started=now()
+        val study=dgsStudy
         var outcome=RunOutcome.StoppedByUser
         try {
             while(true) {
                 if(!state.value.isConnected) { outcome=RunOutcome.BrowserDisconnected; break }
                 if(runner.completed) { outcome=RunOutcome.Completed; break }
-                if(now()-dgsLastReading>4_000) {
+                if(dgsElapsedMillis()-dgsLastReading>4_000) {
                     runner.stale()
                     mutableState.update { it.copy(activity=PageActivity.Dgs(routine,runner.progress)) }; publish()
                 }
+                study?.checkpoint(now(),elapsed=dgsElapsedMillis())
                 val position=automation.pointer.position()
                 if(currentPreferences.value.stopAtScreenCorner && position!=null && automation.pointer.isScreenCorner(position)) { outcome=RunOutcome.ScreenCorner; break }
                 kotlinx.coroutines.delay(250)
             }
-        } finally { withContext(NonCancellable) { endActivity(); record(routine.name,started,runner.progress.clicks,outcome) } }
+        } finally { withContext(NonCancellable) { study?.checkpoint(now(),if(runner.completed) "completed" else "stopped",dgsElapsedMillis()); endActivity(); record(routine.name,started,runner.progress.clicks,outcome) } }
     }
 
     private suspend fun performCourseAutomation(routine: CourseAutomationRoutine) {
@@ -528,6 +535,7 @@ class PageController(
 
     private fun endActivity() {
         dgsSession=null
+        dgsStudy=null
         courseAutomation = null
         courseProgress = null
         courseChunks.clear()
@@ -569,7 +577,7 @@ class PageController(
             if(reading?.type=="dgsReading") {
                 val runner=dgsSession ?: return
                 if(reading.session!=runner.session) return
-                dgsLastReading=now(); runner.read(reading,now())
+                dgsLastReading=dgsElapsedMillis(); dgsStudy?.read(reading,now(),dgsElapsedMillis())
                 val activity=state.value.activity as? PageActivity.Dgs ?: return
                 if(activity.progress.detail!=runner.progress.detail) live.log(LiveSource.Chrome) { "DGS · ${runner.progress.page}: ${runner.progress.detail}" }
                 mutableState.update { it.copy(activity=activity.copy(progress=runner.progress)) }; publish(); return
