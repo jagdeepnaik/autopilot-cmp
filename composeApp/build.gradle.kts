@@ -174,16 +174,36 @@ val removeUnsignedMsiHelperScript = rootProject.file("private/scripts/windows/Re
 val useSignedJavaLauncherScript = rootProject.file("private/scripts/windows/Use-SignedJavaLauncher.ps1")
 val isWindowsBuild = System.getProperty("os.name").startsWith("Windows")
 
-// The runtime image is what both the app folder and the MSI bundle, so javaw.exe goes in there.
+// The runtime image is what both the app folder and the MSI bundle. jlink copies the JDK's native
+// files from its jmods, which are unsigned; Smart App Control can then refuse them (it blocked
+// runtime\bin\server\jvm.dll on Legion). The JDK's installed bin folder holds the same files of the
+// same build, signed by the vendor. So every DLL and EXE in the runtime's bin is replaced with its
+// signed twin, and the signed javaw.exe is added for the shortcuts.
 tasks.withType<AbstractJLinkTask>().configureEach {
-    val javaw = javaHome.map { File(it, "bin/javaw.exe") }
+    val jdk = javaHome.map { File(it) }
     val runtime = destinationDir
     val windows = isWindowsBuild
     doLast {
         if (!windows) return@doLast
-        val source = javaw.get()
-        check(source.isFile) { "No javaw.exe in the packaging JDK at ${source.parent}." }
-        source.copyTo(runtime.get().file("bin/javaw.exe").asFile, overwrite = true)
+        val jdkHome = jdk.get()
+        val image = runtime.get().asFile
+        fun javaVersion(home: File) = File(home, "release").readLines().firstOrNull { it.startsWith("JAVA_VERSION=") }
+        check(javaVersion(jdkHome) == javaVersion(image)) {
+            "The runtime image (${javaVersion(image)}) wasn't built from the packaging JDK (${javaVersion(jdkHome)})."
+        }
+        val jdkBin = File(jdkHome, "bin")
+        val imageBin = File(image, "bin")
+        var replaced = 0
+        imageBin.walkTopDown()
+            .filter { it.isFile && (it.extension.equals("dll", true) || it.extension.equals("exe", true)) }
+            .forEach { file ->
+                val signed = File(jdkBin, file.relativeTo(imageBin).path)
+                if (signed.isFile) { signed.copyTo(file, overwrite = true); replaced++ }
+            }
+        val javaw = File(jdkBin, "javaw.exe")
+        check(javaw.isFile) { "No javaw.exe in the packaging JDK at $jdkBin." }
+        javaw.copyTo(File(imageBin, "javaw.exe"), overwrite = true)
+        println("Runtime image: replaced $replaced native files with the JDK's signed copies and added javaw.exe.")
     }
 }
 

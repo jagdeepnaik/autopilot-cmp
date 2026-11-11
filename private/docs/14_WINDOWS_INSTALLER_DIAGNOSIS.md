@@ -34,6 +34,13 @@ After the installer fix, version 1.0.24 installed but wouldn't open: *"Smart App
 
 The fix: the build copies that signed `javaw.exe` into the runtime image, and `private/scripts/windows/Use-SignedJavaLauncher.ps1` points both MSI shortcuts at it. Verified on Legion with Smart App Control on: the install succeeded, the desktop shortcut targets the signed `runtime\bin\javaw.exe` with the AutoPilot icon, the app was running 15 seconds after opening the shortcut, and no Code Integrity blocks were logged.
 
+
+### Third block: the runtime's `jvm.dll` (11 November 2026)
+
+Version 1.0.50 installed, but opening it failed three times (13:16, 13:18 and 13:19). Each time Code Integrity events 3077/3033 recorded the bundled `runtime\bin\javaw.exe` loading `runtime\bin\server\jvm.dll`, under policy `{0283ac0f-fff1-49ae-ada1-8a933130cad6}`. The runtime's `jvm.dll` (14,046,720 bytes, SHA256 `27159508…D65A1E71`) was `NotSigned`. The packaging JDK's own `C:\Program Files\Microsoft\jdk-21.0.13.21-hotspot\bin\server\jvm.dll` is `Valid` (Microsoft). Both report `JAVA_VERSION="21.0.13.0.2"`.
+
+The install script's launch check had passed, because `javaw.exe` stays open while it shows the load error. Fix: the build swaps the runtime's native files for the JDK's signed copies, and the launch check requires `jvm.dll` to be loaded (see [08, H0c](08_FIX_WINDOWS_INSTALLER.md)).
+
 ## Confirmed cause
 
 **Windows Smart App Control is blocking the unsigned Java packaging custom-action DLL.** The installer’s “required DLL could not be run” message is not evidence of a missing Visual C++ runtime in this case.

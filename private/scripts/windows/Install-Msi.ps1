@@ -65,14 +65,19 @@ foreach ($shortcut in $shortcuts) {
     if ($target -ne $javaw) { $problems += "$shortcut doesn't start the signed javaw.exe" }
 }
 if ($signature -ne 'Valid') { $problems += 'javaw.exe is missing or not validly signed' }
+$unsigned = @(Get-ChildItem (Join-Path $installDir 'runtime\bin') -Recurse -Include *.dll, *.exe | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' })
+Write-Output "Unsigned files in the bundled runtime: $($unsigned.Count)"
+$unsigned | ForEach-Object { Write-Output ('  ' + $_.FullName.Substring($installDir.Length + 1)) }
 
 if ($LaunchCheck) {
     # Runs in this session, so no window appears on the desktop.
     Start-Process $shortcuts[0]
     Start-Sleep 15
-    $app = Get-Process javaw -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $javaw }
-    Write-Output "Running 15 s after opening the shortcut: $([bool]$app)"
-    if (-not $app) { $problems += 'The app was not running 15 s after opening its shortcut' }
+    $app = @(Get-Process javaw -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $javaw })
+    # javaw.exe stays open while it shows a "can't load jvm.dll" error, so check the JVM really loaded.
+    $jvmLoaded = @($app | Where-Object { $_.Modules.ModuleName -contains 'jvm.dll' }).Count -gt 0
+    Write-Output "Running 15 s after opening the shortcut: $($app.Count -gt 0); Java VM loaded: $jvmLoaded"
+    if (-not $jvmLoaded) { $problems += 'The app did not start: its Java VM was not loaded 15 s after opening the shortcut' }
     $app | Stop-Process
 }
 

@@ -36,6 +36,16 @@ To check an installed copy:
 
 Expected: `Valid`, then `C:\Program Files\AutoPilot\runtime\bin\javaw.exe`.
 
+### H0c. The app won't start: Smart App Control blocked `jvm.dll`
+
+| Item | Detail |
+| --- | --- |
+| Symptom | The shortcut opens nothing, or a "can't load jvm.dll" error. Code Integrity events 3077/3033 name `C:\Program Files\AutoPilot\runtime\bin\server\jvm.dll`, loaded by the bundled `javaw.exe`. First seen with 1.0.50 on 11 November 2026. |
+| Cause | `jlink` builds the bundled runtime from the JDK's internal jmod files, whose DLLs are unsigned. The JDK's installed `bin` folder has the same files from the same build, signed by Microsoft. Smart App Control had allowed the unsigned copies on reputation, then started refusing `jvm.dll`. |
+| Fix | After `jlink`, Gradle replaces every DLL and EXE in the runtime's `bin` with its signed twin from the packaging JDK. It first checks that both report the same `JAVA_VERSION`, and it adds the signed `javaw.exe`. The build prints *"Runtime image: replaced N native files with the JDK's signed copies"*. |
+| Check | `Install-Msi.ps1` lists any unsigned files left in the runtime. Its launch check now requires the Java VM to be loaded in the process, because `javaw.exe` stays open while it shows a load error. |
+| Still unsigned | `app\skiko-windows-x64.dll` (Compose's graphics library) and JNA's helper DLL, which it extracts at run time. Smart App Control allows them today, since many apps ship them unchanged. Only trusted code signing removes that remaining risk. |
+
 Full evidence: [Windows installer diagnosis](14_WINDOWS_INSTALLER_DIAGNOSIS.md).
 
 ### H1. Push the code from the Mac
