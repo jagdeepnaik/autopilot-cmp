@@ -24,6 +24,11 @@ From there, run the commands as `./desktop.sh …`, for example:
 
 The script finds the project itself, so it works from any folder. From the project root, `/Users/jagdeep/Projects/AndroidStudio/AutoPilot`, use `private/scripts/desktop.sh …`, as in the table below.
 
+
+## Server Windows VM — start and stop
+
+`desktop.sh vm` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [11 — Start, stop and test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script).
+
 ## Quick reference
 
 From the project root (or replace `private/scripts/desktop.sh` with `./desktop.sh` inside the scripts folder):
@@ -103,10 +108,6 @@ Both debug runs build from source at the synced commit, so breakpoints match the
 
 - **Mac:** stops if AutoPilot is already running or port 5005 is taken. It then runs `./gradlew :composeApp:run --debug-jvm`, which waits for the debugger. In Android Studio choose **AutoPilot Mac (local)** → Debug. Closing the app window ends the run.
 - **Legion:** checks that the `AutoPilot-Debug` task exists and that the installed app isn't open, since both would share `.autopilot`. It starts the task on the signed-in desktop and waits up to 15 minutes until the debug run listens on Legion's port 5005. It then opens `ssh -N -L 127.0.0.1:5005:127.0.0.1:5005 home-legion` on the Mac. In Android Studio choose **AutoPilot Windows (SSH tunnel)** → Debug; the window appears on Legion. Control-C in the Terminal closes the tunnel. Port 5005 is never opened to the network.
-
-## Server Windows VM — start and stop
-
-`desktop.sh vm` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [11 — Start, stop and test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script).
 
 ## Where the scripts live
 
