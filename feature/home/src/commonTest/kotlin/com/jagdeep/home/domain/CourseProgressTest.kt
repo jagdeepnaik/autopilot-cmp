@@ -224,6 +224,11 @@ class CourseProgressTest {
         assertEquals("test",records.single().kind)
     }
 
+    @Test fun `given a failed attempt marked passed elsewhere then import it as this attempts failure`() {
+        val records = assessmentRecords("user", listOf(row("NO (passed in another attempt)")), 1)!!
+        assertEquals("failed", records.single().status)
+    }
+
     @Test fun `explicit saved profile selection works independently of website display name`() = runTest {
         val store = Store().apply { profiles = listOf(LearningAccount("sagarmeinyog:existing","Another person",1)) }
         val runner = CourseProgressSession(store,"run",0)

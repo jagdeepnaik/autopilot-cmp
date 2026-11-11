@@ -34,7 +34,16 @@ internal fun assessmentRecords(account: String, rows: List<Map<String,String>>, 
         val course = cell("Course Name").ifBlank { cell("Material Course") }; val title = cell("Test Title"); val type = cell("Test Type")
         val attempt = cell("Attempt Number"); val started = cell("Started At")
         require(course.isNotBlank() && title.isNotBlank() && type.isNotBlank() && attempt.toIntOrNull() != null && started.isNotBlank())
-        val status = when (cell("Passed").uppercase()) { "YES" -> "passed"; "NO" -> "failed"; "NOT SUBMITTED" -> "unsubmitted"; else -> error("Unknown result") }
+        // The live site decorates older failed attempts as e.g. "NO (passed in another
+        // attempt)". It still describes this attempt as failed, and must not stop the
+        // entire progress import just because a later attempt passed.
+        val passed = cell("Passed").uppercase()
+        val status = when {
+            passed == "YES" -> "passed"
+            passed == "NOT SUBMITTED" -> "unsubmitted"
+            passed == "NO" || passed.startsWith("NO (") -> "failed"
+            else -> error("Unknown result")
+        }
         val score = cell("Percentage").removeSuffix("%").toDoubleOrNull()
         if (status != "unsubmitted") require(score != null && score in 0.0..100.0 && cell("Completed At") !in setOf("", "-"))
         val key = listOf(course,type,title,cell("Material Title"),cell("Topic Name"),attempt,started).joinToString("\u001f")
