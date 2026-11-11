@@ -6,6 +6,63 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class CourseProgressTest {
+    @Test fun `saved verified profile is restored without visiting progress and explicit refresh still works`() = runTest {
+        val store = Store().apply {
+            profiles = listOf(LearningAccount("sagarmeinyog:person", "Person", 500))
+            saved["cached"] = LearningRecord("sagarmeinyog:person", "module-videos:/dashboard/courses/a", "Wellness", "module-videos", "Videos", "completed", details="/dashboard/courses/a", observedAt=500)
+        }
+        val runner = CourseProgressSession(store, "run", 0)
+        runner.process(snapshot(), 0)
+        runner.confirm(runner.request!!.token, "person")
+        assertFalse(runner.process(snapshot(), 1000))
+        assertNull(runner.request)
+        assertNull(runner.action)
+        assertFalse(runner.isChecking)
+        assertEquals(1, runner.summary!!.records.size)
+        runner.requireSync()
+        assertTrue(runner.process(snapshot(), 2000))
+        assertEquals("progress", runner.action?.element)
+    }
+
+    @Test fun `confirmed video and assessment results are durable idempotent and account scoped`() = runTest {
+        val store = Store().apply { profiles = listOf(LearningAccount("sagarmeinyog:person", "Person", 500)) }
+        val tracking = CourseProgressSession(store, "run", 0)
+        tracking.process(snapshot(),0)
+        tracking.confirm(tracking.request!!.token,"person")
+        assertFalse(tracking.process(snapshot(), 1000))
+        val runner = CourseAutomationSession("run")
+        runner.pendingCompletions["module-videos:/dashboard/courses/a"] = CourseCompletion("module-videos:/dashboard/courses/a", "Wellness", "module-videos", "Videos", "/dashboard/courses/a")
+        val result = snapshot().copy(path="/dashboard/courses/a/assessment/result/attempt", assessment=CourseAssessment("Wellness",result="passed"))
+        tracking.capture(result,runner,2000)
+        assertEquals(setOf("module-videos", "assessment"),store.saved.values.map { it.kind }.toSet())
+        assertTrue(store.saved.values.all { it.account == "sagarmeinyog:person" })
+        assertEquals(500,tracking.summary!!.checkedAt)
+        val writes = store.writes
+        tracking.capture(result,runner,3000)
+        assertEquals(writes,store.writes)
+        assertTrue(runner.pendingCompletions.isEmpty())
+        val restarted = CourseProgressSession(store,"run",0)
+        restarted.process(snapshot(),3001)
+        restarted.confirm(restarted.request!!.token,"person")
+        assertFalse(restarted.process(snapshot(),4000))
+        assertEquals(2,restarted.summary!!.records.size)
+    }
+
+    @Test fun `failed local completion save prevents the next learning action`() = runTest {
+        val store = Store().apply { profiles = listOf(LearningAccount("sagarmeinyog:person", "Person", 500)) }
+        val tracking = CourseProgressSession(store,"run",0)
+        tracking.process(snapshot(),0)
+        tracking.confirm(tracking.request!!.token,"person")
+        tracking.process(snapshot(),1000)
+        val runner=CourseAutomationSession("run")
+        runner.pendingCompletions["v"] = CourseCompletion("v","Wellness","lesson","Video","/dashboard/courses/a/l")
+        store.fails=true
+        tracking.capture(snapshot(),runner,2000)
+        assertTrue(tracking.blocksActions)
+        assertEquals(1,runner.pendingCompletions.size)
+        assertEquals(0,store.writes)
+    }
+
     @Test fun `closed page size menu is reopened and maximum is checked before saving`() = runTest {
         val store = Store(); val runner = CourseProgressSession(store,"run",5000)
         runner.process(snapshot(),0); runner.confirm(runner.request!!.token,"Person")

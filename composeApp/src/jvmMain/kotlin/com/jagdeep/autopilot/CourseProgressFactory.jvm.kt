@@ -4,4 +4,7 @@ import com.jagdeep.home.data.RoomCourseProgressRepository
 import com.jagdeep.persistence.room.learning.openLearningProgressStore
 import java.io.File
 internal actual fun createCourseProgressRepository(): CourseProgressRepository = RoomCourseProgressRepository(
-    openLearningProgressStore(desktopDataPaths.file("databases","course-progress.db").absolutePath))
+    openLearningProgressStore(
+        path = desktopDataPaths.file("databases","autopilot.db").absolutePath,
+        previousProgressPath = desktopDataPaths.file("databases","course-progress.db").absolutePath,
+    ))

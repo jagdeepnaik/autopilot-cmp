@@ -14,6 +14,57 @@ class CourseAutomationTest {
         CourseSnapshot("session", document, path, elements = elements.toList())
     private fun CourseAutomationSession.ack(success: Boolean = true) = acknowledge(action!!.request, success)
 
+    @Test fun `verification is deferred while a video or assessment is open`() {
+        val runner=CourseAutomationSession("session")
+        assertTrue(runner.canVerifyProgress(snapshot(course)))
+        assertTrue(runner.canVerifyProgress(snapshot("/dashboard")))
+        assertFalse(runner.canVerifyProgress(snapshot(lesson)))
+        assertFalse(runner.canVerifyProgress(snapshot(course).copy(assessment=CourseAssessment("Wellness",start="start"))))
+        assertFalse(runner.canVerifyProgress(snapshot(course).copy(top=false)))
+    }
+
+    @Test fun `saved individual video completion prevents replay while establishing module completion`() {
+        val runner=CourseAutomationSession("session")
+        runner.configureProgress(CourseProgressSummary("u","User",100,listOf(
+            com.jagdeep.persistence.room.learning.LearningRecord("u","watched:$lesson","Wellness","lesson","Video","completed",details=lesson,observedAt=100))))
+        val page=snapshot(course,CourseElement("watch",label="Watch video",href=lesson,context="Part:1 Not Started"),CourseElement("back",tag="a",href="/dashboard"))
+        runner.read(page,0)
+        assertNull(runner.action)
+        runner.read(page,2000)
+        assertEquals("back",runner.action?.element)
+        assertTrue(runner.pendingCompletions.values.any { it.kind=="module-videos" })
+    }
+
+    @Test fun `a different course ID with the same title is not skipped by the video cache`() {
+        val runner=CourseAutomationSession("session")
+        runner.configureProgress(CourseProgressSummary("u","User",100,listOf(
+            com.jagdeep.persistence.room.learning.LearningRecord("u","videos","Wellness","module-videos","Videos","completed",details=course,observedAt=100))))
+        runner.read(snapshot("/dashboard",CourseElement("new",tag="a",href="/dashboard/courses/new",courseTitle="Wellness",context="Wellness In Progress Min. Pass 75% Duration 20min")),0)
+        assertEquals("new",runner.action?.element)
+    }
+
+    @Test fun `cached videos and passed assessment skip the module without opening it`() {
+        val runner=CourseAutomationSession("session",answerAssessments=true)
+        runner.configureProgress(CourseProgressSummary("u","User",100,listOf(
+            com.jagdeep.persistence.room.learning.LearningRecord("u","videos","Wellness","module-videos","Videos","completed",details=course,observedAt=100),
+            com.jagdeep.persistence.room.learning.LearningRecord("u","test","Wellness","assessment","Course Assessment","passed",observedAt=100))))
+        val complete=CourseElement("complete",tag="a",href=course,courseTitle="Wellness",context="Wellness In Progress Min. Pass 75% Duration 20min")
+        val next=CourseElement("next",tag="a",href="/dashboard/courses/next",courseTitle="Next",context="Next Min. Pass 75% Duration 20min")
+        runner.read(snapshot("/dashboard",complete,next),0)
+        assertEquals("next",runner.action?.element)
+    }
+
+    @Test fun `cached videos with pending assessment open assessment without rescanning lessons`() {
+        val runner=CourseAutomationSession("session",answerAssessments=true,assessmentMode=AssessmentMode.Automatic)
+        runner.configureAnswers(CourseAnswerBank.decode("""{"Wellness":[{"question":"Q?","options":["A","B"],"answer":"A"}]}"""))
+        runner.configureProgress(CourseProgressSummary("u","User",100,listOf(
+            com.jagdeep.persistence.room.learning.LearningRecord("u","videos","Wellness","module-videos","Videos","completed",details=course,observedAt=100))))
+        runner.read(snapshot(course,CourseElement("module",tag="a",href=course,label="Wellness"),
+            CourseElement("chapter",label="1. Chapter In Progress 1 Material",expanded=false),CourseElement("assessment",label="Assessment")),0)
+        assertEquals("assessmentOpen",runner.action?.kind)
+        assertEquals("assessment",runner.action?.element)
+    }
+
     @Test
     fun `given saved assessment pass then still inspect module videos before considering completion`() {
         val runner = CourseAutomationSession("session")

@@ -91,11 +91,16 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                 Detail("Clicks",clicks.toString())
                 if(page!=null) Detail("Chrome",if(state.page.isConnected) "Connected" else "Not connected")
                 if(page is PageActivity.ScrollClick) Detail("Round","${page.progress.round} of ${page.progress.rounds}")
+                if(page is PageActivity.Automation) {
+                    TextButton(onClick = viewModel::refreshCourseProgress, modifier = Modifier.padding(horizontal = 8.dp)) {
+                        Text("Verify website progress")
+                    }
+                }
                 if(page is PageActivity.Automation) page.progressSummary?.let { summary ->
                     Detail("Modules with a passed assessment",summary.records.filter { it.kind=="assessment" && it.status=="passed" }.map { CourseAnswerBank.normalize(it.course) }.distinct().size.toString())
                     RunSection("Saved progress")
                     Detail("User",summary.displayName)
-                    Detail("Last progress check",progressCheckedLabel(summary.checkedAt))
+                    Detail("Last website verification",progressCheckedLabel(summary.checkedAt))
                 }
                 RunSection("Run details")
                 routine?.let { Detail("Routine type",it.kind.label) }

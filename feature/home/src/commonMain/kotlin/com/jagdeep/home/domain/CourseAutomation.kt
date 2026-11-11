@@ -63,6 +63,8 @@ internal data class CourseAction(val request: Long, val document: String, val el
 @Serializable
 internal data class CourseCommand(val session: String, val action: CourseAction? = null, val playbackSpeed: Double = 1.0)
 
+internal data class CourseCompletion(val key: String, val course: String, val kind: String, val title: String, val details: String)
+
 /** App-owned decisions; the extension only describes elements and executes a specific command. */
 internal class CourseAutomationSession(val session: String, private val waitAfterClickMillis: Long = 0, playbackSpeed: Double = 1.0, private val answerAssessments: Boolean = false,
     private val assessmentMode: AssessmentMode = AssessmentMode.Review,
@@ -75,9 +77,17 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var assessmentPass = false
     private var waitingForAssessmentPass = false
     private var rewindDashboard = false
+    internal val pendingCompletions = linkedMapOf<String, CourseCompletion>()
+    private var savedVideoTitles = emptySet<String>()
     private var savedPassedTitles = emptySet<String>()
     private var savedFailedTitles = emptySet<String>()
     fun configureProgress(summary: CourseProgressSummary?) {
+        val records = summary?.records.orEmpty()
+        val modules = records.filter { it.kind == "module-videos" && it.status == "completed" }
+        savedVideoTitles = modules.map { CourseAnswerBank.normalize(it.course) }.toSet()
+        modules.map { it.details }.filter { it.startsWith("/dashboard/courses/") }.forEach(videoFinishedCourses::add)
+        records.filter { it.kind == "lesson" && it.status == "completed" && it.details.startsWith("/dashboard/courses/") }
+            .forEach { completedLessonPages.add(it.details) }
         savedPassedTitles = summary?.records.orEmpty().filter { it.kind == "assessment" && it.status == "passed" }
             .map { CourseAnswerBank.normalize(it.course) }.toSet()
         savedFailedTitles = summary?.records.orEmpty().filter { it.kind == "assessment" && it.status == "failed" }
@@ -205,6 +215,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         if (snapshot.top && controls.any { isSingleCourse(it.context) }) return CourseView.Dashboard
         return currentView ?: CourseView.Dashboard
     }
+
+    internal fun canVerifyProgress(snapshot: CourseSnapshot): Boolean = snapshot.top && action == null &&
+        viewOf(snapshot) in setOf(CourseView.Dashboard, CourseView.Course)
 
     fun acknowledge(request: Long, success: Boolean, now: Long = pendingAt) {
         val pending = action?.takeIf { it.request == request } ?: return
@@ -495,7 +508,12 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             }
             if (!completionScreen && videos.values.any { !it.ended }) { detail = "Waiting for the video to finish. Press play in Chrome if paused."; return }
             lastLesson?.let(completedLessons::add)
-            lessonPage?.let(completedLessonPages::add)
+            val completedPage = lessonPage ?: reportedPath.takeIf { Regex("/dashboard/courses/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+").matches(it) }
+            completedPage?.let {
+                completedLessonPages.add(it)
+                val module = coursePath?.let(moduleTitles::get) ?: currentModule ?: coursePath.orEmpty()
+                pendingCompletions["watched:$it"] = CourseCompletion("watched:$it", module, "lesson", "Video completed", it)
+            }
             coursePath?.let(newlyWatchedCourses::add)
             val courseReturn = elements.firstOrNull { it.label.equals("Back to Course", true) }
                 ?: elements.firstOrNull { it.tag == "a" && it.href == coursePath }
@@ -524,6 +542,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         if (view == CourseView.Course) {
             // Completed rows change their button to Rewatch video on the live site. Keep them in
             // the row order so completing Part 3 cannot make Part 4 inherit Part 3's fallback key.
+            if (path !in videoFinishedCourses) {
             val allLessons = snapshot.elements.filter { it.label.equals("Watch video", true) || it.label.equals("Rewatch video", true) || it.label.equals("Resume video", true) }
             val lessons = elements.filter { it.label.equals("Watch video", true) || it.label.equals("Resume video", true) }
             val expandedChapter = elements.firstOrNull { it.expanded == true && isChapter(it) }
@@ -532,7 +551,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 .replace(Regex("\\s+"), " ").trim()
             val chapter = expandedChapter?.let(::chapterKey)
             fun key(element: CourseElement) = lessonKey(chapter ?: path, element, allLessons.indexOf(element))
-            fun finished(element: CourseElement) = element.label.equals("Rewatch video", true) || done(element.context) || key(element) in completedLessons
+            fun finished(element: CourseElement) = element.label.equals("Rewatch video", true) || done(element.context) || key(element) in completedLessons || element.href in completedLessonPages
             if (chapter != null) {
                 allLessons.filter { it.visible }.forEach { element ->
                     chapterLessons.getOrPut(chapter) { mutableSetOf() }.add(key(element))
@@ -567,6 +586,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             }
             if (!settled(snapshot, now)) return
             videoFinishedCourses.add(path)
+            val title = moduleTitles[path] ?: currentModule ?: path
+            pendingCompletions["module-videos:$path"] = CourseCompletion("module-videos:$path", title, "module-videos", "All module videos", path)
+            }
             val moduleTitle = moduleTitles[path] ?: currentModule
             if (moduleTitle != null && CourseAnswerBank.normalize(moduleTitle) in savedPassedTitles) passedAssessments.add(path)
             if (answerAssessments && (learningOrder == LearningOrder.AssessmentAfterModule || assessmentPass) && path !in passedAssessments) {
@@ -606,7 +628,15 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         }
         val allCards = elements.filter { !forbidden(it.label) && isSingleCourse(it.context) }
         val finishedTitles = completedCourses.mapNotNull(moduleTitles::get).map(CourseAnswerBank::normalize).toSet()
-        val cards = allCards.filter { (!done(it.context) || assessmentPass) && it.context !in completedCards &&
+        fun cachedFinished(card: CourseElement): Boolean {
+            val title = card.courseTitle?.let(CourseAnswerBank::normalize)
+            val hasCoursePath = card.href?.let { Regex("/dashboard/courses/[A-Za-z0-9_-]+").matches(it) } == true
+            val videosDone = if (hasCoursePath) card.href in videoFinishedCourses else title in savedVideoTitles &&
+                allCards.filter { it.courseTitle?.let(CourseAnswerBank::normalize) == title }.map { it.context }.distinct().size == 1
+            val assessmentDone = card.href in passedAssessments || title in savedPassedTitles
+            return videosDone && (!answerAssessments || (learningOrder == LearningOrder.VideosFirst && !assessmentPass) || assessmentDone)
+        }
+        val cards = allCards.filter { !cachedFinished(it) && (!done(it.context) || assessmentPass) && it.context !in completedCards &&
             (it.courseTitle == null || CourseAnswerBank.normalize(it.courseTitle) !in finishedTitles) &&
             (!assessmentPass || it.courseTitle?.let { title -> CourseAnswerBank.normalize(title) !in savedPassedTitles } != false) }
         val next = cards.groupBy { it.context }.values.firstNotNullOfOrNull { controls ->

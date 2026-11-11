@@ -26,6 +26,12 @@ class LearningProgressTest {
             assertEquals(1,store.records("a").size,"Empty refresh cannot erase history")
             store.close(); store = openLearningProgressStore(path)
             assertEquals("passed",store.records("a").single().status)
+            androidx.sqlite.driver.bundled.BundledSQLiteDriver().open(path).use { db ->
+                val tables=mutableSetOf<String>()
+                db.prepare("SELECT name FROM sqlite_master WHERE type='table'").use { row -> while(row.step()) tables.add(row.getText(0)) }
+                assertTrue(tables.containsAll(setOf("app_usage","learning_accounts","learning_records")))
+                assertFalse(tables.any { it.contains("transfer",ignoreCase=true) })
+            }
         } finally { store.close(); folder.deleteRecursively() }
     }
 }

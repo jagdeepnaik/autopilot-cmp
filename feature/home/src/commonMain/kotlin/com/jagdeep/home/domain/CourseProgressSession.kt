@@ -50,6 +50,29 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
         pendingAt = now
         detail = message
     }
+    suspend fun capture(snapshot: CourseSnapshot, runner: CourseAutomationSession, now: Long) {
+        val account = profile ?: return
+        if (fatal || identityMissing || request != null || !snapshot.top || snapshot.profileName?.trim() != account.displayName) return
+        val updates = runner.pendingCompletions.values.toList()
+        val records = updates.map { value -> LearningRecord(account.key, value.key, value.course, value.kind,
+            value.title, "completed", details = value.details, observedAt = now) }.toMutableList()
+        val result = snapshot.assessment
+        if (result?.result in setOf("passed", "failed") && !result?.module.isNullOrBlank()) {
+            val path = snapshot.path.split('/').take(4).joinToString("/")
+            records.add(LearningRecord(account.key, "assessment-result:$path:${snapshot.document}:${result!!.result}",
+                result.module, "assessment", "Course Assessment", result.result!!, details = path, observedAt = now))
+        }
+        val previous = summary?.records.orEmpty().associateBy { it.key }
+        val changed = records.filter { row -> previous[row.key]?.let { it.status == row.status && it.details == row.details && it.course == row.course } != true }
+        if (changed.isEmpty()) { updates.forEach { runner.pendingCompletions.remove(it.key) }; return }
+        try {
+            repository.save(account, changed)
+            summary = CourseProgressSummary(account.key, account.displayName, account.checkedAt, repository.records(account.key))
+            updates.forEach { runner.pendingCompletions.remove(it.key) }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { fatal = true; action = null; detail = "Could not save completed course progress. Check local storage before continuing." }
+    }
+
     suspend fun process(snapshot: CourseSnapshot, now: Long, learningActionPending: Boolean = false): Boolean {
         if (!snapshot.top) return phase != "ready"
         if (fatal) return true
@@ -78,6 +101,14 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
                 if (existing != null && existing.displayName != account.displayName) {
                     fatal = true; detail = "This local profile belongs to a different displayed user. Stop, restart and choose a different local profile name."; return true
                 }
+                if (existing != null) {
+                    profile = existing
+                    summary = CourseProgressSummary(existing.key, existing.displayName, existing.checkedAt, repository.records(existing.key))
+                    if (existing.checkedAt > 0 && snapshot.path.trimEnd('/') != "/dashboard/progress") {
+                        phase = "ready"
+                        detail = "Using saved video and assessment progress for ${existing.displayName}."
+                    }
+                }
                 profileChecked = true
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (_: Exception) { fatal = true; detail = "Could not verify the local profile. Stop and restart after checking storage."; return true }
@@ -102,7 +133,13 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
                 }
                 val digest = observations.joinToString { it.key + it.status }
                 if (digest != lessonDigest) {
-                    try { repository.save(account, observations); lessonDigest = digest }
+                    try {
+                        val previous = summary?.records.orEmpty().associateBy { it.key }
+                        val safe = observations.filterNot { previous[it.key]?.status == "completed" && it.status != "completed" }
+                        repository.save(profile!!, safe)
+                        summary = CourseProgressSummary(account.key, account.displayName, profile!!.checkedAt, repository.records(account.key))
+                        lessonDigest = digest
+                    }
                     catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                     catch (_: Exception) { detail = "Could not save lesson progress. Check local storage and restart."; fatal = true; return true }
                 }

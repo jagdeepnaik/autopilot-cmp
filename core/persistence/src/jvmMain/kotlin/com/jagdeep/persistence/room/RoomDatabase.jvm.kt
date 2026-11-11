@@ -7,10 +7,9 @@ import java.io.File
 
 internal var dbPathJvm: String = ""
 
-fun getRoomDatabaseBuilder(): RoomDatabase.Builder<AppRoomDatabase> {
-    // val dbFile = File(System.getProperty("java.io.tmpdir"), DB_NAME)
-    val baseDir = getAppDataDirectory()
-    val dbFile = File(baseDir, ROOM_DB_NAME)
+fun getRoomDatabaseBuilder(path: String? = null): RoomDatabase.Builder<AppRoomDatabase> {
+    val dbFile = path?.let(::File) ?: File(getAppDataDirectory(), ROOM_DB_NAME)
+    dbFile.absoluteFile.parentFile.mkdirs()
     dbPathJvm = dbFile.absolutePath
     return Room.databaseBuilder<AppRoomDatabase>(
         name = dbFile.absolutePath,

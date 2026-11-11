@@ -34,6 +34,44 @@ private val SPOT = ScreenPoint(640, 880)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PageControllerTest {
+    @Test fun `final completion waits for its database save and then verifies website history`() = runTest {
+        val localBridge=FakeBridge()
+        val saveGate=kotlinx.coroutines.CompletableDeferred<Unit>()
+        val saved=mutableMapOf<String,com.jagdeep.persistence.room.learning.LearningRecord>()
+        val account=com.jagdeep.persistence.room.learning.LearningAccount("sagarmeinyog:u","Person",100)
+        val repo=object:CourseProgressRepository {
+            override val available=true
+            override fun accounts()=kotlinx.coroutines.flow.flowOf(listOf(account))
+            override suspend fun records(account:String)=saved.values.toList()
+            override suspend fun save(account:com.jagdeep.persistence.room.learning.LearningAccount,records:List<com.jagdeep.persistence.room.learning.LearningRecord>) {
+                if(records.any {it.kind=="module-videos"}) saveGate.await()
+                records.forEach {saved[it.key]=it}
+            }
+        }
+        val controller=PageController(FakeDesktop(),localBridge,MutableStateFlow(AppPreferences()),backgroundScope,FakeRunHistory(),{currentTime},{"r"},progressRepository=repo)
+        runCurrent();controller.start(CourseAutomationRoutine("r","Course",waitAfterClickMillis=0));runCurrent()
+        fun command()=Json.decodeFromString(HelperCommand.serializer(),localBridge.published.last())
+        val session=command().courseAutomation!!.session
+        var sequence=0
+        suspend fun send(value:CourseSnapshot) {
+            val chunks=Json.encodeToString(CourseSnapshot.serializer(),value).chunked(1000)
+            val id="snapshot-${++sequence}"
+            chunks.forEachIndexed {index,chunk->localBridge.messages.emit(Json.encodeToString(CourseWireEvent.serializer(),CourseWireEvent("courseChunk",session,id,index,chunks.size,chunk)));runCurrent()}
+        }
+        val complete=CourseSnapshot(session,"doc","/dashboard/courses/a",profileName="Person",elements=listOf(CourseElement("done",label="Rewatch video",context="Part:1 Completed")))
+        send(complete)
+        controller.confirmProgressProfile((controller.state.value.activity as PageActivity.Automation).progressProfile!!.token,"u")
+        send(complete);advanceTimeBy(2000);send(complete)
+        advanceTimeBy(1000);runCurrent()
+        assertNotNull(controller.state.value.activity,"Do not end before the durable completion write")
+        assertFalse(saved.values.any {it.kind=="module-videos"})
+        saveGate.complete(Unit);runCurrent()
+        assertTrue(saved.values.any {it.kind=="module-videos"})
+        send(complete.copy(path="/dashboard",elements=listOf(CourseElement("progress",tag="a",href="/dashboard/progress"))))
+        assertEquals("progress",command().courseAutomation!!.action?.element,"One final website verification is required")
+        controller.stop();runCurrent()
+    }
+
     @Test fun `browser routines require the bundled extension version and report folder failures`() = runTest {
         val bridge = FakeBridge()
         val status = MutableStateFlow(com.jagdeep.shared.browser.BrowserExtensionStatus(latestVersion = "1.14.1"))
@@ -196,7 +234,7 @@ class PageControllerTest {
     private fun lastCommand() = json.decodeFromString(HelperCommand.serializer(), bridge.published.last())
 
     @Test
-    fun `given a completed module then refresh durable progress before selecting another course`() = runTest {
+    fun `given a completed module then save it locally before selecting another course without another scan`() = runTest {
         var imports = 0
         val profiles = MutableStateFlow(emptyList<com.jagdeep.persistence.room.learning.LearningAccount>())
         val repository = object : CourseProgressRepository {
@@ -242,10 +280,10 @@ class PageControllerTest {
         val course=dashboard.copy(path="/dashboard/courses/abc",elements=links+CourseElement("done",label="Rewatch video",context="Part:1 Completed"))
         send(course); advanceTimeBy(2000); send(course)
         assertEquals("home",lastCommand().courseAutomation!!.action?.element)
-        ack(); send(dashboard)
-        assertEquals("progress",lastCommand().courseAutomation!!.action?.element,"Progress must be checked before another course is opened")
-        ack(); advanceTimeBy(1000); send(progress)
-        assertEquals(2,imports)
+        val beforeNext = imports
+        ack(); send(dashboard.copy(elements = links + CourseElement("next-module", tag="a", href="/dashboard/courses/next", courseTitle="Next module", context="Next module Min. Pass 75% Duration 20min")))
+        assertEquals("next-module",lastCommand().courseAutomation!!.action?.element,"A completed module must not trigger another website progress scan")
+        assertEquals(beforeNext, imports)
         controller.stop(); runCurrent()
     }
 

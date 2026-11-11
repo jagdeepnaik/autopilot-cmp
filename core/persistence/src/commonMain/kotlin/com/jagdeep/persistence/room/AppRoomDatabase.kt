@@ -10,8 +10,9 @@ import com.jagdeep.common.config.AppConfig
 import com.jagdeep.logger.Log
 import com.jagdeep.persistence.room.common.AppUsageDao
 import com.jagdeep.persistence.room.common.AppUsageEntity
-import com.jagdeep.persistence.room.transfer.TransferHistoryDao
-import com.jagdeep.persistence.room.transfer.TransferHistoryEntity
+import com.jagdeep.persistence.room.learning.LearningDao
+import com.jagdeep.persistence.room.learning.LearningAccountEntity
+import com.jagdeep.persistence.room.learning.LearningRecordEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 
@@ -20,14 +21,15 @@ internal const val ROOM_DB_NAME = "${AppConfig.APP_NAME_LOWERCASE}.db"
 @Database(
     entities = [
         AppUsageEntity::class,
-        TransferHistoryEntity::class,
+        LearningAccountEntity::class,
+        LearningRecordEntity::class,
     ],
     version = 1,
 )
 @ConstructedBy(AppRoomDatabaseConstructor::class)
 abstract class AppRoomDatabase : RoomDatabase() {
     abstract fun getAppUsageDao(): AppUsageDao
-    abstract fun getTransferHistoryDao(): TransferHistoryDao
+    internal abstract fun getLearningDao(): LearningDao
 }
 
 // The Room compiler generates the `actual` implementations.
@@ -37,7 +39,11 @@ expect object AppRoomDatabaseConstructor : RoomDatabaseConstructor<AppRoomDataba
 }
 
 fun initRoomDatabase(builder: RoomDatabase.Builder<AppRoomDatabase>) {
-    RoomDatabaseHolder.database = builder
+    RoomDatabaseHolder.database = createAppRoomDatabase(builder)
+}
+
+/** Shared database configuration for lifecycle-owned platform stores and the template initializer. */
+fun createAppRoomDatabase(builder: RoomDatabase.Builder<AppRoomDatabase>): AppRoomDatabase = builder
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(connection: SQLiteConnection) {
                 super.onCreate(connection)
@@ -62,7 +68,6 @@ fun initRoomDatabase(builder: RoomDatabase.Builder<AppRoomDatabase>) {
         .setDriver(BundledSQLiteDriver())
         .setQueryCoroutineContext(Dispatchers.IO)
         .build()
-}
 
 object RoomDatabaseHolder {
     const val DATABASE_NAME = ROOM_DB_NAME

@@ -93,6 +93,7 @@ interface PageRunner {
     fun approveAssessment(token: String) = Unit
     fun confirmManualAnswer(token: String, save: Boolean) = Unit
     fun loadProgressHistory(account: String) = Unit
+    fun refreshCourseProgress() = Unit
     fun confirmProgressProfile(token: String, localName: String) = Unit
     fun saveReviewedAnswers(token: String, answers: Map<String, String>) = Unit
     fun retryAssessment(token: String, automatic: Boolean) = Unit
@@ -174,6 +175,16 @@ class PageController(
     }
     fun reportInactivity(message: String?) {
         if (state.value.inactivityWarning != message) mutableState.update { it.copy(inactivityWarning = message) }
+    }
+    override fun refreshCourseProgress() {
+        val tracking = courseProgress ?: return
+        if (tracking.isChecking) return
+        manualProgressCheckRequested = true
+        mutableState.update { state ->
+            val activity = state.activity as? PageActivity.Automation ?: return@update state
+            state.copy(activity = activity.copy(detail = "Website progress verification queued for the next safe course page."))
+        }
+        automation.apps.bringToFront(BROWSER_APP_NAME)
     }
     override fun loadProgressHistory(account: String) {
         val profile = state.value.progressAccounts.singleOrNull { it.key == account } ?: return
@@ -276,6 +287,7 @@ class PageController(
     private var questionAlertAt: Long? = null
     private val alertedAssessmentFailures = mutableSetOf<String>()
     private val assessmentAlertMutex = Mutex()
+    private val courseProgressMutex = Mutex()
     private var failedAudioAttention: String? = null
     private var lastCourseInventoryAt = 0L
     private val pageReading = MutableStateFlow<PageReading?>(null)
@@ -292,7 +304,8 @@ class PageController(
     private var courseAutomation: CourseAutomationSession? = null
     private var activeAnswerBankStore: CourseAnswerBankStore = answerBankStore
     private var courseProgress: CourseProgressSession? = null
-    private var progressCheckpoint = 0
+    private var finalProgressCheckRequested = false
+    private var manualProgressCheckRequested = false
     private val courseChunks = CourseSnapshotAssembler()
     private var courseRunSequence = 0L
     private var lastCourseSnapshotSummary: String? = null
@@ -388,7 +401,8 @@ class PageController(
                 lastCourseInventoryAt = now()
                 courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode, routine.learningOrder, bankFile)
                 courseProgress = if (progressRepository.available) CourseProgressSession(progressRepository, courseAutomation!!.session, routine.waitAfterClickMillis) else null
-                progressCheckpoint = 0
+                finalProgressCheckRequested = false
+                manualProgressCheckRequested = false
                 courseChunks.clear()
                 launchActivity(PageActivity.Automation(routine.copy(answerBankFile = bankFile), courseAutomation!!.detail), scrolling = false) { performCourseAutomation(routine) }
                 automation.apps.bringToFront(BROWSER_APP_NAME)
@@ -405,7 +419,11 @@ class PageController(
         }
     }
 
-    suspend fun awaitStopped() {job?.join()}
+    suspend fun awaitStopped() {
+        job?.join()
+        // Finish an already accepted progress write before the app closes its database.
+        courseProgressMutex.withLock { }
+    }
 
     override fun stop(): Boolean {
         val active = isActive
@@ -531,7 +549,8 @@ class PageController(
                 if (prefs.stopAtScreenCorner && position != null && automation.pointer.isScreenCorner(position)) {
                     outcome = RunOutcome.ScreenCorner; break
                 }
-                if (runner?.completed == true && courseProgress?.isChecking != true) { outcome = RunOutcome.Completed; break }
+                val finished = courseProgressMutex.withLock { runner?.completed == true && courseProgress?.isChecking != true }
+                if (finished) { outcome = RunOutcome.Completed; break }
                 kotlinx.coroutines.delay(100)
             }
         } finally {
@@ -671,6 +690,7 @@ class PageController(
         if (event.type != "courseChunk" && event.type != "courseAction") return false
         val runner = courseAutomation ?: return true
         if (event.session != runner.session) return true
+        courseProgressMutex.withLock {
         if (event.type == "courseAction") {
             live.log(LiveSource.Chrome) { "Course action ${event.request}: ${if (event.success) "accepted" else "refused"}" }
             if (courseProgress?.acknowledge(event.request, event.success, now()) != true) runner.acknowledge(event.request, event.success, now())
@@ -697,14 +717,20 @@ class PageController(
             }
             val previousAction = runner.action
             val tracking = courseProgress
+            if (manualProgressCheckRequested && tracking != null && !tracking.isChecking && runner.canVerifyProgress(snapshot)) {
+                manualProgressCheckRequested = false
+                tracking.requireSync()
+            }
             val progressHandled = tracking?.process(snapshot, now(), learningActionPending = runner.action != null) == true
             if (courseAutomation !== runner) return true
             if (!progressHandled) {
                 runner.configureProgress(tracking?.summary)
                 runner.read(snapshot, now())
-                if (runner.progressCheckpoint != progressCheckpoint) {
-                    progressCheckpoint = runner.progressCheckpoint
-                    tracking?.requireSync()
+                tracking?.capture(snapshot, runner, now())
+                runner.configureProgress(tracking?.summary)
+                if (runner.completed && tracking != null && !finalProgressCheckRequested) {
+                    finalProgressCheckRequested = true
+                    tracking.requireSync()
                 }
             }
             updateAssessmentAlerts(runner)
@@ -726,6 +752,7 @@ class PageController(
             answerSaveError = activity.answerSaveError.takeIf { activity.manualAnswer?.token == runner.manualAnswer?.token })) }
         publish()
         return true
+        }
     }
 
     private fun updateAssessmentAlerts(runner: CourseAutomationSession) {
