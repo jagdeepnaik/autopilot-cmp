@@ -2,11 +2,8 @@
 
 [All guides](00_INDEX.md) · [Build in the VM](12_BUILD_WINDOWS_IN_SERVER_VM.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md)
 
-**On this page:** [One line with the script](#one-line-with-the-script) · [Separately, by hand](#separately-by-hand) · [Recorded test](#recorded-test--11-november-2026) · [Detailed steps: monitor, Screen Sharing, troubleshooting](#11-windows-vm-connect-check-start-monitor-and-stop) · [Cancel, disconnect or shut down](#5-cancel-disconnect-or-shut-down--choose-the-right-action)
-
 The VM is a Windows guest on the home server. It uses 8 GB of the server's 16 GB, so start it only for a build and stop it afterwards. Starting or stopping it never touches Debian or the websites. `desktop.sh vm` needs the VM running and stops with a hint if it isn't.
 
-<a id="one-line-with-the-script"></a>
 ## One line with the script
 
 From `private/scripts` (or as `private/scripts/server-vm.sh …` from the project root):
@@ -29,7 +26,6 @@ cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts
 
 The script never force-kills the VM. If Windows doesn't answer, or takes longer than 5 minutes to shut down (often because it's installing updates), the script stops and says to check it with Screen Sharing.
 
-<a id="separately-by-hand"></a>
 ## Separately, by hand
 
 **Check whether it's running** (Mac Terminal):
@@ -62,9 +58,8 @@ Expected: `jagdeep\builduser`. *Connection refused* or a timeout soon after star
 ssh home-server-build Stop-Computer -Force
 ```
 
-The SSH connection closes as Windows shuts down. Then repeat the first command until it prints nothing. Don't use Debian's `shutdown`, `reboot` or `poweroff`: they stop the whole server, websites included. For resource monitoring, Screen Sharing and troubleshooting, see [the detailed steps below](#11-windows-vm-connect-check-start-monitor-and-stop).
+The SSH connection closes as Windows shuts down. Then repeat the first command until it prints nothing. Don't use Debian's `shutdown`, `reboot` or `poweroff`: they stop the whole server, websites included. For resource monitoring, Screen Sharing and troubleshooting, see the detailed steps below.
 
-<a id="recorded-test--11-november-2026"></a>
 ## Recorded test — 11 November 2026
 
 | Command | Result |
@@ -78,7 +73,6 @@ The interactive `start` (typing the console password) runs `start.sh` through `s
 
 ## Detailed steps
 
-<a id="11-windows-vm-connect-check-start-monitor-and-stop"></a>
 ### 1.1 Windows VM: connect, check, start, monitor and stop
 
 **Choose only the action you need.** You do not perform every subsection each time. All operations below are manual commands for you to run; the assistant is not starting, stopping or monitoring anything.
@@ -234,7 +228,6 @@ This returns to your Mac Terminal and leaves the VM running. If you manually ope
 
 If you have a separate `ssh -N ...` VNC tunnel window, **Control-C in that tunnel window** closes only the tunnel, not Windows. Closing the tunnel prevents Screen Sharing from reconnecting until you reopen it.
 
-<a id="5-cancel-disconnect-or-shut-down--choose-the-right-action"></a>
 ## 5. Cancel, disconnect or shut down — choose the right action
 
 - **Cancel your foreground build:** Control-C once in the build’s own Terminal window; wait for the prompt. Do not distribute partial output.

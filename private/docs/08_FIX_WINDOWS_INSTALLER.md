@@ -110,7 +110,6 @@ To patch an MSI built before the fix, without rebuilding:
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\private\scripts\windows\Remove-UnsignedMsiHelper.ps1 -Path .\composeApp\build\compose\binaries\main-release\msi
 ```
 
-<a id="h5-updating-an-installed-copy"></a>
 ### H5. Updating an installed copy
 
 Since commit `c11518c`, each commit builds a higher MSI version: `<major>.<minor>.<commit count>`, for example `1.0.22`. The major and minor parts come from `versionName` in `gradle/libs.versions.toml`. Running a newer MSI (H6) **upgrades the installed app in place**: the normal installer dialogs appear, the old version is removed and the new one installed. You don't need to uninstall.

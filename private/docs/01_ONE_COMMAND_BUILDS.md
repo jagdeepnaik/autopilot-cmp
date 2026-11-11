@@ -1,14 +1,11 @@
 # 01 — One Command: Sync, Build, Install and Debug on Every Desktop Machine
 
-[All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](09_BUILD_LINUX_ON_SERVER.md)
+[All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md) · [Manual server build](09_BUILD_LINUX_ON_SERVER.md)
 
-**On this page:** [Go to the scripts folder](#go-to-the-scripts-folder) · [Quick reference](#quick-reference) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
-
-**Related:** [Git guide](18_GIT_GUIDE.md) · [Start/stop/test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
+**Related:** [Git guide](18_GIT_GUIDE.md) · [Start/stop/test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md) · [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
 
 `private/scripts/desktop.sh` runs the whole build chain for one machine, or all of them, from a Mac Terminal. Every step stops with a plain reason when something isn't right. The manual guides still work; this script runs the same commands in order.
 
-<a id="go-to-the-scripts-folder"></a>
 ## Go to the scripts folder
 
 **Mac Terminal:**
@@ -25,7 +22,6 @@ From there, run the commands as `./desktop.sh …`, for example:
 
 The script finds the project itself, so it works from any folder. From the project root, `/Users/jagdeep/Projects/AndroidStudio/AutoPilot`, use `private/scripts/desktop.sh …`, as in the table below.
 
-<a id="quick-reference"></a>
 ## Quick reference
 
 From the project root (or replace `private/scripts/desktop.sh` with `./desktop.sh` inside the scripts folder):
@@ -48,7 +44,6 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 
 `private/scripts/windows/legion.sh` is a shortcut for `private/scripts/desktop.sh legion`.
 
-<a id="what-each-machine-does"></a>
 ## What each machine does
 
 | Machine | Target | Builds | Installs | Debug |
@@ -60,10 +55,8 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 
 Install a copied DEB on a Linux desktop with `sudo apt install ./autopilot_<version>_amd64.deb`, not on the server.
 
-<a id="how-it-works"></a>
 ## How it works
 
-<a id="1-git-is-the-only-way-code-reaches-a-build-machine"></a>
 ### 1. Git is the only way code reaches a build machine
 
 The rule for every remote machine is **push, pull, then build**. Nothing is copied over directly, and the script never builds from a side folder.
@@ -75,7 +68,6 @@ The rule for every remote machine is **push, pull, then build**. Nothing is copi
 
 The Mac target builds from your working folder and doesn't need a push. If you have uncommitted changes, it says so, because the version number only rises with a commit.
 
-<a id="2-one-version-number-per-commit"></a>
 ### 2. One version number per commit
 
 Every desktop build uses `<major>.<minor>.<commit count>`, for example `1.0.30`. Major and minor come from `versionName` in `gradle/libs.versions.toml`; the third part is `git rev-list --count HEAD`. The same number goes on:
@@ -110,16 +102,14 @@ Both debug runs build from source at the synced commit, so breakpoints match the
 - **Mac:** stops if AutoPilot is already running or port 5005 is taken. It then runs `./gradlew :composeApp:run --debug-jvm`, which waits for the debugger. In Android Studio choose **AutoPilot Mac (local)** → Debug. Closing the app window ends the run.
 - **Legion:** checks that the `AutoPilot-Debug` task exists and that the installed app isn't open, since both would share `.autopilot`. It starts the task on the signed-in desktop and waits up to 15 minutes until the debug run listens on Legion's port 5005. It then opens `ssh -N -L 127.0.0.1:5005:127.0.0.1:5005 home-legion` on the Mac. In Android Studio choose **AutoPilot Windows (SSH tunnel)** → Debug; the window appears on Legion. Control-C in the Terminal closes the tunnel. Port 5005 is never opened to the network.
 
-<a id="server-windows-vm--start-and-stop"></a>
 ## Server Windows VM — start and stop
 
-`desktop.sh vm` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [11 — Start, stop and test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script).
+`desktop.sh vm` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [11 — Start, stop and test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md).
 
 ## Where the scripts live
 
 All build, install and debug scripts are in `private/scripts/` (moved from `tools/` on 11 November 2026): `private/scripts/desktop.sh` for the Mac, and `private/scripts/windows/` for Windows. They're tracked in Git, because Gradle runs the two MSI patch scripts during packaging and the build machines need them. The `AutoPilot-Debug` task on Legion stores its launcher's path. `desktop.sh legion debug` re-registers it automatically when that path is out of date.
 
-<a id="when-it-stops"></a>
 ## When it stops
 
 | Message | What to do |
@@ -135,7 +125,6 @@ All build, install and debug scripts are in `private/scripts/` (moved from `tool
 | *port 5005 is already in use* | Close the earlier tunnel or debug run (`lsof -nP -iTCP:5005`) |
 | A build or test failure | Read the Gradle output above the message; nothing was installed |
 
-<a id="files"></a>
 ## Files
 
 | File | Runs on | Role |
@@ -149,7 +138,6 @@ All build, install and debug scripts are in `private/scripts/` (moved from `tool
 | `private/scripts/windows/Start-Debug.ps1` | Legion (via the `AutoPilot-Debug` task) | Debug run from source |
 | `.run/AutoPilot-Mac-local.run.xml`, `.run/AutoPilot-Windows-SSH.run.xml` | Android Studio | Attach to `127.0.0.1:5005` |
 
-<a id="recorded-run--11-november-2026"></a>
 ## Recorded run — 11 November 2026
 
 `private/scripts/desktop.sh all` at commit `1a13630` (version 1.0.30):

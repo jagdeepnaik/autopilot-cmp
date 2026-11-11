@@ -4,7 +4,7 @@
 
 ## PART E — INSTALL AND TEST — Legion desktop
 
-Use the physical Legion desktop for installer dialogs and GUI testing. SSH alone does not show the Windows screen. To install or update without touching the laptop, use [PART S — install over SSH](#part-s--install-or-update-over-ssh--from-the-mac) below, then check the window on the desktop.
+Use the physical Legion desktop for installer dialogs and GUI testing. SSH alone does not show the Windows screen. To install or update without touching the laptop, use PART S — install over SSH below, then check the window on the desktop.
 
 The current AutoPilot build removes the blocked unsigned Java MSI helper through `private/scripts/windows/Remove-UnsignedMsiHelper.ps1`, and its shortcuts start the app through the bundled, Microsoft-signed `javaw.exe` because Smart App Control blocks the generated `AutoPilot.exe`. Always open AutoPilot from its Start menu or desktop shortcut. The recorded installation result and remaining validation are in [Windows installer diagnosis](14_WINDOWS_INSTALLER_DIAGNOSIS.md). Keep Smart App Control enabled. Successful installation on Legion does not establish trust on every recipient's PC; trusted signing remains a separate distribution step.
 
@@ -60,7 +60,6 @@ Open **AutoPilot** from Windows Start. Verify the window controls, sidebar Home 
 
 Record the commit, MSI version/hash, installation outcome, and tested routine. Building, installing, launching, and completing a routine are separate checks.
 
-<a id="part-s--install-or-update-over-ssh--from-the-mac"></a>
 ## PART S — INSTALL OR UPDATE OVER SSH — from the Mac
 
 Installs or updates AutoPilot silently, with no installer dialogs, from a Mac Terminal. The SSH session on Legion runs with administrator rights, so the per-machine install needs no extra prompt. Use this after a successful build (Part C), then open the app on the Legion desktop to check the window (E5).

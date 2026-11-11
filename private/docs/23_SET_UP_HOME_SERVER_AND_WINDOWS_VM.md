@@ -108,7 +108,6 @@ ssh home-server-remote
 
 Enter credentials only into your own Terminal. Do not send them in chat.
 
-<a id="internet-access-through-cloudflare"></a>
 ### Internet access through Cloudflare
 
 There are two routes to the Debian machine:
@@ -972,7 +971,7 @@ Set-Location C:\Build\autopilot-cmp
 if ($LASTEXITCODE -ne 0) { throw 'Gradle startup failed.' }
 ```
 
-**Windows preparation stops here.** A successful `--version` check confirms the tools start; it does not create an installer. Do not repeat this checkout setup for each build. The actual MSI build command is in [Part B, section 1.6](12_BUILD_WINDOWS_IN_SERVER_VM.md#16-build-the-msi).
+**Windows preparation stops here.** A successful `--version` check confirms the tools start; it does not create an installer. Do not repeat this checkout setup for each build. The actual MSI build command is in [Part B, section 1.6](12_BUILD_WINDOWS_IN_SERVER_VM.md).
 
 ## 13. Prepare the Linux build checkout
 
@@ -1061,7 +1060,7 @@ An MSI cannot be installed on the Mac. Transfer it to the Windows laptop for ins
 
 ## 15. Start, monitor and shut down
 
-**For the clearer step-by-step SSH instructions, use [Part B, section 1.1](11_START_STOP_WINDOWS_BUILD_VM.md#11-windows-vm-connect-check-start-monitor-and-stop): connect to Debian, check/start the VM, monitor resources, shut down Windows through SSH, or disconnect without stopping it. Each action identifies the correct Terminal window. The commands below are supplementary reference.**
+**For the clearer step-by-step SSH instructions, use [Part B, section 1.1](11_START_STOP_WINDOWS_BUILD_VM.md): connect to Debian, check/start the VM, monitor resources, shut down Windows through SSH, or disconnect without stopping it. Each action identifies the correct Terminal window. The commands below are supplementary reference.**
 
 
 Start the VM when required, **Debian**:

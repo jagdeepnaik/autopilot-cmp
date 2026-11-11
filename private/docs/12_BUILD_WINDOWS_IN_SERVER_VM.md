@@ -50,7 +50,6 @@ No output means clean. If files are listed, stop before pulling; do not delete/r
 
 Wait for success. This fetches committed GitHub changes; it does not include uncommitted or unpushed edits from the Mac.
 
-<a id="16-build-the-msi"></a>
 ### 1.6 Build the MSI
 
 **Required prompt: `PS C:\Build\autopilot-cmp>` — Windows PowerShell.** Use `gradlew.bat` and `packageReleaseMsi` here. Do not use `nice`, `ionice`, or `packageReleaseDeb` in this window.

@@ -199,7 +199,7 @@ private/
 ```
 
 - **`misc/` is the default for anything temporary or unimportant:** backups, screenshots, captures, research notes, reports, scratch files, old copies and one-off helpers. It's git-ignored as a whole, so nothing in it reaches GitHub. Never make the build, the app or a tracked guide depend on a file in `misc/`; move the file to its proper folder first.
-- `docs/`: number the guides `NN_TOPIC.md` by how often they're used, keep `00_INDEX.md` current, and update every link when renumbering. Put an explicit `<a id="…"></a>` anchor on the line above every heading that a link jumps to (using GitHub's heading id), because the Android Studio Markdown preview doesn't generate the same heading ids as GitHub. Guides hold instructions and recorded results, not plans.
+- `docs/`: number the guides `NN_TOPIC.md` by how often they're used, keep `00_INDEX.md` current, and update every link when renumbering. Link only to files, never to a heading (`#section`): the Android Studio Markdown preview doesn't jump to headings and opens such links in the browser. Name the section in the link text instead (for example `[01 · Quick reference](01_ONE_COMMAND_BUILDS.md)`), and split a long guide into one file per part in a subfolder (as `private/docs/git/`) when readers need to jump between parts. Guides hold instructions and recorded results, not plans.
 - `scripts/` is tracked because the build machines pull it from Git and the build may run scripts from it. Reference scripts by their path under `private/scripts/` from Gradle, CI and the guides.
 - `plans/` follows the planning rule at the top of this file, and stays local.
 - Keep a data folder only for data that's part of the project. Put temporary exports and captures of it in `misc/`.

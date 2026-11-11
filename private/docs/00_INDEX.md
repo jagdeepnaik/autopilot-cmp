@@ -6,18 +6,18 @@ Updated 11 November 2026.
 
 ## Find it fast
 
-| I want to… | Go to |
+| I want to… | Open (file · section) |
 | --- | --- |
-| Build, install and debug with one command | [01 · Quick reference](01_ONE_COMMAND_BUILDS.md#quick-reference) |
-| Go to the scripts folder | [01 · Go to the scripts folder](01_ONE_COMMAND_BUILDS.md#go-to-the-scripts-folder) |
-| Start, stop or test the server VM | [11 · One line with the script](11_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script) · [by hand](11_START_STOP_WINDOWS_BUILD_VM.md#separately-by-hand) |
-| Install or update on Legion over SSH | [03 · Part S](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) |
+| Build, install and debug with one command | [01 · Quick reference](01_ONE_COMMAND_BUILDS.md) |
+| Go to the scripts folder | [01 · Go to the scripts folder](01_ONE_COMMAND_BUILDS.md) |
+| Start, stop or test the server VM | [11 · One line with the script, or by hand](11_START_STOP_WINDOWS_BUILD_VM.md) |
+| Install or update on Legion over SSH | [03 · Part S](03_INSTALL_AND_TEST_WINDOWS.md) |
 | Fix "Error 1723" or "Smart App Control blocked an app" | [08 · Fix installer errors](08_FIX_WINDOWS_INSTALLER.md) |
-| Fix "already installed" | [08 · H5 Updating an installed copy](08_FIX_WINDOWS_INSTALLER.md#h5-updating-an-installed-copy) |
-| See why a one-command run stopped | [01 · When it stops](01_ONE_COMMAND_BUILDS.md#when-it-stops) |
+| Fix "already installed" | [08 · H5 Updating an installed copy](08_FIX_WINDOWS_INSTALLER.md) |
+| See why a one-command run stopped | [01 · When it stops](01_ONE_COMMAND_BUILDS.md) |
 | Debug the Windows app from the Mac | [04 · Debug from the Mac](04_DEBUG_WINDOWS_FROM_MAC.md) |
-| Look up a Git command, or fix a Git problem | [18 · Cheat sheet](18_GIT_GUIDE.md#16-cheat-sheet) · [Recipes](18_GIT_GUIDE.md#14-recipes-for-common-situations) · [Undoing things](18_GIT_GUIDE.md#7-undoing-things) |
-| A pull refused because of local changes | [18 · Recipe 14.7](18_GIT_GUIDE.md#147-a-build-machine-has-local-changes) |
+| Look up a Git command, or fix a Git problem | [Git cheat sheet](git/16_CHEAT_SHEET.md) · [Recipes](git/14_RECIPES.md) · [Undoing things](git/07_UNDOING.md) |
+| A pull refused because of local changes | [Git recipes · 14.7](git/14_RECIPES.md) |
 
 ## 01–08 · Everyday
 
@@ -54,7 +54,7 @@ Updated 11 November 2026.
 | Windows build and debug details, with recorded tests | [15_WINDOWS_BUILD_DEBUG_REFERENCE.md](15_WINDOWS_BUILD_DEBUG_REFERENCE.md) |
 | Server tests and earlier build results | [16_SERVER_BUILD_TESTS_AND_RESULTS.md](16_SERVER_BUILD_TESTS_AND_RESULTS.md) |
 | How SSH and its keys work | [17_UNDERSTAND_SSH_AND_KEYS.md](17_UNDERSTAND_SSH_AND_KEYS.md) |
-| **Git: how it works, every important command, recipes and a cheat sheet** | [18_GIT_GUIDE.md](18_GIT_GUIDE.md) |
+| **Git: how it works, every important command, recipes and a cheat sheet** (16 parts in `git/`) | [18_GIT_GUIDE.md](18_GIT_GUIDE.md) |
 
 ## 19–23 · One-time setup — already done
 

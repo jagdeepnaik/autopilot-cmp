@@ -6,29 +6,28 @@ This document follows the app from launch to the last click: what each part does
 
 ## Contents
 
-1. [The big picture](#1-the-big-picture)
-2. [Project layout](#2-project-layout)
-3. [What happens at launch](#3-what-happens-at-launch)
-4. [Talking to the operating system](#4-talking-to-the-operating-system)
-5. [Hot keys](#5-hot-keys)
-6. [Routines: the clicker](#6-routines-the-clicker)
-7. [How the app talks to Chrome](#7-how-the-app-talks-to-chrome)
-8. [The Chrome extension](#8-the-chrome-extension)
-9. [Page helper by hand](#9-page-helper-by-hand)
-10. [Scroll and click, step by step](#10-scroll-and-click-step-by-step)
-11. [Videos, step by step](#11-videos-step-by-step)
-12. [Every way a run can stop](#12-every-way-a-run-can-stop)
-13. [What gets saved, and where](#13-what-gets-saved-and-where)
-14. [Screens, ViewModels and navigation](#14-screens-viewmodels-and-navigation)
-15. [Privacy and security](#15-privacy-and-security)
-16. [Build, install and release](#16-build-install-and-release)
-17. [Testing](#17-testing)
-18. [Limits and troubleshooting](#18-limits-and-troubleshooting)
-19. [Timings and limits reference](#19-timings-and-limits-reference)
+1. The big picture
+2. Project layout
+3. What happens at launch
+4. Talking to the operating system
+5. Hot keys
+6. Routines: the clicker
+7. How the app talks to Chrome
+8. The Chrome extension
+9. Page helper by hand
+10. Scroll and click, step by step
+11. Videos, step by step
+12. Every way a run can stop
+13. What gets saved, and where
+14. Screens, ViewModels and navigation
+15. Privacy and security
+16. Build, install and release
+17. Testing
+18. Limits and troubleshooting
+19. Timings and limits reference
 
 ---
 
-<a id="1-the-big-picture"></a>
 ## 1. The big picture
 
 AutoClicker does two different kinds of work:
@@ -70,7 +69,6 @@ flowchart LR
 
 ---
 
-<a id="2-project-layout"></a>
 ## 2. Project layout
 
 The project uses Kotlin Multiplatform and Compose Multiplatform. Modules depend in one direction: `composeApp` uses features, and features use core modules. A feature never uses another concrete feature; `verifyFeatureModuleBoundaries` enforces that part in the build.
@@ -98,17 +96,16 @@ The Routines page lists every routine, whatever its kind, and **New routine** as
 
 | Kind | Saved as | Runs in | What it does |
 | --- | --- | --- | --- |
-| Click routine | `ClickRoutine` (`click`) with the pointer as its target | `ClickController` with `ClickRun` | Clicks wherever the pointer is, in any app ([section 6](#6-routines-the-clicker)) |
+| Click routine | `ClickRoutine` (`click`) with the pointer as its target | `ClickController` with `ClickRun` | Clicks wherever the pointer is, in any app (section 6) |
 | Multi-point click | `ClickRoutine` (`click`) with a list of points | `ClickController` with `ClickRun` | Clicks a list of steps in order, each with its own wait and button, once or repeated |
-| Scroll and click | `ScrollClickRoutine` (`scrollClick`) | `PageController` with `ScrollClickRun` | Scrolls a Chrome page to the bottom, plays videos, clicks a spot, repeats ([section 10](#10-scroll-and-click-step-by-step)) |
-| Web page helper | `PageHelperRoutine` (`pageHelper`) | `PageController` | Highlights the next button in Chrome while it runs; F8 clicks it and F9 scrolls ([section 9](#9-page-helper-by-hand)) |
-| Course helper | `CourseHelperRoutine` (`courseHelper`) | `PageController` | For sagarmeinyog.com: outlines the next unfinished part or Back to Course; each key press opens it ([Course helper](#course-helper)) |
+| Scroll and click | `ScrollClickRoutine` (`scrollClick`) | `PageController` with `ScrollClickRun` | Scrolls a Chrome page to the bottom, plays videos, clicks a spot, repeats (section 10) |
+| Web page helper | `PageHelperRoutine` (`pageHelper`) | `PageController` | Highlights the next button in Chrome while it runs; F8 clicks it and F9 scrolls (section 9) |
+| Course helper | `CourseHelperRoutine` (`courseHelper`) | `PageController` | For sagarmeinyog.com: outlines the next unfinished part or Back to Course; each key press opens it (Course helper) |
 
 To add a kind: add a `Routine` subtype and a `RoutineKind` entry, teach `RoutineDraft` to edit it, add its editor section, and give it a runner that `ClickController.start` hands it to. Routines saved before kinds existed have no `type` and load as click routines.
 
 ---
 
-<a id="3-what-happens-at-launch"></a>
 ## 3. What happens at launch
 
 1. **`main.kt`** starts logging and opens the desktop window, restoring its size and position. `DesktopTitleBar` fits the window to the desktop shell: on a Mac the title bar is see-through with the content running under it, so the app's toolbar shares the row with the system's window buttons (as in Android Studio), and `apple.awt.application.appearance=system` keeps those buttons in the Mac's light or dark style. On Windows, one custom toolbar row contains the app identity and caption controls. `WindowsNativeCaption` retains the native resizable-frame and caption capabilities Windows uses for Snap Layouts, while removing the extra native title row. It exposes the maximize control to native Windows hit testing and empty caption space for dragging and double-click maximize/restore. Resize edges retain their native behavior. Other controls retain their regular app input. The app icon navigates Home. `DesktopCaptionClicks` handles unconsumed double-clicks without taking drag or button gestures.
@@ -131,7 +128,6 @@ The controllers live in `AppServices`, not in a screen, because hot keys and run
 
 ---
 
-<a id="4-talking-to-the-operating-system"></a>
 ## 4. Talking to the operating system
 
 Everything goes through the small interfaces in `DesktopAutomation.kt`, so the rest of the app doesn't know which operating system it's on:
@@ -158,7 +154,6 @@ Linux, Android and iOS use `UnsupportedDesktopAutomation`, where every action re
 
 ---
 
-<a id="5-hot-keys"></a>
 ## 5. Hot keys
 
 | Default key | Job | Handled by |
@@ -180,7 +175,6 @@ Settings refuses to give one key two jobs, and explains the clash.
 
 ---
 
-<a id="6-routines-the-clicker"></a>
 ## 6. Routines: the clicker
 
 ### What a routine holds
@@ -215,7 +209,7 @@ stateDiagram-v2
 Each pass does the following:
 
 1. Finish if the limit is reached.
-2. Run the **safety checks** ([section 12](#12-every-way-a-run-can-stop)).
+2. Run the **safety checks** (section 12).
 3. Work out the next point, and check whether it should wait:
    - **Wrong app in front** (`WaitingForApp`), when "only in this app" is set.
    - **On its own window** (`OverOwnWindow`), when the click would land on AutoClicker's focused window. This keeps Stop reachable.
@@ -227,7 +221,6 @@ When the run ends, `ClickController` writes a `RunRecord` to history, even if it
 
 ---
 
-<a id="7-how-the-app-talks-to-chrome"></a>
 ## 7. How the app talks to Chrome
 
 ### The transport
@@ -321,7 +314,6 @@ This stops **web pages** from driving the app. It doesn't stop **another program
 
 ---
 
-<a id="8-the-chrome-extension"></a>
 ## 8. The Chrome extension
 
 The files are in `composeApp/src/jvmMain/resources/chrome-extension/` and ship inside the app. **Show extension folder** copies them to `~/.autoclicker/chrome-extension`, and Chrome loads them from there as an unpacked extension.
@@ -386,7 +378,6 @@ Reloading cuts off the `content.js` already running in open tabs, and Chrome doe
 
 ---
 
-<a id="9-page-helper-by-hand"></a>
 ## 9. Page helper by hand
 
 **Pressing F8:**
@@ -413,7 +404,6 @@ The controller ignores F8 unless a page helper routine is running and a button i
 
 ---
 
-<a id="10-scroll-and-click-step-by-step"></a>
 ## 10. Scroll and click, step by step
 
 This mode scrolls to the bottom, clicks the spot you picked, waits for the page to change, and repeats. The app makes the click, through the operating system, so it works on any page element. The logic is in `ScrollClickRun`, and `PageController` wires it up.
@@ -480,7 +470,6 @@ If none happens within 15 seconds while Chrome is in front, the run stops with "
 
 ---
 
-<a id="11-videos-step-by-step"></a>
 ## 11. Videos, step by step
 
 With **Stop for videos** on, `content.js` does this on each tick (`checkVideos`):
@@ -496,7 +485,7 @@ With **Stop for videos** on, `content.js` does this on each tick (`checkVideos`)
 | Not started yet | Centre it and call `play()` | `playing` |
 | Started, now paused | Leave it alone, because pausing is your choice | `needsPlay` |
 
-4. **If no real video needs anything,** look for a play button ([below](#pictures-with-a-play-button)).
+4. **If no real video needs anything,** look for a play button (below).
 
 `background.js` combines all frames into one state, and turns scrolling off for the page while it's anything but `none`. The app sees the same state in the `page` event and won't click. Moving the pointer doesn't end the run while a video plays, so you can use the player's controls.
 
@@ -508,7 +497,6 @@ With **Stop for videos** on, `content.js` does this on each tick (`checkVideos`)
 
 Chrome can refuse to start a video with sound unless you've interacted with the site. A refusal shows "Press play on the video in Chrome", and the run waits for you. Clicking once on the page before starting makes this less likely.
 
-<a id="pictures-with-a-play-button"></a>
 ### Pictures with a play button
 
 Many players show a picture and a button, and only create the `<video>` once it's pressed. Until then there's nothing to play. So when no real video needs attention, `pressPlayControl` looks for a control that:
@@ -523,7 +511,6 @@ This is a scripted click, so **some players ignore it**, and Chrome's autoplay r
 
 ---
 
-<a id="12-every-way-a-run-can-stop"></a>
 ## 12. Every way a run can stop
 
 | Trigger | Routine | Scroll and click | Recorded as |
@@ -547,7 +534,6 @@ The corner and pointer-moved stops can be turned off in Settings. A routine canc
 
 ---
 
-<a id="13-what-gets-saved-and-where"></a>
 ## 13. What gets saved, and where
 
 On desktop, data is stored in `~/.autoclicker/` using DataStore files.
@@ -570,7 +556,6 @@ Room is set up by the template but not used. Absent or unknown saved values fall
 
 ---
 
-<a id="14-screens-viewmodels-and-navigation"></a>
 ## 14. Screens, ViewModels and navigation
 
 Every tab follows the same pattern:
@@ -596,7 +581,6 @@ Desktop uses `DesktopShell` in `composeApp`, laid out like Android Studio: a too
 
 ---
 
-<a id="course-helper"></a>
 ### Course helper
 
 A hands-on routine for one site, sagarmeinyog.com, built on the web page helper's key-press clicking. While it runs, the command carries `course: true`, and `content.js` uses `findCourseTarget` instead of word matching:
@@ -622,7 +606,6 @@ With **Developer mode** on in Settings, Activity gains a **Live log** view, next
 
 The log is `LiveLog` in `feature:shared`, implemented by `MemoryLiveLog` in `composeApp`. It keeps the newest 500 entries in memory only, never saved or sent anywhere. Recording happens only while the switch is on, and the `log { }` helper doesn't even build the text otherwise. **Pause** freezes the view for reading, **Copy** puts the whole log on the clipboard, and **Clear** empties it.
 
-<a id="15-privacy-and-security"></a>
 ## 15. Privacy and security
 
 **No outside connections.** The app and extension contact nothing but each other, on this computer. There's no account, analytics or telemetry.
@@ -637,13 +620,12 @@ The log is `LiveLog` in `feature:shared`, implemented by `MemoryLiveLog` in `com
 
 **What's stored:** routine names and screen positions, timings, run counts and stop reasons, and your settings. History doesn't record screen contents or the page you were on. Nothing here is encrypted, as none of it is meant to be secret.
 
-**Clicking without a key press:** routines and Scroll and click runs both click on their own once you start them, on whatever is at that screen position. The extension's own clicks need a key press, with one exception, the play button described in [section 11](#pictures-with-a-play-button).
+**Clicking without a key press:** routines and Scroll and click runs both click on their own once you start them, on whatever is at that screen position. The extension's own clicks need a key press, with one exception, the play button described in section 11.
 
 **Use on courses and tests:** the page helper's hands-on mode is designed for working through pages yourself. It doesn't answer questions or get around course checks. Scroll and click isn't meant for completing recorded training with nobody there.
 
 ---
 
-<a id="16-build-install-and-release"></a>
 ## 16. Build, install and release
 
 ```shell
@@ -665,7 +647,6 @@ Only one copy can hold the port, so quit the installed app before running from s
 
 ---
 
-<a id="17-testing"></a>
 ## 17. Testing
 
 ```shell
@@ -699,7 +680,6 @@ AUTOCLICKER_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveI
 
 ---
 
-<a id="18-limits-and-troubleshooting"></a>
 ## 18. Limits and troubleshooting
 
 ### Limits
@@ -732,7 +712,6 @@ AUTOCLICKER_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveI
 
 ---
 
-<a id="19-timings-and-limits-reference"></a>
 ## 19. Timings and limits reference
 
 | Value | Amount | Where |
