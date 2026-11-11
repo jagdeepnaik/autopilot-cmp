@@ -58,6 +58,9 @@ sealed interface PageActivity {
 }
 
 data class PageState(
+    val progressRevision: Long = 0,
+    val inactivityWarning: String? = null,
+    val extension: com.jagdeep.shared.browser.BrowserExtensionStatus = com.jagdeep.shared.browser.BrowserExtensionStatus(),
     val isSupported: Boolean = true,
     val isConnected: Boolean = false,
     val problem: String? = null,
@@ -127,6 +130,8 @@ internal data class HelperCommand(
 
 @Serializable
 internal data class HelperEvent(
+    val version: String? = null,
+    val progress: String? = null,
     val type: String,
     val label: String? = null,
     val focused: Boolean = false,
@@ -157,8 +162,19 @@ class PageController(
     private val progressRepository: CourseProgressRepository = NoCourseProgressRepository,
     private val dgsStudyRepository:DgsStudyRepository = NoDgsStudyRepository,
     private val dgsElapsedMillis:()->Long = now,
+    extensionStatus: StateFlow<com.jagdeep.shared.browser.BrowserExtensionStatus> = MutableStateFlow(com.jagdeep.shared.browser.BrowserExtensionStatus()),
 ) : PageRunner {
     private var historySelection = ""
+    private val progressMarkers = mutableMapOf<String, String>()
+    private fun observeProgress(channel: String, marker: String) {
+        if (progressMarkers[channel] == marker) return
+        if (channel !in progressMarkers && progressMarkers.size >= 32) progressMarkers.remove(progressMarkers.keys.first())
+        progressMarkers[channel] = marker
+        mutableState.update { it.copy(progressRevision = it.progressRevision + 1, inactivityWarning = null) }
+    }
+    fun reportInactivity(message: String?) {
+        if (state.value.inactivityWarning != message) mutableState.update { it.copy(inactivityWarning = message) }
+    }
     override fun loadProgressHistory(account: String) {
         val profile = state.value.progressAccounts.singleOrNull { it.key == account } ?: return
         historySelection = account
@@ -264,7 +280,7 @@ class PageController(
     private var lastCourseInventoryAt = 0L
     private val pageReading = MutableStateFlow<PageReading?>(null)
     private val currentPreferences: StateFlow<AppPreferences> = preferences.stateIn(scope, SharingStarted.Eagerly, AppPreferences())
-    private val mutableState = MutableStateFlow(PageState(isSupported = automation.access.access() != InputAccess.Unsupported))
+    private val mutableState = MutableStateFlow(PageState(isSupported = automation.access.access() != InputAccess.Unsupported, extension = extensionStatus.value))
     private val mutableLastRun = MutableStateFlow<RunRecord?>(null)
     private val scrollClickRun = ScrollClickRun(automation.pointer, automation.access) {
         if (!state.value.isConnected) RunOutcome.BrowserDisconnected else null
@@ -303,10 +319,13 @@ class PageController(
     init {
         publish()
         scope.launch {
+            extensionStatus.collect { status -> mutableState.update { it.copy(extension = status.copy(connectedVersion = it.extension.connectedVersion)) } }
+        }
+        scope.launch {
             bridge.connected.collect { connected ->
                 live.log(LiveSource.Chrome) { if (connected) "Extension connected" else "Extension not connected" }
                 // Nothing is highlighted, as far as anyone knows, without a connection.
-                mutableState.update { it.copy(isConnected = connected, foundLabel = it.foundLabel.takeIf { connected }) }
+                mutableState.update { it.copy(isConnected = connected, foundLabel = it.foundLabel.takeIf { connected }, extension = if (connected) it.extension else it.extension.copy(connectedVersion = null)) }
             }
         }
         scope.launch {
@@ -342,6 +361,8 @@ class PageController(
 
     override fun start(routine: Routine): String? {
         if (isActive) return null
+        progressMarkers.clear()
+        observeProgress("run", newId())
         val refusal = startOrRefuse(routine)
         live.log(LiveSource.Routine) {
             if (refusal == null) "Started ${routine.name} (${routine.kind.label})" else "Didn't start ${routine.name}: $refusal"
@@ -352,6 +373,7 @@ class PageController(
     private fun startOrRefuse(routine: Routine): String? {
         state.value.problem?.let { return it }
         if (!state.value.isConnected) return NOT_CONNECTED
+        state.value.extension.warning?.let { return it }
         return when (routine) {
             is DgsELearningRoutine -> {
                 val runner = DgsSession("${newId()}:${now()}",routine,nativeClicks=automation.access.access()==InputAccess.Granted)
@@ -361,13 +383,14 @@ class PageController(
                 null
             }
             is CourseAutomationRoutine -> {
-                activeAnswerBankStore = answerBankStore.forName(routine.answerBankFile)
+                val bankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(routine.answerBankFile) ?: routine.answerBankFile
+                activeAnswerBankStore = answerBankStore.forName(bankFile)
                 lastCourseInventoryAt = now()
-                courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode, routine.learningOrder, routine.answerBankFile)
+                courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode, routine.learningOrder, bankFile)
                 courseProgress = if (progressRepository.available) CourseProgressSession(progressRepository, courseAutomation!!.session, routine.waitAfterClickMillis) else null
                 progressCheckpoint = 0
                 courseChunks.clear()
-                launchActivity(PageActivity.Automation(routine, courseAutomation!!.detail), scrolling = false) { performCourseAutomation(routine) }
+                launchActivity(PageActivity.Automation(routine.copy(answerBankFile = bankFile), courseAutomation!!.detail), scrolling = false) { performCourseAutomation(routine) }
                 automation.apps.bringToFront(BROWSER_APP_NAME)
                 null
             }
@@ -577,6 +600,8 @@ class PageController(
             if(reading?.type=="dgsReading") {
                 val runner=dgsSession ?: return
                 if(reading.session!=runner.session) return
+                observeProgress("dgs", listOf(reading.page, reading.courseId, reading.scroll.toInt(), reading.atBottom,
+                    reading.videos.map { listOf(it.id, it.position.toLong(), it.ended) }).toString())
                 dgsLastReading=dgsElapsedMillis(); dgsStudy?.read(reading,now(),dgsElapsedMillis())
                 val activity=state.value.activity as? PageActivity.Dgs ?: return
                 if(activity.progress.detail!=runner.progress.detail) live.log(LiveSource.Chrome) { "DGS · ${runner.progress.page}: ${runner.progress.detail}" }
@@ -595,9 +620,16 @@ class PageController(
             return
         }
         when (event.type) {
+            "extensionVersion" -> {
+                val version = event.version?.takeIf { Regex("[0-9]{1,5}(?:\\.[0-9]{1,5}){0,3}").matches(it) }
+                mutableState.update { it.copy(extension = it.extension.copy(connectedVersion = version)) }
+            }
             "found" -> mutableState.update { it.copy(foundLabel = event.label?.take(MAX_LABEL_LENGTH)) }
             "textClicked" -> if (event.request == textRequest) textClicks.done.value = textRequest
-            "page" -> pageReading.value = PageReading(event.focused, event.atBottom, event.signature?.take(MAX_SIGNATURE_LENGTH), pageVideo(event.video))
+            "page" -> {
+                observeProgress("scroll", "${event.signature}:${event.progress?.take(4000)}:${event.atBottom}:${event.video}")
+                pageReading.value = PageReading(event.focused, event.atBottom, event.signature?.take(MAX_SIGNATURE_LENGTH), pageVideo(event.video))
+            }
         }
     }
 
@@ -644,6 +676,7 @@ class PageController(
             if (courseProgress?.acknowledge(event.request, event.success, now()) != true) runner.acknowledge(event.request, event.success, now())
         } else courseChunks.accept(event)?.let { snapshot ->
             lastCourseInventoryAt = now()
+            observeProgress("course:${snapshot.document}", snapshot.progressMarker())
             val summary = "Course page ${snapshot.path} top=${snapshot.top} · " + snapshot.elements
                 .filter { it.visible && (it.tag in setOf("h1", "h2", "h3", "h4") || it.expanded != null) }
                 .joinToString(" | ") { "${it.tag}:${it.label.take(100)} expanded=${it.expanded}" }.take(1200) +

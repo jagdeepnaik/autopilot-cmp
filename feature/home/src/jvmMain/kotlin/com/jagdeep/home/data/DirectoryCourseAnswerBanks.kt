@@ -50,7 +50,7 @@ class DirectoryCourseAnswerBanks(
         Files.move(partial.toPath(), target.toPath())
     }
     override fun forName(name: String): CourseAnswerBankStore {
-        val fileName = answerBankFileName(name) ?: return NoCourseAnswerBankStore
+        val fileName = resolvedAnswerBankFileName(name) ?: return NoCourseAnswerBankStore
         val delegate = FileCourseAnswerBankStore(listOf(File(folder, fileName)))
         return object : CourseAnswerBankStore {
             override suspend fun load(): CourseAnswerBank? { prepare(); return delegate.load() }
@@ -63,10 +63,10 @@ class DirectoryCourseAnswerBanks(
     override suspend fun saveReviewed(module: String, answers: List<ReviewedAnswer>) = forName(DEFAULT_ANSWER_BANK_FILE).saveReviewed(module,answers)
     override suspend fun names(): List<String> = withContext(Dispatchers.IO) {
         prepare()
-        folder.listFiles().orEmpty().filter { it.isFile && answerBankFileName(it.name) == it.name }.map { it.name }.sorted()
+        folder.listFiles().orEmpty().filter { it.isFile && resolvedAnswerBankFileName(it.name) == it.name }.map { it.name }.sorted()
     }
     override suspend fun validate(name: String): String = withContext(Dispatchers.IO) {
-        val normalized = answerBankFileName(name) ?: return@withContext "Use a simple file name ending in .json."
+        val normalized = resolvedAnswerBankFileName(name) ?: return@withContext "Use a simple file name ending in .json."
         prepare()
         val file = File(folder, normalized)
         when {
@@ -77,7 +77,7 @@ class DirectoryCourseAnswerBanks(
         }
     }
     override suspend fun importFile(name: String): String? {
-        val normalized = answerBankFileName(name) ?: return "Use a simple file name ending in .json."
+        val normalized = resolvedAnswerBankFileName(name) ?: return "Use a simple file name ending in .json."
         val source = chooseFile() ?: return null
         return withContext(Dispatchers.IO) {
             prepare()

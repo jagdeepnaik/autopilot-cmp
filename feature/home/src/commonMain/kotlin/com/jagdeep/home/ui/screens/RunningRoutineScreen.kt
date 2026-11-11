@@ -45,6 +45,13 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                     if(page is PageActivity.Automation) Text("Current module: ${page.context.module ?: "Choosing a module"}",
                         style=MaterialTheme.typography.headlineSmall,modifier=Modifier.semantics { heading() })
                 }
+                state.page.inactivityWarning?.let { warning ->
+                    Text(warning, modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error)
+                }
+                if (page != null) state.page.extension.warning?.let { warning ->
+                    Text(warning, modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium)
+                }
                 RunPanel(state,viewModel::start,viewModel::stop,viewModel::requestAccess,
                     onApproveAssessment=viewModel::approveAssessment,onManualAnswer=viewModel::confirmManualAnswer,
                     onProgressProfile=viewModel::confirmProgressProfile,onRetryAssessment=viewModel::retryAssessment,

@@ -166,7 +166,7 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                         val modes = listOf(
                             Triple(com.jagdeep.home.domain.AssessmentMode.Manual, "Manual", "Choose answers yourself. Approve assessment starts and submissions."),
                             Triple(com.jagdeep.home.domain.AssessmentMode.Review, "Review approvals", "Use saved answers, but approve assessment starts and submissions. Existing routines keep this mode."),
-                            Triple(com.jagdeep.home.domain.AssessmentMode.Automatic, "Automatic", "Authorize starts, saved-answer selection and submission for this routine. Unknown questions pause; a failed retry still needs your choice."),
+                            Triple(com.jagdeep.home.domain.AssessmentMode.Automatic, "Automatic", "Automatically start, answer and submit unfinished assessments. Videos first still asks once before the assessment pass. Unknown questions pause; failed retries need your choice."),
                         )
                         ChoiceSetting("Assessment mode",draft.assessmentMode,modes) { mode -> update { it.copy(assessmentMode=mode) } }
                     }
@@ -209,7 +209,7 @@ private fun AnswerBankOptions(state: RoutineEditorUiState, viewModel: RoutineEdi
         Column(Modifier.padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(value=state.draft.answerBankFile,onValueChange={name->viewModel.updateDraft{it.copy(answerBankFile=name)}},
                 label={Text("File name")},singleLine=true,isError=state.errors.answerBankFile!=null,
-                supportingText={Text(state.errors.answerBankFile ?: "Use a name such as my-answers.json. Save the routine to apply it.")})
+                supportingText={Text(state.errors.answerBankFile ?: "Use name-ver-1.0.json, for example sagarmeinyog-ver-1.0.json. Increase the version for updates; save the routine to apply it.")})
             state.answerBankFolder?.let { Text(it,style=MaterialTheme.typography.bodySmall) }
             Text(if(state.draft.kind==RoutineKind.DgsELearning) "Reserved for future DGS assessment support. This routine does not read or answer assessments." else "Files are validated and loaded at the start of each run. Changing a file does not alter an active assessment.",style=MaterialTheme.typography.bodySmall)
             if(state.answerBankFolder!=null) {

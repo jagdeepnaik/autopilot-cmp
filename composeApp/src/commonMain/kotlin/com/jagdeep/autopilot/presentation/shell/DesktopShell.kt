@@ -112,6 +112,7 @@ internal fun DesktopShell(
     appName: String = "",
     windowControls: @Composable () -> Unit = {},
     windowIdentity: @Composable () -> Unit = {},
+    toolbarBlankAreaModifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -120,7 +121,7 @@ internal fun DesktopShell(
     Column(Modifier.fillMaxSize().background(colors.surfaceContainer)) {
         toolbarDragArea {
             Column {
-                Toolbar(state, onSelectRoutine, onStart, onStop, toolbarStartInset, toolbarHeight, stripExpanded, { stripExpanded = !stripExpanded }, topBar, windowControls, windowIdentity)
+                Toolbar(state, onSelectRoutine, onStart, onStop, toolbarStartInset, toolbarHeight, stripExpanded, { stripExpanded = !stripExpanded }, topBar, windowControls, windowIdentity, toolbarBlankAreaModifier)
                 // A little more bar below a standard-height row, which stays in line with the Mac window buttons.
                 if (toolbarHeight <= DesktopToolbarHeight) Spacer(Modifier.fillMaxWidth().height(DesktopToolbarBottomSpace))
             }
@@ -152,6 +153,7 @@ private fun Toolbar(
     topBar: @Composable () -> Unit,
     windowControls: @Composable () -> Unit,
     windowIdentity: @Composable () -> Unit,
+    toolbarBlankAreaModifier: Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
     Row(
@@ -172,7 +174,7 @@ private fun Toolbar(
         state.runningName?.let {
             Text("Running $it", modifier = Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Spacer(Modifier.weight(1f))
+        Spacer(toolbarBlankAreaModifier.weight(1f).height(height))
         }
         windowControls()
     }
@@ -249,7 +251,7 @@ private fun ToolbarIcon(icon: ImageVector, label: String, tint: Color, enabled: 
 private fun ChromeStatus(state: ShellUiState) {
     val colors = MaterialTheme.colorScheme
     val (dot, label) = when {
-        state.chromeProblem != null -> colors.error to "Can't reach Chrome"
+        state.chromeProblem != null -> colors.error to if (state.chromeConnected) "Check Chrome extension" else "Can't reach Chrome"
         state.chromeConnected -> AppColors.live to "Chrome connected"
         else -> colors.outline to "Chrome not connected"
     }
@@ -357,7 +359,7 @@ private fun StatusBar(state: ShellUiState, appVersion: String, now: () -> Long) 
         }
     }
     val operation = buildString {
-        append(state.operation)
+        append(state.routineWarning ?: state.operation)
         state.nextClickAtMillis?.let { append(" · ").append(nextClickLabel(it, nowMillis)) }
     }
     Row(
@@ -368,7 +370,7 @@ private fun StatusBar(state: ShellUiState, appVersion: String, now: () -> Long) 
         Text(
             operation,
             style = style,
-            color = if (state.isActive) colors.onSurface else colors.onSurfaceVariant,
+            color = if (state.routineWarning != null) colors.error else if (state.isActive) colors.onSurface else colors.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },

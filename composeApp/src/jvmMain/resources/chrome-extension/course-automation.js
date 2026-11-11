@@ -183,7 +183,7 @@
           visible: visible(node), enabled: !node.matches(':disabled') && !node.closest('[inert],[aria-disabled="true"]') && getComputedStyle(node).pointerEvents !== 'none',
           expanded: node.hasAttribute('aria-expanded') ? node.getAttribute('aria-expanded') === 'true' : null,
           svg: !!node.querySelector('svg'), courseTitle: courseTitle(node),
-          ...(tag === 'video' ? { paused: node.paused, ended: node.ended, decorative: node.loop || (node.muted && node.autoplay) || node.duration === Infinity } : {}),
+          ...(tag === 'video' ? { paused: node.paused, ended: node.ended, mediaPosition: Number.isFinite(node.currentTime) ? node.currentTime : null, decorative: node.loop || (node.muted && node.autoplay) || node.duration === Infinity } : {}),
         });
         if (result.length >= 2000) return { items: result, truncated: true };
       }

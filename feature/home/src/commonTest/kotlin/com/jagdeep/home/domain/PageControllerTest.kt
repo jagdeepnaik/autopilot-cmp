@@ -34,6 +34,28 @@ private val SPOT = ScreenPoint(640, 880)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PageControllerTest {
+    @Test fun `browser routines require the bundled extension version and report folder failures`() = runTest {
+        val bridge = FakeBridge()
+        val status = MutableStateFlow(com.jagdeep.shared.browser.BrowserExtensionStatus(latestVersion = "1.14.1"))
+        val controller = PageController(FakeDesktop(), bridge, MutableStateFlow(AppPreferences()), backgroundScope,
+            FakeRunHistory(), { currentTime }, { "version-test" }, extensionStatus = status)
+        runCurrent()
+        val routine = CourseAutomationRoutine("r", "Course")
+        assertTrue(controller.start(routine)!!.contains("version"))
+        assertFalse(controller.isActive)
+        bridge.messages.emit("""{"type":"extensionVersion","version":"1.14.0"}"""); runCurrent()
+        assertTrue(controller.start(routine)!!.contains("out of date"))
+        bridge.messages.emit("""{"type":"extensionVersion","version":"1.14.1"}"""); runCurrent()
+        assertNull(controller.state.value.extension.warning)
+        status.value = status.value.copy(folderProblem = "Extension folder is read-only."); runCurrent()
+        assertEquals("Extension folder is read-only.", controller.start(routine))
+        status.value = status.value.copy(folderProblem = null); runCurrent()
+        assertNull(controller.start(routine))
+        controller.stop(); runCurrent()
+        bridge.connected.value = false; runCurrent()
+        assertNull(controller.state.value.extension.connectedVersion)
+    }
+
     @Test fun `DGS native clicks require the exact pending command and foreground Chrome and ignore duplicates`() = runTest {
         val bridge=FakeBridge();val desktop=FakeDesktop().apply {frontApp=BROWSER_APP_NAME}
         val controller=PageController(desktop,bridge,MutableStateFlow(AppPreferences()),backgroundScope,FakeRunHistory(),{currentTime},{"dgs"})

@@ -138,7 +138,7 @@
     const text = document.body ? document.body.textContent : "";
     const images = [...document.images].map((image) => image.currentSrc).join();
     const height = document.documentElement.scrollHeight;
-    return { atBottom: loaded && reachedEnd, content: `${hash(location.href)}:${height}:${text.length}:${hash(text)}:${hash(images)}` };
+    return { scrollPosition: Math.round(scroller?.scrollTop || 0), mediaPosition: [...videosReached].map(v => Math.floor(v.currentTime || 0)).join(","), atBottom: loaded && reachedEnd, content: `${hash(location.href)}:${height}:${text.length}:${hash(text)}:${hash(images)}` };
   }
 
   function watchVideos(roots) {

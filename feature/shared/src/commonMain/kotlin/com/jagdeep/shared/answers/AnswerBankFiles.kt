@@ -1,6 +1,16 @@
 package com.jagdeep.shared.answers
 
-const val DEFAULT_ANSWER_BANK_FILE = "sagarmeinyog.json"
+const val DEFAULT_ANSWER_BANK_FILE = "sagarmeinyog-ver-1.0.json"
+const val DEFAULT_DGS_ANSWER_BANK_FILE = "dgs-elearning-ver-1.0.json"
+
+/** Keep saved routines using the former built-in names on the current versioned default. */
+fun resolvedAnswerBankFileName(value: String): String? = answerBankFileName(value)?.let {
+    when (it) {
+        "sagarmeinyog.json" -> DEFAULT_ANSWER_BANK_FILE
+        "dgs-elearning.json" -> DEFAULT_DGS_ANSWER_BANK_FILE
+        else -> it
+    }
+}
 
 /** A single local filename, never an arbitrary path from an imported routine. */
 fun answerBankFileName(value: String): String? {

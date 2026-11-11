@@ -10,6 +10,14 @@ import kotlin.test.assertTrue
 
 class BrowserExtensionTest {
     @Test
+    fun `bundled version is derived from the manifest and the worker reports its loaded version`() {
+        val manifest = kotlinx.serialization.json.Json.parseToJsonElement(bundled("manifest.json")) as kotlinx.serialization.json.JsonObject
+        assertEquals(manifest["version"].toString().trim('"'), bundledBrowserExtensionVersion())
+        assertEquals(bundledBrowserExtensionVersion(), browserExtensionStatus.value.latestVersion)
+        assertTrue(bundled("background.js").contains("chrome.runtime.getManifest().version"))
+    }
+
+    @Test
     fun `renamed extension keeps its name and configured trusted identity`() {
         val manifest = kotlinx.serialization.json.Json.parseToJsonElement(bundled("manifest.json")) as kotlinx.serialization.json.JsonObject
         assertEquals("\"AutoPilot Page Helper\"", manifest["name"].toString())

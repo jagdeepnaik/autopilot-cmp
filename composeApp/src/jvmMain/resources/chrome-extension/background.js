@@ -22,6 +22,7 @@ async function pollApp() {
       if (!response.ok) throw new Error(String(response.status));
       const body = await response.json();
       version = body.version;
+      report({ type: "extensionVersion", version: chrome.runtime.getManifest().version });
       applyCommand(body.state);
     } catch {
       // App closed. Forget pending text requests before reconnecting.
@@ -89,7 +90,8 @@ function pageSignature(tabId) {
 async function reportPageFrom(tabId, frameId, scroller, reading, video) {
   if (!reading || frameId !== (scroller ? scroller.frameId : 0)) return;
   const window = await chrome.windows.getLastFocused();
-  const page = { focused: window.focused, atBottom: reading.atBottom, signature: pageSignature(tabId), video };
+  const progress = `${reading.scrollPosition ?? 0}|${frameEntries(tabId).sort((a,b) => a.frameId-b.frameId).map(f => `${f.frameId}:${f.mediaPosition ?? ""}`).join("|")}`;
+  const page = { progress, focused: window.focused, atBottom: reading.atBottom, signature: pageSignature(tabId), video };
   if (JSON.stringify(page) !== JSON.stringify(lastPage)) reportPage(page);
 }
 
@@ -100,7 +102,7 @@ async function onTick(message, sender) {
   if (!command || !command.enabled || !active) return { enabled: false };
   frames.set(`${tabId}:${frameId}`, {
     tabId, frameId, area: message.area, video: message.video,
-    content: message.reading?.content, textRank: message.textRank ?? null, at: Date.now(),
+    content: message.reading?.content, mediaPosition: message.reading?.mediaPosition, textRank: message.textRank ?? null, at: Date.now(),
   });
   clickTextIfFound(tabId);
   const scroller = scrollerFrame(tabId);
@@ -157,7 +159,10 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
 
 // Chrome stops an idle worker after about 30 seconds, and a waiting fetch doesn't count as activity.
 // Any extension API call does, so this keeps the link to the app alive between key presses.
-setInterval(() => chrome.runtime.getPlatformInfo(() => {}), 20000);
+setInterval(() => {
+  chrome.runtime.getPlatformInfo(() => {});
+  report({ type: "extensionVersion", version: chrome.runtime.getManifest().version });
+}, 20000);
 
 // If Chrome stops this worker anyway, the alarm brings it back so the app link recovers.
 chrome.alarms.create("keep-link", { periodInMinutes: 1 });

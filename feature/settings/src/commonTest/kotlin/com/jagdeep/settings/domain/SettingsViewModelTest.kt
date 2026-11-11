@@ -37,6 +37,37 @@ class SettingsViewModelTest {
     private val store = InMemoryPreferencesStore(AppPreferences())
 
     @Test
+    fun `extension version status updates and sound test respects the enabled setting`() = test {
+        val extension = kotlinx.coroutines.flow.MutableStateFlow(com.jagdeep.shared.browser.BrowserExtensionStatus("1.14.1", "1.14.0"))
+        var sounds = 0
+        val viewModel = SettingsViewModel(store, FakeGate(), extensionStatus = extension, testSound = { sounds++; null })
+        advanceUntilIdle()
+        assertEquals("1.14.1", viewModel.state.value.extension.latestVersion)
+        assertTrue(viewModel.state.value.extension.warning!!.contains("out of date"))
+        extension.value = extension.value.copy(connectedVersion = "1.14.1")
+        advanceUntilIdle()
+        assertEquals(null, viewModel.state.value.extension.warning)
+        viewModel.updateAssessmentSounds(false)
+        viewModel.testAssessmentSound()
+        advanceUntilIdle()
+        assertEquals(0, sounds)
+        viewModel.updateAssessmentSounds(true)
+        viewModel.testAssessmentSound()
+        advanceUntilIdle()
+        assertEquals(1, sounds)
+        assertFalse(viewModel.state.value.testingSound)
+    }
+
+    @Test
+    fun `sound test displays an audio output failure`() = test {
+        val viewModel = SettingsViewModel(store, FakeGate(), testSound = { "No audio output." })
+        advanceUntilIdle()
+        viewModel.testAssessmentSound()
+        advanceUntilIdle()
+        assertEquals("No audio output.", viewModel.state.value.soundProblem)
+    }
+
+    @Test
     fun `given routine file actions then settings forwards selections and prevents duplicate imports`() = test {
         val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
         var imports = 0

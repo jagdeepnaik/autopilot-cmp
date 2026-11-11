@@ -23,6 +23,9 @@ data class SettingsUiState(
     val access: InputAccess = InputAccess.Granted,
     /** True while the Chrome extension is checking in. */
     val browserConnected: Boolean = false,
+    val extension: com.jagdeep.shared.browser.BrowserExtensionStatus = com.jagdeep.shared.browser.BrowserExtensionStatus(),
+    val testingSound: Boolean = false,
+    val soundProblem: String? = null,
     val routineFilesAvailable: Boolean = false,
     val transferableRoutines: List<com.jagdeep.shared.routines.TransferRoutine> = emptyList(),
     val transferringRoutines: Boolean = false,
@@ -45,6 +48,8 @@ class SettingsViewModel(
     private val routineTransfer: com.jagdeep.shared.routines.RoutineTransfer = com.jagdeep.shared.routines.NoRoutineTransfer,
     displayWakeProblem: Flow<String?> = flowOf(null),
     private val answerBanks: com.jagdeep.shared.answers.AnswerBankFiles = com.jagdeep.shared.answers.NoAnswerBankFiles,
+    extensionStatus: Flow<com.jagdeep.shared.browser.BrowserExtensionStatus> = flowOf(com.jagdeep.shared.browser.BrowserExtensionStatus()),
+    private val testSound: suspend () -> String? = { "Sound testing isn't available on this platform." },
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(SettingsUiState(access = accessGate.access(), routineFilesAvailable = routineTransfer.isAvailable, answerBankFolder=answerBanks.folderPath))
     val state = mutableState.asStateFlow()
@@ -69,6 +74,7 @@ class SettingsViewModel(
         }
     }
     init {
+        viewModelScope.launch { extensionStatus.collect { status -> mutableState.update { it.copy(extension = status) } } }
         viewModelScope.launch { displayWakeProblem.collect { problem -> mutableState.update { it.copy(displayWakeProblem = problem) } } }
         viewModelScope.launch { routineTransfer.routines.collect { items -> mutableState.update { it.copy(transferableRoutines = items) } } }
         viewModelScope.launch {
@@ -93,6 +99,20 @@ class SettingsViewModel(
 
     fun updateKeepDisplayOn(enabled: Boolean) = save(state.value.preferences.copy(keepDisplayOn = enabled))
     fun updateAssessmentSounds(enabled: Boolean) = save(state.value.preferences.copy(assessmentSoundsEnabled = enabled))
+
+    fun testAssessmentSound() {
+        if (!state.value.preferences.assessmentSoundsEnabled || state.value.testingSound) return
+        mutableState.update { it.copy(testingSound = true, soundProblem = null) }
+        viewModelScope.launch {
+            try {
+                val problem = testSound()
+                mutableState.update { it.copy(soundProblem = problem) }
+                mutableMessages.send(problem ?: "Test sound sent to your audio output. If silent, check the Windows volume mixer and selected output device.")
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { mutableState.update { it.copy(soundProblem = "Couldn't play the alert. Check the selected audio output and volume mixer.") } }
+            finally { mutableState.update { it.copy(testingSound = false) } }
+        }
+    }
 
     /** One key can't do two jobs, so a clash keeps the saved choice and says why. */
     fun updateToggleHotKey(key: HotKey) = assignKey(key, HotKeyJob.Toggle) { copy(toggleHotKey = key) }

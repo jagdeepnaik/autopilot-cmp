@@ -70,7 +70,8 @@ fun App(
     toolbarDragArea: @Composable (@Composable () -> Unit) -> Unit = { it() },
     toolbarHeight: Dp = DesktopToolbarHeight,
     windowControls: @Composable () -> Unit = {},
-    windowIdentity: @Composable () -> Unit = {},
+    windowIdentity: @Composable (onHome: () -> Unit) -> Unit = {},
+    toolbarBlankAreaModifier: Modifier = Modifier,
 ) {
     // Services outlive this composition (activity recreation must not stop a run).
     val services = remember { AppServices.get() }
@@ -121,6 +122,8 @@ fun App(
                         controller = services.controller,
                         routineRepository = services.routines,
                         browserConnected = remember(services) { services.page.state.map { it.isConnected } },
+                        extensionStatus = remember(services) { services.page.state.map { it.extension } },
+                        onTestSound = services::testAssessmentSound,
                         runHistory = services.runHistory,
                         liveLog = services.liveLog,
                         routineFiles = routineFiles,
@@ -157,7 +160,8 @@ fun App(
                         appIcon = { AppLogo(24.dp) },
                         appName = AppConfig.APP_NAME,
                         windowControls = windowControls,
-                        windowIdentity = windowIdentity,
+                        windowIdentity = { windowIdentity { navigator.navigate(RouteTopLevel.Home) } },
+                        toolbarBlankAreaModifier = toolbarBlankAreaModifier,
                     ) { navHost(Modifier.fillMaxSize()) }
                 } else {
                     AdaptiveNavigationScaffold(

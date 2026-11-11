@@ -99,11 +99,17 @@ fun SettingsScreen(
                 onChange = viewModel::updateKeepDisplayOn,
             )
             SwitchRow(
-                title = "Assessment sounds",
-                supporting = "Repeats every 30 seconds when an answer is needed. A different sound signals a failed assessment.",
+                title = "Alert sounds",
+                supporting = "Question reminders repeat every 30 seconds. Different sounds signal failure or five minutes without progress.",
                 checked = preferences.assessmentSoundsEnabled,
                 onChange = viewModel::updateAssessmentSounds,
             )
+
+            if (desktop) ListItem(colors = transparent(),
+                headlineContent = { Text("Check alert sound") },
+                supportingContent = { Text(state.soundProblem ?: "Plays the same reminder used when a question needs your answer.") },
+                trailingContent = { TextButton(onClick = viewModel::testAssessmentSound,
+                    enabled = preferences.assessmentSoundsEnabled && !state.testingSound) { Text(if (state.testingSound) "Playing…" else "Test sound") } })
 
             Group("Safety")
             SwitchRow("Stop when I move the pointer", "For routines that click fixed screen positions.", preferences.stopWhenPointerMoves, viewModel::updateStopWhenPointerMoves)
@@ -132,7 +138,12 @@ fun SettingsScreen(
             if (desktop) {
                 Group("Browser connection")
                 ListItem(colors = transparent(), headlineContent = { Text("Chrome extension") },
-                    supportingContent = { Text(if(state.browserConnected) "Connected to AutoPilot on this computer." else "Not connected. Set up the extension to use browser routines.") },
+                    supportingContent = { Column {
+                        Text("Latest bundled version: ${state.extension.latestVersion ?: "Unavailable"}")
+                        Text("Loaded in Chrome: ${state.extension.connectedVersion ?: "Not reported"}")
+                        Text(state.extension.folderProblem ?: if (!state.browserConnected) "Not connected. Open Chrome with the extension enabled." else state.extension.warning ?: "Connected and up to date.",
+                            color = if (state.extension.folderProblem != null || state.browserConnected && state.extension.warning != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                    } },
                     trailingContent = { TextButton(onClick = { setupOpen = true }) { Text("Set up extension") } })
             }
 

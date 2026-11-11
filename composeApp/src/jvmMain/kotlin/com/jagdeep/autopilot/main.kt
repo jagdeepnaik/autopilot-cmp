@@ -1,5 +1,9 @@
 package com.jagdeep.autopilot
 
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.window.WindowDraggableArea
@@ -90,15 +94,26 @@ private fun ApplicationScope.DesktopWindow() {
         LaunchedEffect(theme, systemDark) {
             theme?.let { DesktopTitleBar.apply(window, it.dark, it.background, it.content) }
         }
+        val windowsCaption = remember(window) {
+            if (DesktopTitleBar.isWindows) WindowsNativeCaption(window) {
+                windowState.placement = if (windowState.placement == WindowPlacement.Maximized) WindowPlacement.Floating else WindowPlacement.Maximized
+            } else null
+        }
+        DisposableEffect(windowsCaption) {
+            windowsCaption?.install()
+            onDispose { windowsCaption?.close() }
+        }
         App(
             onThemeApplied = { dark, background, content -> theme = AppliedTheme(dark, background, content) },
             toolbarStartInset = DesktopTitleBar.toolbarStartInset,
-            toolbarDragArea = { toolbar -> if (DesktopTitleBar.isMac || DesktopTitleBar.isWindows) WindowDraggableArea { toolbar() } else toolbar() },
+            toolbarDragArea = { toolbar -> if (DesktopTitleBar.isMac || DesktopTitleBar.isWindows) WindowDraggableArea(Modifier.captionDoubleClick { windowState.placement = if (windowState.placement == WindowPlacement.Maximized) WindowPlacement.Floating else WindowPlacement.Maximized }) { toolbar() } else toolbar() },
             toolbarHeight = if (tallTitleBar || DesktopTitleBar.isWindows) MAC_TALL_TITLE_BAR_HEIGHT else DesktopToolbarHeight,
-            windowIdentity = { if (DesktopTitleBar.isWindows) WindowsWindowIdentity() },
+            windowIdentity = { onHome -> if (DesktopTitleBar.isWindows) WindowsWindowIdentity(onHome) },
+            toolbarBlankAreaModifier = Modifier.onGloballyPositioned { windowsCaption?.dragBounds = it.boundsInWindow() },
             windowControls = {
                 if (DesktopTitleBar.isWindows) WindowsWindowControls(
                     maximized = windowState.placement == WindowPlacement.Maximized,
+                    maximizeModifier = Modifier.onGloballyPositioned { windowsCaption?.maximizeBounds = it.boundsInWindow() },
                     onMinimize = { windowState.isMinimized = true },
                     onMaximize = { windowState.placement = if (windowState.placement == WindowPlacement.Maximized) WindowPlacement.Floating else WindowPlacement.Maximized },
                     onClose = { window.dispatchEvent(java.awt.event.WindowEvent(window, java.awt.event.WindowEvent.WINDOW_CLOSING)) },

@@ -94,8 +94,8 @@ class CourseAssessmentTest {
     }
 
     @Test
-    fun `given saved failed or unsubmitted attempt then automatic mode asks before starting another`() {
-        for (status in listOf("failed", "unsubmitted")) {
+    fun `given saved failed attempt then automatic mode asks before starting another`() {
+        for (status in listOf("failed")) {
             val runner = CourseAutomationSession("s",0,answerAssessments=true,assessmentMode=AssessmentMode.Automatic)
             runner.configureAnswers(bank)
             runner.configureProgress(CourseProgressSummary("user","User",1,listOf(
@@ -106,6 +106,35 @@ class CourseAssessmentTest {
             assertNull(runner.action)
             assertEquals(CourseApprovalKind.StartAssessment,runner.approval?.kind)
         }
+    }
+
+    @Test
+    fun `given automatic mode and unsubmitted progress then open and start an unfinished assessment`() {
+        val runner = CourseAutomationSession("s", 0, answerAssessments = true, assessmentMode = AssessmentMode.Automatic)
+        runner.configureAnswers(bank)
+        runner.configureProgress(CourseProgressSummary("user", "User", 1, listOf(
+            com.jagdeep.persistence.room.learning.LearningRecord("user", "attempt", "Wellness", "assessment", "Course Assessment", "unsubmitted", observedAt = 1))))
+        val done = page(CourseElement("module", tag = "a", label = "Wellness", href = course),
+            CourseElement("done", label = "Rewatch video", context = "Part:1 Completed"), CourseElement("assessment", label = "Assessment"))
+        runner.read(done, 0); runner.read(done, 2000)
+        assertNull(runner.approval)
+        assertEquals("assessmentOpen", runner.action?.kind)
+        runner.acknowledge(runner.action!!.request, true)
+        runner.read(page(CourseElement("start", label = "Start Assessment"), assessment = CourseAssessment("Wellness", start = "start")), 3000)
+        assertNull(runner.approval)
+        assertEquals("assessmentStart", runner.action?.kind)
+    }
+
+    @Test
+    fun `given manual mode without answer bank then approved start works`() {
+        val runner = CourseAutomationSession("s", 0, answerAssessments = true, assessmentMode = AssessmentMode.Manual)
+        val start = page(CourseElement("start", label = "Start Assessment"), assessment = CourseAssessment("Wellness", start = "start"))
+        runner.read(start, 0)
+        assertEquals(CourseApprovalKind.StartAssessment, runner.approval?.kind)
+        assertNull(runner.action)
+        runner.approveAssessment(runner.approval!!.token)
+        runner.read(start, 1000)
+        assertEquals("assessmentStart", runner.action?.kind)
     }
 
     @Test

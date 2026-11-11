@@ -1,5 +1,6 @@
 package com.jagdeep.autopilot
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -23,12 +24,13 @@ internal fun WindowsWindowControls(
     onMinimize: () -> Unit,
     onMaximize: () -> Unit,
     onClose: () -> Unit,
+    maximizeModifier: Modifier = Modifier,
 ) {
     Row {
         IconButton(onMinimize, Modifier.width(46.dp).height(38.dp)) {
             Icon(Icons.Default.Remove, "Minimize window", Modifier.size(16.dp))
         }
-        IconButton(onMaximize, Modifier.width(46.dp).height(38.dp)) {
+        IconButton(onMaximize, maximizeModifier.width(46.dp).height(38.dp)) {
             Icon(if (maximized) Icons.Default.FilterNone else Icons.Default.CropSquare,
                 if (maximized) "Restore window" else "Maximize window", Modifier.size(16.dp))
         }
@@ -41,7 +43,7 @@ internal fun WindowsWindowControls(
 /** Small Windows caption identity, preceding all app toolbar actions. */
 @Suppress("DEPRECATION")
 @Composable
-internal fun WindowsWindowIdentity() {
+internal fun WindowsWindowIdentity(onHome: () -> Unit = {}) {
     Row(
         Modifier.padding(start = 8.dp, end = 8.dp),
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
@@ -50,7 +52,7 @@ internal fun WindowsWindowIdentity() {
         androidx.compose.foundation.Image(
             androidx.compose.ui.res.painterResource("autopilot-icon.png"),
             contentDescription = "AutoPilot window icon",
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(24.dp).then(Modifier.clickable(onClickLabel = "Open Home", onClick = onHome)),
         )
         androidx.compose.material3.Text(
             com.jagdeep.common.config.AppConfig.APP_NAME,

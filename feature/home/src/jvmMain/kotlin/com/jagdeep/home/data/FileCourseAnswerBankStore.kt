@@ -51,7 +51,11 @@ class FileCourseAnswerBankStore(private val candidates: List<File>) : CourseAnsw
                         val name = modules.keys.singleOrNull { CourseAnswerBank.normalize(it) == CourseAnswerBank.normalize(module) } ?: module
                         fun key(value: CourseAnswer) = CourseAnswerBank.normalize(value.question) to value.options.map(CourseAnswerBank::optionText).sorted()
                         for (review in answers) {
-                            val answer = review.answer
+                            // Persist answer text, never the website's shuffled choice numbering.
+                            val answer = review.answer.copy(
+                                options = review.answer.options.map(CourseAnswerBank::optionLabel),
+                                answer = review.answer.answer?.let(CourseAnswerBank::optionLabel),
+                            )
                             val existing = modules[name].orEmpty()
                             val matches = existing.filter { key(it) == key(answer) }
                             fun normalized(value: String?) = value?.let(CourseAnswerBank::optionText)

@@ -60,6 +60,13 @@ class DesktopShellUiTest {
         }
 
     @Test
+    fun `given a stalled routine then its warning is visible in the status bar`() = runDesktopComposeUiTest(1000,600) {
+        val warning = "No routine progress for over five minutes. Check Chrome."
+        setContent(ui(ShellUiState(isActive = true, routineWarning = warning)))
+        onNodeWithText(warning).assertExists()
+    }
+
+    @Test
     fun `given expanded sidebar then app name is shown and opens Home`() = runDesktopComposeUiTest(1000,600) {
         var destination: NavKey? = null
         setContent(ui(ShellUiState(), onNavigate = { destination = it }))

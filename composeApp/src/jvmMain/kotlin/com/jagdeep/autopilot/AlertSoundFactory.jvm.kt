@@ -22,7 +22,11 @@ internal fun assessmentAlertPcm(kind: AssessmentAlertKind = AssessmentAlertKind.
     val rate = 22_050
     val noteSamples = rate / 5
     val gapSamples = rate / 12
-    val notes = if (kind == AssessmentAlertKind.Question) listOf(880.0, 1_175.0) else listOf(660.0, 520.0, 390.0)
+    val notes = when (kind) {
+        AssessmentAlertKind.Question -> listOf(880.0, 1_175.0)
+        AssessmentAlertKind.Failure -> listOf(660.0, 520.0, 390.0)
+        AssessmentAlertKind.Stalled -> listOf(440.0, 880.0, 440.0, 880.0)
+    }
     val samples = ShortArray(noteSamples * notes.size + gapSamples * (notes.size - 1))
     for ((note, frequency) in notes.withIndex()) {
         val start = note * (noteSamples + gapSamples)
@@ -42,6 +46,7 @@ internal fun assessmentAlertPcm(kind: AssessmentAlertKind = AssessmentAlertKind.
 private class AudibleDesktopAutomation(private val delegate: DesktopAutomation) : DesktopAutomation by delegate {
     private val clips = mutableSetOf<Clip>()
     private var closed = false
+    private var pendingInactivity = false
 
     override fun playAlert() = play(AssessmentAlertKind.Question)
 
@@ -49,15 +54,25 @@ private class AudibleDesktopAutomation(private val delegate: DesktopAutomation) 
     fun play(kind: AssessmentAlertKind) {
         check(!closed) { "Audio output is closed" }
         // A second request must not overlap an alert still playing.
-        if (clips.isNotEmpty()) return
+        if (clips.isNotEmpty()) {
+            // A five-minute warning must not disappear behind a simultaneous question reminder.
+            if (kind == AssessmentAlertKind.Stalled) pendingInactivity = true
+            return
+        }
         val clip = AudioSystem.getClip()
         try {
             val bytes = assessmentAlertPcm(kind)
             clip.open(AudioFormat(22_050f, 16, 1, true, false), bytes, 0, bytes.size)
             clip.addLineListener { event ->
                 if (event.type == LineEvent.Type.STOP) {
-                    synchronized(this) { clips.remove(clip) }
-                    clip.close()
+                    val playInactivity = synchronized(this) {
+                        clips.remove(clip)
+                        clip.close()
+                        (pendingInactivity && !closed).also { if (it) pendingInactivity = false }
+                    }
+                    if (playInactivity) runCatching { play(AssessmentAlertKind.Stalled) }.onFailure {
+                        com.jagdeep.logger.Log.w("Queued inactivity sound unavailable", "AlertSound")
+                    }
                 }
             }
             clips.add(clip)
@@ -73,6 +88,7 @@ private class AudibleDesktopAutomation(private val delegate: DesktopAutomation) 
     override fun close() {
         if (closed) return
         closed = true
+        pendingInactivity = false
         clips.toList().forEach { it.close() }
         clips.clear()
         delegate.close()

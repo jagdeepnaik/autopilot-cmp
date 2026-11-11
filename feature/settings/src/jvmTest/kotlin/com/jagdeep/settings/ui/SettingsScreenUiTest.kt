@@ -33,6 +33,16 @@ class SettingsScreenUiTest {
     }
 
     @Test
+    fun `browser connection displays bundled and loaded extension versions`() = runDesktopComposeUiTest(1000, 1200) {
+        val status = kotlinx.coroutines.flow.MutableStateFlow(com.jagdeep.shared.browser.BrowserExtensionStatus("1.14.1", "1.14.0"))
+        val vm = SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate, extensionStatus = status)
+        setContent { AppTheme(darkTheme = false) { SettingsScreen(vm, {}, "1.0.0") } }
+        onNodeWithText("Latest bundled version: 1.14.1").performScrollTo().assertExists()
+        onNodeWithText("Loaded in Chrome: 1.14.0").assertExists()
+        onNodeWithText("Test sound").performScrollTo().assertExists()
+    }
+
+    @Test
     fun `given routine files in settings then choose exports and open import without Home actions`() = runDesktopComposeUiTest(1000,1200) {
         var exports=emptySet<String>()
         var imports=0

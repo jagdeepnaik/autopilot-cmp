@@ -62,6 +62,7 @@ internal class AppServices private constructor() {
         progressRepository = courseProgress,
         dgsStudyRepository = com.jagdeep.home.data.StoredDgsStudyRepository(courseProgress),
         dgsElapsedMillis = {dgsTimeOrigin.elapsedNow().inWholeMilliseconds},
+        extensionStatus = browserExtensionStatus,
     )
 
     // Runs every kind of routine, one at a time, handing Chrome routines to [page].
@@ -78,6 +79,36 @@ internal class AppServices private constructor() {
     )
 
     init {
+        scope.launch {
+            val monitor = com.jagdeep.home.domain.RoutineInactivityMonitor()
+            var inactivityAudioFailed = false
+            while (true) {
+                val run = controller.state.value
+                val browser = page.state.value
+                val active = run != RunState.Idle || browser.activity != null
+                val expectedWait = run is RunState.CountingDown ||
+                    (run is RunState.Running && run.pause == null && run.nextClickAtMillis?.let { it > AppClock.nowMillis() } == true)
+                val marker = when (run) {
+                    is RunState.Running -> "${run.routine.id}:${run.clicks}:${browser.progressRevision}"
+                    else -> "${browser.activity?.routine?.id}:${browser.progressRevision}"
+                }
+                val sound = monitor.observe(active && !expectedWait, marker, dgsTimeOrigin.elapsedNow().inWholeMilliseconds,
+                    controller.preferences.value.assessmentSoundsEnabled)
+                if (!monitor.isStalled) inactivityAudioFailed = false
+                if (sound) {
+                    try {
+                        createAssessmentAlerts(automation).play(com.jagdeep.home.domain.AssessmentAlertKind.Stalled)
+                        inactivityAudioFailed = false
+                    } catch (_: Exception) { inactivityAudioFailed = true }
+                }
+                page.reportInactivity(when {
+                    !monitor.isStalled -> null
+                    inactivityAudioFailed -> "No routine progress for over five minutes. Alert sound unavailable; check your audio output."
+                    else -> "No routine progress for over five minutes. Check Chrome or the current step. An alert repeats every five minutes while sounds are enabled."
+                })
+                kotlinx.coroutines.delay(1_000)
+            }
+        }
         scope.launch {
             preferences.data.map { it.developerMode }.distinctUntilChanged().collect { on ->
                 liveLog.recording = on
@@ -107,6 +138,13 @@ internal class AppServices private constructor() {
                 }
             }
         }
+    }
+
+    suspend fun testAssessmentSound(): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        try {
+            createAssessmentAlerts(automation).play(com.jagdeep.home.domain.AssessmentAlertKind.Question)
+            null
+        } catch (_: Exception) { "Couldn't play the alert. Check the selected audio output and volume mixer." }
     }
 
     private suspend fun close() {

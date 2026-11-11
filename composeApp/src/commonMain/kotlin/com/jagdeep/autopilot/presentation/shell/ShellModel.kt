@@ -25,6 +25,7 @@ data class ShellUiState(
     val nextClickAtMillis: Long? = null,
     val chromeConnected: Boolean = false,
     val chromeProblem: String? = null,
+    val routineWarning: String? = null,
     val toggleHotKey: HotKey = HotKey.F6,
 )
 
@@ -57,7 +58,8 @@ class ShellModel(
             operation = operation(run, page, selected),
             nextClickAtMillis = (run as? RunState.Running)?.nextClickAtMillis,
             chromeConnected = page.isConnected,
-            chromeProblem = page.problem,
+            chromeProblem = page.problem ?: page.extension.warning.takeIf { page.isConnected },
+            routineWarning = page.inactivityWarning,
             toggleHotKey = prefs.toggleHotKey,
         )
     }
@@ -73,6 +75,7 @@ class ShellModel(
     private fun operation(run: RunState, page: PageState, selected: Routine?): String {
         val activity = page.activity
         return when {
+            page.isConnected && page.extension.warning != null -> page.extension.warning!!
             run is RunState.CountingDown -> "${run.routine.name} · starting in ${run.secondsLeft} s"
             run is RunState.Running -> buildString {
                 append(run.routine.name).append(" · ").append(clicks(run.clicks))

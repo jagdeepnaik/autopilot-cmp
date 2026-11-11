@@ -47,7 +47,7 @@ class CourseAnswerBank private constructor(private val modules: Map<String, List
                     require(q.question.isNotBlank() && q.options.size in 2..20)
                     require(q.options.all { optionText(it).isNotBlank() })
                     q.answer?.let { answer ->
-                        require(q.options.count { optionText(it) == optionText(answer) } == 1)
+                        require(q.options.any { optionText(it) == optionText(answer) })
                     }
                 }
             }
@@ -55,7 +55,12 @@ class CourseAnswerBank private constructor(private val modules: Map<String, List
                 questions.groupBy { normalize(it.question) to it.options.map(::optionText).sorted() }.values.map { copies ->
                     val answers = copies.mapNotNull { it.answer?.let(::optionText) }.toSet()
                     require(answers.size <= 1)
-                    copies.firstOrNull { it.answer != null } ?: copies.first()
+                    val saved = copies.firstOrNull { it.answer != null } ?: copies.first()
+                    // Duplicate choices cannot identify one radio option. Keep the question for
+                    // manual review without rejecting every other answer in the bank.
+                    saved.takeIf { q ->
+                        q.answer == null || q.options.count { optionText(it) == optionText(q.answer) } == 1
+                    } ?: saved.copy(answer = null)
                 }
             }
             CourseAnswerBank(unique)
@@ -65,7 +70,11 @@ class CourseAnswerBank private constructor(private val modules: Map<String, List
             .replace('’', '\'').replace('‘', '\'').replace('“', '"').replace('”', '"')
             .replace(Regex("\\s+"), " ").trim().lowercase()
 
-        internal fun optionText(text: String) = normalize(text).replace(Regex("^\\d+[.)]\\s+"), "")
+        /** Remove display-order labels without changing case or meaningful numbers such as 2.1. */
+        internal fun optionLabel(text: String) = text.replace('\u00a0', ' ').trim()
+            .replace(Regex("^\\d+[.)]\\s+"), "")
+
+        internal fun optionText(text: String) = normalize(optionLabel(text))
     }
 }
 
@@ -107,5 +116,5 @@ data class ManualAnswerRequest(val token: String, val module: String, val questi
 data class AssessmentReviewQuestion(val id: String, val question: String, val options: List<String>, val selectedAnswer: String?, val bankAnswer: String?)
 data class ReviewedAnswer(val answer: CourseAnswer, val previousAnswer: String?)
 data class AssessmentFailureRequest(val token: String, val module: String, val canRetry: Boolean, val questions: List<AssessmentReviewQuestion> = emptyList())
-enum class AssessmentAlertKind { Question, Failure }
+enum class AssessmentAlertKind { Question, Failure, Stalled }
 fun interface AssessmentAlerts { fun play(kind: AssessmentAlertKind) }

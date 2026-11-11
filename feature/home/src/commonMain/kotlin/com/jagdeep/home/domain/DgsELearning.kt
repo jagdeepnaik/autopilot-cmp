@@ -3,7 +3,7 @@ package com.jagdeep.home.domain
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-const val DGS_ANSWER_BANK = "dgs-elearning.json"
+const val DGS_ANSWER_BANK = com.jagdeep.shared.answers.DEFAULT_DGS_ANSWER_BANK_FILE
 
 @Serializable
 @SerialName("dgsELearning")

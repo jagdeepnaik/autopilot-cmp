@@ -9,6 +9,13 @@ import com.jagdeep.home.domain.AssessmentAlertKind
 
 class AlertSoundTest {
     @Test
+    fun `inactivity alert has its own longer pattern`() {
+        val stalled = assessmentAlertPcm(AssessmentAlertKind.Stalled)
+        assertFalse(stalled.contentEquals(assessmentAlertPcm(AssessmentAlertKind.Question)))
+        assertFalse(stalled.contentEquals(assessmentAlertPcm(AssessmentAlertKind.Failure)))
+        assertTrue(stalled.size / 2 / 22050.0 in 1.0..1.2)
+    }
+    @Test
     fun `given a failed assessment then its three-note pattern differs from a question reminder`() {
         val reminder = assessmentAlertPcm(AssessmentAlertKind.Question)
         val failure = assessmentAlertPcm(AssessmentAlertKind.Failure)

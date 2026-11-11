@@ -40,6 +40,7 @@ internal data class CourseElement(
     val ended: Boolean = false,
     val decorative: Boolean = false,
     val courseTitle: String? = null,
+    val mediaPosition: Double? = null,
 )
 
 @Serializable
@@ -75,11 +76,11 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var waitingForAssessmentPass = false
     private var rewindDashboard = false
     private var savedPassedTitles = emptySet<String>()
-    private var savedUnsubmittedTitles = emptySet<String>()
+    private var savedFailedTitles = emptySet<String>()
     fun configureProgress(summary: CourseProgressSummary?) {
         savedPassedTitles = summary?.records.orEmpty().filter { it.kind == "assessment" && it.status == "passed" }
             .map { CourseAnswerBank.normalize(it.course) }.toSet()
-        savedUnsubmittedTitles = summary?.records.orEmpty().filter { it.kind == "assessment" && it.status in setOf("unsubmitted", "failed") }
+        savedFailedTitles = summary?.records.orEmpty().filter { it.kind == "assessment" && it.status == "failed" }
             .map { CourseAnswerBank.normalize(it.course) }.toSet() - savedPassedTitles
     }
     private var answerBank: CourseAnswerBank? = null
@@ -294,7 +295,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             detail = message
         }
         fun requireApproval(kind: CourseApprovalKind, module: String, signature: String): Boolean {
-            if (assessmentMode == AssessmentMode.Automatic && !(kind == CourseApprovalKind.StartAssessment && CourseAnswerBank.normalize(module) in savedUnsubmittedTitles)) return true
+            if (assessmentMode == AssessmentMode.Automatic && !(kind == CourseApprovalKind.StartAssessment && CourseAnswerBank.normalize(module) in savedFailedTitles)) return true
             val token = "$pageId:$kind:$signature"
             if (kind == CourseApprovalKind.StartAssessment && path in approvedStarts) return true
             if (kind == CourseApprovalKind.SubmitAssessment && approvedSubmission == token) return true
@@ -355,9 +356,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     detail = "This assessment was already started in this run. No additional attempt will be started."
                     return
                 }
-                if (answerBank?.module(assessment.module) == null) {
+                if (assessmentMode != AssessmentMode.Manual && answerBank?.module(assessment.module) == null) {
                     attention = "$path:module:${assessment.module}"
-                    detail = "No local answer bank matches this module. Stop and check sagarmeinyog.json."
+                    detail = "No local answer bank matches this module. Stop and check $answerBankFile."
                     return
                 }
                 if (!requireApproval(CourseApprovalKind.StartAssessment, assessment.module, path)) return
@@ -395,7 +396,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val saved = bank?.module(assessment.module)
             if (saved == null && assessment.questions.isEmpty()) {
                 attention = "$path:module:${assessment.module}"
-                detail = "No local answer bank matches this module. Stop and check sagarmeinyog.json."
+                detail = "No local answer bank matches this module. Stop and check $answerBankFile."
                 return
             }
             if (assessment.questions.isEmpty()) { detail = "Waiting for assessment questions; unknown start or confirmation buttons are left for review."; return }
@@ -413,7 +414,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                         persistedAnswerBank?.entry(assessment.module, unknown)?.answer)
                 }
                 detail = if (assessmentMode == AssessmentMode.Manual) "Choose an answer manually in Chrome for “${unknown.text.take(180)}”."
-                    else "Assessment paused: no exact saved answer for “${unknown.text.take(180)}”. Check the question and options in sagarmeinyog.json."
+                    else "Assessment paused: no exact saved answer for “${unknown.text.take(180)}”. Check the question and options in $answerBankFile."
                 return
             }
             val confirmed = confirmedAnswers.getOrPut(path) { mutableMapOf() }
@@ -569,7 +570,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val moduleTitle = moduleTitles[path] ?: currentModule
             if (moduleTitle != null && CourseAnswerBank.normalize(moduleTitle) in savedPassedTitles) passedAssessments.add(path)
             if (answerAssessments && (learningOrder == LearningOrder.AssessmentAfterModule || assessmentPass) && path !in passedAssessments) {
-                if (answerBank == null) { detail = "Videos finished. Validate $answerBankFile in the routine options before starting the assessment."; return }
+                if (assessmentMode != AssessmentMode.Manual && answerBank == null) { detail = "Videos finished. Validate $answerBankFile in the routine options before starting the assessment."; return }
                 val assessment = elements.firstOrNull { it.label.trim().equals("Assessment", true) }
                 if (assessment != null) {
                     val module = elements.firstOrNull { it.href == path }?.label?.takeIf { it.isNotBlank() } ?: path

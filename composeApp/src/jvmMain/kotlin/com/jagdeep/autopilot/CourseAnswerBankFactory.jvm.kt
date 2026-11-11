@@ -3,13 +3,14 @@ package com.jagdeep.autopilot
 import com.jagdeep.home.data.DirectoryCourseAnswerBanks
 import com.jagdeep.home.domain.CourseAnswerBankStore
 import java.io.File
+import com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE
 import kotlinx.coroutines.swing.Swing
 
 internal actual fun createCourseAnswerBankStore(): CourseAnswerBankStore = DirectoryCourseAnswerBanks(
     folder = File(System.getProperty("user.home"), ".autopilot/answer-banks"),
     legacy = listOf(
-    File("private/course-q&a/sagarmeinyog.json"),
-    File("../private/course-q&a/sagarmeinyog.json"),
+    File("private/answer-banks/$DEFAULT_ANSWER_BANK_FILE"),
+    File("../private/answer-banks/$DEFAULT_ANSWER_BANK_FILE"),
     ),
     bundled = BUNDLED_ANSWER_BANKS.associateWith { name -> { bundledAnswerBank(name) } },
     chooseFile = { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Swing) {

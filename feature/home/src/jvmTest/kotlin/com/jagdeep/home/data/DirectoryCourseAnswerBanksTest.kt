@@ -8,6 +8,19 @@ import kotlinx.coroutines.test.runTest
 
 class DirectoryCourseAnswerBanksTest {
     private val content = """{"Module":[{"question":"Question?","options":["A","B"],"answer":"A"}]}"""
+    @Test fun `old saved default names resolve to the versioned bank without changing old files`() = runTest {
+        val root=Files.createTempDirectory("versioned-banks").toFile()
+        try {
+            root.resolve("sagarmeinyog.json").writeText("old data preserved")
+            val banks=DirectoryCourseAnswerBanks(root,bundled=mapOf(DEFAULT_ANSWER_BANK_FILE to {content}))
+            assertNotNull(banks.forName("sagarmeinyog.json").load())
+            assertEquals("old data preserved",root.resolve("sagarmeinyog.json").readText())
+            assertEquals(content,root.resolve(DEFAULT_ANSWER_BANK_FILE).readText())
+            assertEquals(listOf(DEFAULT_ANSWER_BANK_FILE),banks.names())
+            assertEquals(DEFAULT_DGS_ANSWER_BANK_FILE,resolvedAnswerBankFileName("dgs-elearning.json"))
+            assertEquals("other-ver-2.0.json",resolvedAnswerBankFileName("other-ver-2.0"))
+        } finally { root.deleteRecursively() }
+    }
     @Test fun `migrate legacy bank once and never replace a permanent user update`() = runTest {
         val root=Files.createTempDirectory("named-banks").toFile()
         try {

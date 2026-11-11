@@ -129,8 +129,8 @@ fun Routine.toDraft(): RoutineDraft = when (this) {
         rounds = rounds.toString(),
         watchVideos = watchVideos,
     )
-    is DgsELearningRoutine -> RoutineDraft(kind=kind,name=name,requiredHours=requiredHours.toString(),creditedHours=creditedHours.toString(),pixelsPerSecond=pixelsPerSecond,playbackSpeed=playbackSpeed,waitAfterClickSeconds=(waitAfterClickMillis/1000).toString(),answerBankFile=answerBankFile)
-    is CourseAutomationRoutine -> RoutineDraft(kind = RoutineKind.CourseAutomation, name = name, waitAfterClickSeconds = (waitAfterClickMillis / 1000).toString(), playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode, learningOrder = learningOrder, answerBankFile = answerBankFile)
+    is DgsELearningRoutine -> RoutineDraft(kind=kind,name=name,requiredHours=requiredHours.toString(),creditedHours=creditedHours.toString(),pixelsPerSecond=pixelsPerSecond,playbackSpeed=playbackSpeed,waitAfterClickSeconds=(waitAfterClickMillis/1000).toString(),answerBankFile=com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile) ?: answerBankFile)
+    is CourseAutomationRoutine -> RoutineDraft(kind = RoutineKind.CourseAutomation, name = name, waitAfterClickSeconds = (waitAfterClickMillis / 1000).toString(), playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode, learningOrder = learningOrder, answerBankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile) ?: answerBankFile)
 }
 
 fun ClickRoutine.toDraft(): RoutineDraft {
@@ -187,10 +187,10 @@ fun RoutineDraft.validate(): DraftErrors = when (kind) {
         studyHours=if(requiredHours.toDoubleOrNull()?.let { it.isFinite() && it>0 && it<=1000 }==true && creditedHours.toDoubleOrNull()?.let { it.isFinite() && it>=0 && it<=requiredHours.toDouble() }==true) null else "Enter required hours (up to 1000) and credited hours from 0 to the required hours.",
         playbackSpeed=if(playbackSpeed in setOf(1.0,1.5,2.0)) null else "Choose 1×, 1.5× or 2×.",
         waitAfterClick=if(waitAfterClickSeconds.toLongOrNull()?.let { it in 1..86400 }==true) null else "Enter whole seconds from 1 to 86400.",
-        answerBankFile=if(com.jagdeep.shared.answers.answerBankFileName(answerBankFile)!=null) null else "Use a simple JSON file name.",
+        answerBankFile=if(com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile)!=null) null else "Use a simple JSON file name.",
     )
     RoutineKind.CourseAutomation -> DraftErrors(
-        answerBankFile = if (com.jagdeep.shared.answers.answerBankFileName(answerBankFile) == null) "Use a simple file name, for example my-answers.json." else null,
+        answerBankFile = if (com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile) == null) "Use a file name such as name-ver-1.0.json." else null,
         name = nameError(),
         playbackSpeed = if (playbackSpeed in setOf(1.0, 1.5, 2.0)) null else "Choose 1×, 1.5× or 2×.",
         waitAfterClick = if (waitAfterClickSeconds.trim().toLongOrNull()?.let { it in 0..86_400 } == true) null else "Enter whole seconds from 0 to 86400.",
@@ -259,8 +259,8 @@ fun RoutineDraft.toRoutine(id: String): Routine = when (kind) {
         pixelsPerSecond = pixelsPerSecond.coerceIn(MIN_PIXELS_PER_SECOND, MAX_PIXELS_PER_SECOND),
         watchVideos = watchVideos,
     )
-    RoutineKind.DgsELearning -> DgsELearningRoutine(id,name.trim(),requiredHours.toDouble(),creditedHours.toDouble(),pixelsPerSecond.coerceIn(MIN_PIXELS_PER_SECOND,MAX_PIXELS_PER_SECOND),playbackSpeed,waitAfterClickSeconds.toLong()*1000,requireNotNull(com.jagdeep.shared.answers.answerBankFileName(answerBankFile)))
-    RoutineKind.CourseAutomation -> CourseAutomationRoutine(id = id, name = name.trim(), waitAfterClickMillis = waitAfterClickSeconds.trim().toLong() * 1000, playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode, learningOrder = learningOrder, answerBankFile = requireNotNull(com.jagdeep.shared.answers.answerBankFileName(answerBankFile)))
+    RoutineKind.DgsELearning -> DgsELearningRoutine(id,name.trim(),requiredHours.toDouble(),creditedHours.toDouble(),pixelsPerSecond.coerceIn(MIN_PIXELS_PER_SECOND,MAX_PIXELS_PER_SECOND),playbackSpeed,waitAfterClickSeconds.toLong()*1000,requireNotNull(com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile)))
+    RoutineKind.CourseAutomation -> CourseAutomationRoutine(id = id, name = name.trim(), waitAfterClickMillis = waitAfterClickSeconds.trim().toLong() * 1000, playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode, learningOrder = learningOrder, answerBankFile = requireNotNull(com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile)))
 }
 
 private fun RoutineDraft.toClickRoutine(id: String): ClickRoutine = ClickRoutine(

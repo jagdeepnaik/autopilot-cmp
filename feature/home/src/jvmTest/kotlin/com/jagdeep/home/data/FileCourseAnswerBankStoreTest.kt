@@ -15,6 +15,24 @@ import kotlinx.serialization.json.Json
 
 class FileCourseAnswerBankStoreTest {
     @Test
+    fun `approved numbered website answers are saved without numbering and keep decimals`() = runTest {
+        val directory = Files.createTempDirectory("unnumbered-bank").toFile()
+        try {
+            val file = directory.resolve("answers-ver-1.0.json")
+            val store = FileCourseAnswerBankStore(listOf(file))
+            val original = CourseAnswer("How much?", listOf("1. 2.1 liters", "2) 4.5 liters"), "1. 2.1 liters")
+            kotlin.test.assertTrue(store.save("Module", original) is AnswerBankSaveResult.Saved)
+            fun saved() = Json.decodeFromString<Map<String, List<CourseAnswer>>>(file.readText()).getValue("Module").single()
+            kotlin.test.assertEquals(listOf("2.1 liters", "4.5 liters"), saved().options)
+            kotlin.test.assertEquals("2.1 liters", saved().answer)
+            val corrected = original.copy(options = listOf("1) 4.5 liters", "2. 2.1 liters"), answer = "1) 4.5 liters")
+            kotlin.test.assertTrue(store.saveReviewed("Module", listOf(ReviewedAnswer(corrected, "2. 2.1 liters"))) is AnswerBankSaveResult.Saved)
+            kotlin.test.assertEquals("4.5 liters", saved().answer)
+            kotlin.test.assertEquals(listOf("4.5 liters", "2.1 liters"), saved().options)
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
     fun `given approved corrections then replace expected answers atomically and reject stale reviews`() = runTest {
         val directory = Files.createTempDirectory("review-answer-bank").toFile()
         try {
