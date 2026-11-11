@@ -38,8 +38,12 @@ DEBUG_PORT=5005
 LOW_MEMORY=(--no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process')
 FOCUSED_TESTS=(:core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :composeApp:jvmTest --tests '*DesktopDataPathsTest*' --tests '*AppVersionTest*')
 
+# The help text is the comment block at the top of this file, up to the first line of code.
+usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; }
+
 TARGET="${1:-}"
-[ -n "$TARGET" ] || { sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+case "$TARGET" in -h|--help|help) usage; exit 0 ;; esac
+[ -n "$TARGET" ] || { usage; exit 2; }
 shift
 ACTION=all
 TESTS=1
@@ -48,7 +52,7 @@ for arg in "$@"; do
         all|sync|build|install|fetch|debug) ACTION="$arg" ;;
         --no-tests) TESTS=0 ;;
         --remote) SERVER_HOST=home-server-remote; VM_HOST=home-server-build-remote ;;
-        -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
     esac
 done
