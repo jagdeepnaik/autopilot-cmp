@@ -12,7 +12,7 @@ Use this part when you need an installer that installs and runs on Legion with S
 | --- | --- |
 | Symptom | The MSI stops with *"Error 1723. A DLL required for this install to complete could not be run"*. The action named is `JpFindRelatedProducts`, and the install log shows status 1603. |
 | Cause | Smart App Control (`VerifiedAndReputablePolicyState` = 1 on Legion) blocks `JpCaDll`. That is an unsigned helper DLL the Java packager (jpackage) puts in every MSI. Windows logs Code Integrity events 3077/3033. No DLL is missing. |
-| Fix | After every MSI packaging task, `composeApp/build.gradle.kts` runs `tools/windows/Remove-UnsignedMsiHelper.ps1`. The script removes `JpCaDll` and the two optional actions it backs. Commit `b0faba5`. |
+| Fix | After every MSI packaging task, `composeApp/build.gradle.kts` runs `private/scripts/windows/Remove-UnsignedMsiHelper.ps1`. The script removes `JpCaDll` and the two optional actions it backs. Commit `b0faba5`. |
 | What you lose | Only the installer's *"folder is not empty"* warning on the install-folder page. Upgrades still work through the MSI's standard upgrade actions (`FindRelatedProducts` and `RemoveExistingProducts`). WiX's signed `WixUIValidatePath` check still validates the folder. |
 | Safety | If `JpCaDll` backs any other action (for example after a JDK update), the script stops with an error and leaves the MSI unchanged. Running it twice is harmless. |
 | Not changed | Smart App Control stays on. The installer and app are still unsigned, so SmartScreen can still warn on other PCs. Trusted signing remains the release step for other people's PCs. |
@@ -23,7 +23,7 @@ Use this part when you need an installer that installs and runs on Legion with S
 | --- | --- |
 | Symptom | The MSI installs, but opening AutoPilot shows *"Smart App Control blocked an app that may be unsafe"*. Code Integrity event 3077 names `C:\Program Files\AutoPilot\AutoPilot.exe`. |
 | Cause | jpackage generates a new, unsigned `AutoPilot.exe` launcher for every build. Smart App Control has never seen that file and has no reputation for it, so it blocks it. The bundled runtime's DLLs and `skiko-windows-x64.dll` are also unsigned, but they're identical to files shipped in many other apps, and Smart App Control allows them. |
-| Fix | Gradle copies the packaging JDK's `javaw.exe`, signed by Microsoft, into the runtime image (`runtime\bin\javaw.exe`). After each MSI build, `tools/windows/Use-SignedJavaLauncher.ps1` points the desktop and Start menu shortcuts at that `javaw.exe`, with the same main class and JVM options the generated launcher used, and the AutoPilot icon. |
+| Fix | Gradle copies the packaging JDK's `javaw.exe`, signed by Microsoft, into the runtime image (`runtime\bin\javaw.exe`). After each MSI build, `private/scripts/windows/Use-SignedJavaLauncher.ps1` points the desktop and Start menu shortcuts at that `javaw.exe`, with the same main class and JVM options the generated launcher used, and the AutoPilot icon. |
 | Trade-offs | Task Manager shows the process as *OpenJDK Platform binary* (`javaw.exe`). `C:\Program Files\AutoPilot\AutoPilot.exe` is still installed but blocked, so always open the app from its shortcut. A shortcut you create yourself by right-clicking `AutoPilot.exe` won't work. |
 | Safety | The script stops, leaving the MSI unchanged, if `javaw.exe` isn't validly signed, if the MSI doesn't have exactly one `javaw.exe`, or if a shortcut points anywhere unexpected. Running it twice is harmless. |
 
@@ -87,7 +87,7 @@ The log must show `b0faba5` or a later commit.
 .\gradlew.bat --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :composeApp:packageReleaseMsi
 ```
 
-Wait for **BUILD SUCCESSFUL**. With a warm cache this takes about a minute. Removing the helper happens inside this task, so there's no extra step. For a release check with tests, use `.\tools\windows\Build-Distribution.ps1` (C5) instead; it runs the same packaging task.
+Wait for **BUILD SUCCESSFUL**. With a warm cache this takes about a minute. Removing the helper happens inside this task, so there's no extra step. For a release check with tests, use `.\private\scripts\windows\Build-Distribution.ps1` (C5) instead; it runs the same packaging task.
 
 ### H4. Check that the helper is gone
 
@@ -107,7 +107,7 @@ Expected: `OK: JpCaDll removed`, followed by the SHA256. The H3 build output als
 To patch an MSI built before the fix, without rebuilding:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tools\windows\Remove-UnsignedMsiHelper.ps1 -Path .\composeApp\build\compose\binaries\main-release\msi
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\private\scripts\windows\Remove-UnsignedMsiHelper.ps1 -Path .\composeApp\build\compose\binaries\main-release\msi
 ```
 
 ### H5. Updating an installed copy
@@ -208,7 +208,7 @@ Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='MsiInstalle
 
 ### H10. Using the fix in another Compose app
 
-Copy `tools/windows/Remove-UnsignedMsiHelper.ps1` and `tools/windows/Use-SignedJavaLauncher.ps1` into the other repository. Then add the Smart App Control block from AutoPilot's `composeApp/build.gradle.kts`: the `AbstractJLinkTask` and `AbstractJPackageTask` hooks, plus their imports from `org.jetbrains.compose.desktop.application.tasks`. Build and check with H3–H4 in that app's own folder.
+Copy `private/scripts/windows/Remove-UnsignedMsiHelper.ps1` and `private/scripts/windows/Use-SignedJavaLauncher.ps1` into the other repository. Then add the Smart App Control block from AutoPilot's `composeApp/build.gradle.kts`: the `AbstractJLinkTask` and `AbstractJPackageTask` hooks, plus their imports from `org.jetbrains.compose.desktop.application.tasks`. Build and check with H3–H4 in that app's own folder.
 
 ### H11. Recorded result — 10 November 2026
 

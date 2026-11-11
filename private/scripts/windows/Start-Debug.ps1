@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
-$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
 $logDirectory = Join-Path $env:USERPROFILE '.autopilot/logs'
 New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
 $logPath = Join-Path $logDirectory ("debug-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')

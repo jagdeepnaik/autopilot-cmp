@@ -4,7 +4,7 @@
 
 ## Fix in place (10 November 2026)
 
-The build now removes the unsigned helper instead of waiting for signing. After every MSI packaging task, `composeApp/build.gradle.kts` runs `tools/windows/Remove-UnsignedMsiHelper.ps1`, which deletes the `JpCaDll` binary and the two actions it backs:
+The build now removes the unsigned helper instead of waiting for signing. After every MSI packaging task, `composeApp/build.gradle.kts` runs `private/scripts/windows/Remove-UnsignedMsiHelper.ps1`, which deletes the `JpCaDll` binary and the two actions it backs:
 
 - `JpFindRelatedProducts` refines the standard `FindRelatedProducts`. The MSI still runs that standard action and `RemoveExistingProducts` against its Upgrade table, so upgrades keep working.
 - `JpCheckInstallDir` only warns, on the folder page, that the chosen folder is not empty. The signed WiX path check (`WixUIValidatePath`) still validates the folder.
@@ -32,7 +32,7 @@ After the installer fix, version 1.0.24 installed but wouldn't open: *"Smart App
 - All bundled runtime DLLs are unsigned too (`jlink` copies the JDK's pre-signing files from its jmods), and so is `skiko-windows-x64.dll`. None of them was blocked: they're identical across every app built with the same JDK.
 - The Microsoft JDK's `javaw.exe` is signed by Microsoft Corporation. Starting the installed app with it, or with a copy placed in the bundled runtime, ran with no blocks.
 
-The fix: the build copies that signed `javaw.exe` into the runtime image, and `tools/windows/Use-SignedJavaLauncher.ps1` points both MSI shortcuts at it. Verified on Legion with Smart App Control on: the install succeeded, the desktop shortcut targets the signed `runtime\bin\javaw.exe` with the AutoPilot icon, the app was running 15 seconds after opening the shortcut, and no Code Integrity blocks were logged.
+The fix: the build copies that signed `javaw.exe` into the runtime image, and `private/scripts/windows/Use-SignedJavaLauncher.ps1` points both MSI shortcuts at it. Verified on Legion with Smart App Control on: the install succeeded, the desktop shortcut targets the signed `runtime\bin\javaw.exe` with the AutoPilot icon, the app was running 15 seconds after opening the shortcut, and no Code Integrity blocks were logged.
 
 ## Confirmed cause
 
@@ -114,6 +114,6 @@ No routines, private application databases, website services, signing trust stor
 
 On 10 November 2026, a fresh check over `home-legion` found all five direct Windows DLL dependencies present and successfully loadable: `ole32.dll`, `msi.dll`, `user32.dll`, `shlwapi.dll`, and `kernel32.dll`. Loading the extracted `JpCaDll.dll` still returned error 4551. Code Integrity event 3077 independently recorded the extracted helper and MSI temporary helpers blocked under policy `{0283ac0f-fff1-49ae-ada1-8a933130cad6}`. This confirms a policy block; it is not evidence of a missing direct dependency. Additional issues after that block are not ruled out.
 
-The earlier successful app run used the `AutoPilot-Debug` scheduled task, invoking `tools/windows/Start-Debug.ps1`, rather than an installed MSI. That task still exists. Successful packaging generated an MSI but did not prove installation succeeded. The queried AutoPilot installer events from the past seven days contained failures with status 1603; no successful installation appeared in the returned records.
+The earlier successful app run used the `AutoPilot-Debug` scheduled task, invoking `private/scripts/windows/Start-Debug.ps1`, rather than an installed MSI. That task still exists. Successful packaging generated an MSI but did not prove installation succeeded. The queried AutoPilot installer events from the past seven days contained failures with status 1603; no successful installation appeared in the returned records.
 
 The Downloads folder contained only `ChromeSetup.exe` among MSI/EXE installers, and its signature was Valid. A known working unsigned installer has not yet been identified, so comparison with the owner's other unsigned apps remains pending. No security setting, installed application, or source file was changed for these checks.

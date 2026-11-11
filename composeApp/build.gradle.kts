@@ -170,8 +170,8 @@ compose.desktop {
 // runtime image gets the JDK's vendor-signed javaw.exe, and each MSI is then patched: the helper DLL is
 // removed and the shortcuts start the app through that javaw.exe. Each script explains what it
 // changes and refuses an MSI it doesn't recognise.
-val removeUnsignedMsiHelperScript = rootProject.file("tools/windows/Remove-UnsignedMsiHelper.ps1")
-val useSignedJavaLauncherScript = rootProject.file("tools/windows/Use-SignedJavaLauncher.ps1")
+val removeUnsignedMsiHelperScript = rootProject.file("private/scripts/windows/Remove-UnsignedMsiHelper.ps1")
+val useSignedJavaLauncherScript = rootProject.file("private/scripts/windows/Use-SignedJavaLauncher.ps1")
 val isWindowsBuild = System.getProperty("os.name").startsWith("Windows")
 
 // The runtime image is what both the app folder and the MSI bundle, so javaw.exe goes in there.

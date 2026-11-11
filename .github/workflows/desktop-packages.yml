@@ -39,11 +39,11 @@ jobs:
 
       - name: Validate Windows helper scripts
         shell: pwsh
-        run: .\tools\windows\Validate-Scripts.ps1
+        run: .\private\scripts\windows\Validate-Scripts.ps1
 
       - name: Test and build Windows package
         shell: pwsh
-        run: .\tools\windows\Build-Distribution.ps1
+        run: .\private\scripts\windows\Build-Distribution.ps1
 
       - name: Upload installer
         uses: actions/upload-artifact@v6

@@ -8,7 +8,7 @@ Updated 11 November 2026.
 
 | What you want to do | Guide |
 | --- | --- |
-| **Sync, build, install and debug on any machine with one command** (`tools/desktop.sh`) | [01_ONE_COMMAND_BUILDS.md](01_ONE_COMMAND_BUILDS.md) |
+| **Sync, build, install and debug on any machine with one command** (`private/scripts/desktop.sh`) | [01_ONE_COMMAND_BUILDS.md](01_ONE_COMMAND_BUILDS.md) |
 | Build the Windows MSI on Legion, step by step | [02_BUILD_WINDOWS_ON_LEGION.md](02_BUILD_WINDOWS_ON_LEGION.md) |
 | Install, update and test AutoPilot on Windows (desktop or over SSH) | [03_INSTALL_AND_TEST_WINDOWS.md](03_INSTALL_AND_TEST_WINDOWS.md) |
 | Debug the Windows app from Android Studio on the Mac | [04_DEBUG_WINDOWS_FROM_MAC.md](04_DEBUG_WINDOWS_FROM_MAC.md) |
@@ -17,7 +17,7 @@ Updated 11 November 2026.
 | Copy an MSI between Legion and the Mac | [07_COPY_WINDOWS_INSTALLER.md](07_COPY_WINDOWS_INSTALLER.md) |
 | Fix installer errors: Error 1723, "Smart App Control blocked an app", "already installed" | [08_FIX_WINDOWS_INSTALLER.md](08_FIX_WINDOWS_INSTALLER.md) |
 
-**Usual order:** run `tools/desktop.sh legion` (or `mac`, `server`, `all`) from the Mac, then open the app on that machine and check it. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
+**Usual order:** run `private/scripts/desktop.sh legion` (or `mac`, `server`, `all`) from the Mac, then open the app on that machine and check it. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
 
 ## 09–12 · Home server — Linux DEB and the Windows VM
 
@@ -28,7 +28,7 @@ Updated 11 November 2026.
 | Start, stop or monitor the server's Windows VM | [11_START_STOP_WINDOWS_BUILD_VM.md](11_START_STOP_WINDOWS_BUILD_VM.md) |
 | Build the MSI inside that VM (alternative to Legion) | [12_BUILD_WINDOWS_IN_SERVER_VM.md](12_BUILD_WINDOWS_IN_SERVER_VM.md) |
 
-`tools/desktop.sh server` and `tools/desktop.sh vm` run these steps in one command. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.
+`private/scripts/desktop.sh server` and `private/scripts/desktop.sh vm` run these steps in one command. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.
 
 ## 13–17 · Background and recorded evidence
 

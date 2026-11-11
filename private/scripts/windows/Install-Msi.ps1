@@ -1,6 +1,6 @@
 # Installs or updates AutoPilot silently from the newest built MSI, then checks the result.
 # Run on Windows as an administrator, for example over SSH from the Mac:
-#   ssh home-legion 'powershell -NoProfile -ExecutionPolicy RemoteSigned -File C:\Users\jagde\Projects\autopilot-cmp\tools\windows\Install-Msi.ps1'
+#   ssh home-legion 'powershell -NoProfile -ExecutionPolicy RemoteSigned -File C:\Users\jagde\Projects\autopilot-cmp\private\scripts\windows\Install-Msi.ps1'
 # App data in %USERPROFILE%\.autopilot is never touched. A running AutoPilot is closed first:
 # close it normally on the desktop beforehand so a routine's progress is saved.
 [CmdletBinding()]
@@ -11,7 +11,7 @@ param(
     [switch]$SkipIfInstalled
 )
 $ErrorActionPreference = 'Stop'
-$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
 $installDir = 'C:\Program Files\AutoPilot'
 $uninstallKeys = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
 

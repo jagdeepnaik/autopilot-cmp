@@ -26,11 +26,11 @@ Set-Location (Join-Path $env:USERPROFILE 'Projects\autopilot-cmp')
 if ($LASTEXITCODE -ne 0) { throw 'Tests or packaging failed.' }
 ```
 
-The reusable helper is [Build-Distribution.ps1](../../tools/windows/Build-Distribution.ps1). It runs focused tests, checks failures, builds the MSI, and reports its location and hash. Its optional `-SkipTests` switch is not release-validation evidence.
+The reusable helper is [Build-Distribution.ps1](../../private/scripts/windows/Build-Distribution.ps1). It runs focused tests, checks failures, builds the MSI, and reports its location and hash. Its optional `-SkipTests` switch is not release-validation evidence.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned `
-  -File .\tools\windows\Build-Distribution.ps1
+  -File .\private\scripts\windows\Build-Distribution.ps1
 ```
 
 ### The JDK problem we fixed
@@ -201,9 +201,9 @@ The historical Windows app PID was `20288`, in session 1; the Mac SSH listener P
 
 | Location | Purpose |
 | --- | --- |
-| `tools/windows/Build-Distribution.ps1` | Focused tests and Windows MSI build |
-| `tools/windows/Register-DebugLauncher.ps1` | Register/remove interactive debug task |
-| `tools/windows/Start-Debug.ps1` | Debug run and PowerShell transcript |
+| `private/scripts/windows/Build-Distribution.ps1` | Focused tests and Windows MSI build |
+| `private/scripts/windows/Register-DebugLauncher.ps1` | Register/remove interactive debug task |
+| `private/scripts/windows/Start-Debug.ps1` | Debug run and PowerShell transcript |
 | `.run/AutoPilot-Windows-SSH.run.xml` | Mac IDE attach configuration |
 | `.github/workflows/desktop-packages.yml` | Manually requested platform packaging CI |
 | Windows `%USERPROFILE%\.autopilot\logs\debug-*.log` | Debug-launch transcripts |
@@ -329,7 +329,7 @@ This can disrupt other commands using the master. Finish builds and transfers fi
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned `
-  -File .\tools\windows\Register-DebugLauncher.ps1 -Remove
+  -File .\private\scripts\windows\Register-DebugLauncher.ps1 -Remove
 ```
 
 Close the app normally first. Force-stopping a task/process can lose the last unsaved checkpoint; removing the registration is not a substitute for orderly shutdown.

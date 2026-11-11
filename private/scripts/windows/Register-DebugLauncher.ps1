@@ -10,7 +10,7 @@ if ($Remove) {
 }
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $scriptPath = Join-Path $PSScriptRoot 'Start-Debug.ps1'
-$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -ExecutionPolicy RemoteSigned -File "' + $scriptPath + '"') -WorkingDirectory $projectRoot
 $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 4) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries

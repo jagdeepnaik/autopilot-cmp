@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One command from the Mac to sync, build, install and debug AutoPilot on every desktop machine.
 #
-#   tools/desktop.sh <target> [action] [--no-tests] [--remote]
+#   private/scripts/desktop.sh <target> [action] [--no-tests] [--remote]
 #
 #   target   mac      this Mac: macOS app in /Applications
 #            legion   Windows laptop (ssh home-legion): MSI, installed on Legion
@@ -24,7 +24,7 @@
 # never overwritten: the script stops and says what to do. See private/docs/01_ONE_COMMAND_BUILDS.md.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 LEGION_HOST="${LEGION_HOST:-home-legion}"
@@ -163,13 +163,13 @@ mac_debug() {
 legion_build() {
     windows_sync Legion "$LEGION_HOST" "$LEGION_DIR"
     step "Legion: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the MSI"
-    windows_ps "$LEGION_HOST" "$LEGION_DIR" "& .\\tools\\windows\\Build-Distribution.ps1$( [ "$TESTS" -eq 1 ] || echo ' -SkipTests')" \
+    windows_ps "$LEGION_HOST" "$LEGION_DIR" "& .\\private\\scripts\\windows\\Build-Distribution.ps1$( [ "$TESTS" -eq 1 ] || echo ' -SkipTests')" \
         || fail "the Legion build failed (see above)."
 }
 
 legion_install() {
     step "Legion: install or update, then check"
-    windows_ps "$LEGION_HOST" "$LEGION_DIR" "& .\\tools\\windows\\Install-Msi.ps1 -LaunchCheck -SkipIfInstalled" \
+    windows_ps "$LEGION_HOST" "$LEGION_DIR" "& .\\private\\scripts\\windows\\Install-Msi.ps1 -LaunchCheck -SkipIfInstalled" \
         || fail "the install or its checks failed (see above)."
 }
 
@@ -178,7 +178,12 @@ legion_debug() {
     step "Legion: start the debug run"
     lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 && fail "port $DEBUG_PORT is already in use on the Mac. Close it and run again."
     windows_ps "$LEGION_HOST" "$LEGION_DIR" "
-if (-not (Get-ScheduledTask -TaskName 'AutoPilot-Debug' -ErrorAction SilentlyContinue)) { throw 'The AutoPilot-Debug task is not registered. Run tools\\windows\\Register-DebugLauncher.ps1 once on the Legion desktop.' }
+\$task = Get-ScheduledTask -TaskName 'AutoPilot-Debug' -ErrorAction SilentlyContinue
+if (-not \$task) { throw 'The AutoPilot-Debug task is not registered. Run private\\scripts\\windows\\Register-DebugLauncher.ps1 once on the Legion desktop.' }
+# The task stores the launcher's path; after the scripts move, point it at the current one.
+if (-not ((\$task.Actions | ForEach-Object Arguments) -like '*private\\scripts\\windows\\Start-Debug.ps1*')) {
+    & .\\private\\scripts\\windows\\Register-DebugLauncher.ps1
+}
 if (@(Get-Process javaw, AutoPilot -ErrorAction SilentlyContinue | Where-Object { \$_.Path -like 'C:\\Program Files\\AutoPilot\\*' })) { throw 'The installed AutoPilot is open on Legion. Close it normally first; both copies share the same data.' }
 if (Get-NetTCPConnection -LocalPort $DEBUG_PORT -State Listen -ErrorAction SilentlyContinue) { 'A debug run is already waiting on port $DEBUG_PORT.'; return }
 Start-ScheduledTask -TaskName 'AutoPilot-Debug'
@@ -232,7 +237,7 @@ vm_build() {
         || fail "the Windows VM isn't running. Start it with: ssh -t $SERVER_HOST /srv/vms/windows-build/start.sh"
     windows_sync "Server VM" "$VM_HOST" "$VM_DIR"
     step "Server VM: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the MSI"
-    windows_ps "$VM_HOST" "$VM_DIR" "& .\\tools\\windows\\Build-Distribution.ps1$( [ "$TESTS" -eq 1 ] || echo ' -SkipTests')" \
+    windows_ps "$VM_HOST" "$VM_DIR" "& .\\private\\scripts\\windows\\Build-Distribution.ps1$( [ "$TESTS" -eq 1 ] || echo ' -SkipTests')" \
         || fail "the server VM build failed (see above)."
 }
 
@@ -283,7 +288,7 @@ case "$TARGET" in
             sync) mac_check_pushed; windows_sync Legion "$LEGION_HOST" "$LEGION_DIR"; server_sync ;;
             build) mac_check_pushed; mac_build; legion_build; server_build ;;
             all|install|fetch) mac_check_pushed; mac_build; mac_install; legion_build; legion_install; server_build; server_fetch ;;
-            debug) unsupported "Debug one machine at a time: tools/desktop.sh mac debug, or tools/desktop.sh legion debug." ;;
+            debug) unsupported "Debug one machine at a time: private/scripts/desktop.sh mac debug, or private/scripts/desktop.sh legion debug." ;;
         esac ;;
     *) fail "unknown target '$TARGET'. Use mac, legion, server, vm or all (see --help)." ;;
 esac

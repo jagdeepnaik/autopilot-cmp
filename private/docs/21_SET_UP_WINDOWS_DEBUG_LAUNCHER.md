@@ -15,8 +15,8 @@ Windows Home does not supply the built-in Remote Desktop host used by Pro editio
 
 Two small Windows scripts and one IDE configuration were added:
 
-- [Register-DebugLauncher.ps1](../../tools/windows/Register-DebugLauncher.ps1) registers or removes the task.
-- [Start-Debug.ps1](../../tools/windows/Start-Debug.ps1) runs the app with JVM debugging enabled and creates a transcript.
+- [Register-DebugLauncher.ps1](../../private/scripts/windows/Register-DebugLauncher.ps1) registers or removes the task.
+- [Start-Debug.ps1](../../private/scripts/windows/Start-Debug.ps1) runs the app with JVM debugging enabled and creates a transcript.
 - [AutoPilot-Windows-SSH.run.xml](../../.run/AutoPilot-Windows-SSH.run.xml) tells Android Studio where to attach.
 
 ### Registration
@@ -25,7 +25,7 @@ Two small Windows scripts and one IDE configuration were added:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned `
-  -File .\tools\windows\Register-DebugLauncher.ps1
+  -File .\private\scripts\windows\Register-DebugLauncher.ps1
 Start-ScheduledTask -TaskName 'AutoPilot-Debug'
 ```
 

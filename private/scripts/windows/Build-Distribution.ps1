@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param([switch]$SkipTests)
 $ErrorActionPreference = 'Stop'
-$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
 Push-Location $projectRoot
 try {
     if (-not (Get-Command java -ErrorAction SilentlyContinue)) { throw 'Install a full JDK 21 and reopen PowerShell first.' }

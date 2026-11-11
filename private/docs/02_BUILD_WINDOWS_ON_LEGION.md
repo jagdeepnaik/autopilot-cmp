@@ -4,7 +4,7 @@
 
 ## ONE COMMAND — sync, build, install, debug
 
-From the Mac: `tools/desktop.sh legion` (or `tools/windows/legion.sh`). It pushes, pulls on Legion, builds with tests, installs and checks, then starts the debug run and tunnel. Add `install`, `build`, `debug` or `sync` to run only part of it. How it works, and the commands for the Mac and the home server: [01_ONE_COMMAND_BUILDS.md](01_ONE_COMMAND_BUILDS.md).
+From the Mac: `private/scripts/desktop.sh legion` (or `private/scripts/windows/legion.sh`). It pushes, pulls on Legion, builds with tests, installs and checks, then starts the debug run and tunnel. Add `install`, `build`, `debug` or `sync` to run only part of it. How it works, and the commands for the Mac and the home server: [01_ONE_COMMAND_BUILDS.md](01_ONE_COMMAND_BUILDS.md).
 
 The manual steps below do the same thing one command at a time.
 
@@ -57,7 +57,7 @@ git log -1 --oneline
 ### C5. Run focused tests and build the MSI
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tools\windows\Build-Distribution.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\private\scripts\windows\Build-Distribution.ps1
 ```
 
 This AutoPilot helper runs `core:automation` tests, DGS study tests, desktop data-path tests, and `:composeApp:packageReleaseMsi`. The script permission applies only to this PowerShell process. Do not add `-SkipTests` for a release check.

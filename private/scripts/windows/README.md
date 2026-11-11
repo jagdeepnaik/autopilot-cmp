@@ -12,7 +12,7 @@ AutoPilot's Windows MSI must be built on Windows. GitHub Actions can produce it 
    Set-Location "$env:USERPROFILE\Projects"
    git clone https://github.com/jagdeepnaik/autopilot-cmp.git
    Set-Location autopilot-cmp
-   powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tools\windows\Build-Distribution.ps1
+   powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\private\scripts\windows\Build-Distribution.ps1
    ```
 
    If PowerShell blocks locally reviewed scripts, use `Set-ExecutionPolicy -Scope Process RemoteSigned` in this window only. Do not disable machine-wide script policies. Do not use this to override an organization-managed policy. The build script runs native-automation unit tests, DGS persistence tests, folder migration tests, and creates an MSI plus its SHA-256 output. Full UI and live browser tests are separate.
@@ -22,18 +22,18 @@ AutoPilot's Windows MSI must be built on Windows. GitHub Actions can produce it 
 ## One command from the Mac
 
 ```bash
-tools/desktop.sh legion            # sync with Git, build, install, then debug on Legion
-tools/desktop.sh mac | server | vm | all
+private/scripts/desktop.sh legion            # sync with Git, build, install, then debug on Legion
+private/scripts/desktop.sh mac | server | vm | all
 ```
 
-`tools/windows/legion.sh` is a shortcut for `tools/desktop.sh legion`. The commands for the Mac and the home server, and how it works, are in `private/docs/01_ONE_COMMAND_BUILDS.md`.
+`private/scripts/windows/legion.sh` is a shortcut for `private/scripts/desktop.sh legion`. The commands for the Mac and the home server, and how it works, are in `private/docs/01_ONE_COMMAND_BUILDS.md`.
 
 ## Install or update remotely from the Mac
 
 After a build, `Install-Msi.ps1` installs or updates AutoPilot silently from the newest MSI and checks the result. Close AutoPilot normally on the desktop first:
 
 ```bash
-ssh WINDOWS_USER@WINDOWS_LAN_IP 'powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "C:\Users\WINDOWS_USER\Projects\autopilot-cmp\tools\windows\Install-Msi.ps1"'
+ssh WINDOWS_USER@WINDOWS_LAN_IP 'powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "C:\Users\WINDOWS_USER\Projects\autopilot-cmp\private\scripts\windows\Install-Msi.ps1"'
 ```
 
 It refuses an MSI that isn't newer than the installed version, and it never touches `%USERPROFILE%\.autopilot`.
@@ -45,7 +45,7 @@ Commit and push the intended code first. In the Windows checkout use `git pull -
 Example (replace the username, IP and path):
 
 ```bash
-ssh WINDOWS_USER@WINDOWS_LAN_IP 'powershell.exe -NoProfile -File "C:\Users\WINDOWS_USER\Projects\autopilot-cmp\tools\windows\Build-Distribution.ps1"'
+ssh WINDOWS_USER@WINDOWS_LAN_IP 'powershell.exe -NoProfile -File "C:\Users\WINDOWS_USER\Projects\autopilot-cmp\private\scripts\windows\Build-Distribution.ps1"'
 ```
 
 MSI output: `composeApp/build/compose/binaries/main-release/msi/`. Copy the exact produced MSI back with `scp`, or download the Windows artifact from GitHub Actions → Desktop packages. Building over SSH is supported; launching a GUI directly inside an SSH service session is not the desktop testing path.
@@ -55,7 +55,7 @@ MSI output: `composeApp/build/compose/binaries/main-release/msi/`. Copy the exac
 1. On the signed-in Windows desktop, close any installed/running AutoPilot copy to avoid port and database conflicts. Keep Chrome and AutoPilot in the same user session. Run once:
 
    ```powershell
-   powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tools\windows\Register-DebugLauncher.ps1
+   powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\private\scripts\windows\Register-DebugLauncher.ps1
    ```
 
    This registers an on-demand, non-elevated task for the interactive user. Its PowerShell process uses RemoteSigned for the reviewed local project scripts; machine-wide execution policy is unchanged. No password, automatic trigger, SSH setting or firewall rule is created. Re-register it if the checkout moves. If Windows restricts task registration, run `Start-Debug.ps1` manually in the desktop PowerShell instead.

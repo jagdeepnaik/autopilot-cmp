@@ -6,7 +6,7 @@
 
 Use the physical Legion desktop for installer dialogs and GUI testing. SSH alone does not show the Windows screen. To install or update without touching the laptop, use [PART S — install over SSH](#part-s--install-or-update-over-ssh--from-the-mac) below, then check the window on the desktop.
 
-The current AutoPilot build removes the blocked unsigned Java MSI helper through `tools/windows/Remove-UnsignedMsiHelper.ps1`, and its shortcuts start the app through the bundled, Microsoft-signed `javaw.exe` because Smart App Control blocks the generated `AutoPilot.exe`. Always open AutoPilot from its Start menu or desktop shortcut. The recorded installation result and remaining validation are in [Windows installer diagnosis](14_WINDOWS_INSTALLER_DIAGNOSIS.md). Keep Smart App Control enabled. Successful installation on Legion does not establish trust on every recipient's PC; trusted signing remains a separate distribution step.
+The current AutoPilot build removes the blocked unsigned Java MSI helper through `private/scripts/windows/Remove-UnsignedMsiHelper.ps1`, and its shortcuts start the app through the bundled, Microsoft-signed `javaw.exe` because Smart App Control blocks the generated `AutoPilot.exe`. Always open AutoPilot from its Start menu or desktop shortcut. The recorded installation result and remaining validation are in [Windows installer diagnosis](14_WINDOWS_INSTALLER_DIAGNOSIS.md). Keep Smart App Control enabled. Successful installation on Legion does not establish trust on every recipient's PC; trusted signing remains a separate distribution step.
 
 ### E1. Close AutoPilot normally
 
@@ -166,12 +166,12 @@ Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='MsiInstalle
 
 ### S8. One command from the Mac
 
-`tools/windows/Install-Msi.ps1` does S2–S5 in one go: it picks the newest MSI, refuses one that isn't newer than the installed version, closes a running copy, installs silently, then checks the version, the signed `javaw.exe`, both shortcuts, and Smart App Control blocks. Close AutoPilot normally on the desktop first.
+`private/scripts/windows/Install-Msi.ps1` does S2–S5 in one go: it picks the newest MSI, refuses one that isn't newer than the installed version, closes a running copy, installs silently, then checks the version, the signed `javaw.exe`, both shortcuts, and Smart App Control blocks. Close AutoPilot normally on the desktop first.
 
 **Mac Terminal:**
 
 ```sh
-ssh home-legion 'powershell -NoProfile -ExecutionPolicy RemoteSigned -File C:\Users\jagde\Projects\autopilot-cmp\tools\windows\Install-Msi.ps1'
+ssh home-legion 'powershell -NoProfile -ExecutionPolicy RemoteSigned -File C:\Users\jagde\Projects\autopilot-cmp\private\scripts\windows\Install-Msi.ps1'
 ```
 
 Add `-LaunchCheck` after `Install-Msi.ps1` to also open the app through its shortcut for 15 seconds (no window appears on the desktop). To install a particular file, add `-Msi C:\path\to\AutoPilot-1.0.25.msi`.
