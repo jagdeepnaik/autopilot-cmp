@@ -44,10 +44,10 @@ ssh -S /tmp/autopilot-windows-ssh -O check jagde@192.168.1.6
 
 ### Current setup work — 10 November 2026
 
-The owner has authorized a passphrase-protected, dedicated Ed25519 key saved through Apple's Keychain integration. The local helper is `private/misc/setup-windows-ssh-key.command`. Run it in Mac Terminal:
+The owner has authorized a passphrase-protected, dedicated Ed25519 key saved through Apple's Keychain integration. The local helper is `private/scripts/windows/setup-windows-ssh-key.command`. Run it in Mac Terminal:
 
 ```sh
-bash '/Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/misc/setup-windows-ssh-key.command'
+bash '/Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts/windows/setup-windows-ssh-key.command'
 ```
 
 It preserves existing keys, rejects an unencrypted dedicated key, asks for the passphrase locally, calls Apple's `ssh-add --apple-use-keychain`, verifies the pinned Windows host fingerprint, appends only the public key to the administrator authorization file, checks its permissions, preserves existing SSH configuration, and tests a fresh key-only connection with password fallback disabled. The Windows account is an administrator and the server's default administrator Match rule uses the shared authorization file; the owner explicitly approved that protected-key scope. No Windows password is stored by the helper.
