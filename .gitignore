@@ -32,3 +32,4 @@ keystore.properties
 *.keystore
 # Read-only reference copy of the template
 /private/zynk-cmp-main/
+/private/secrets/

@@ -25,7 +25,7 @@ Updated 11 November 2026.
 | --- | --- |
 | Build the Linux DEB on Debian | [09_BUILD_LINUX_ON_SERVER.md](09_BUILD_LINUX_ON_SERVER.md) |
 | Copy server-built installers to the Mac | [10_COPY_SERVER_INSTALLERS.md](10_COPY_SERVER_INSTALLERS.md) |
-| Start, stop or monitor the server's Windows VM | [11_START_STOP_WINDOWS_BUILD_VM.md](11_START_STOP_WINDOWS_BUILD_VM.md) |
+| Start, stop or monitor the server's Windows VM (one line: `private/scripts/server-vm.sh start \| stop \| status \| test`, see [01](01_ONE_COMMAND_BUILDS.md#server-windows-vm--start-stop-and-test)) | [11_START_STOP_WINDOWS_BUILD_VM.md](11_START_STOP_WINDOWS_BUILD_VM.md) |
 | Build the MSI inside that VM (alternative to Legion) | [12_BUILD_WINDOWS_IN_SERVER_VM.md](12_BUILD_WINDOWS_IN_SERVER_VM.md) |
 
 `private/scripts/desktop.sh server` and `private/scripts/desktop.sh vm` run these steps in one command. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.

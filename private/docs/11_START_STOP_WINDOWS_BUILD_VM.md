@@ -2,6 +2,8 @@
 
 [All guides](00_INDEX.md) · [Build in the VM](12_BUILD_WINDOWS_IN_SERVER_VM.md)
 
+**One line from the Mac:** `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. See [01 — Server Windows VM](01_ONE_COMMAND_BUILDS.md#server-windows-vm--start-stop-and-test). The steps below do the same by hand.
+
 ### 1.1 Windows VM: connect, check, start, monitor and stop
 
 **Choose only the action you need.** You do not perform every subsection each time. All operations below are manual commands for you to run; the assistant is not starting, stopping or monitoring anything.

@@ -100,6 +100,77 @@ Both debug runs build from source at the synced commit, so breakpoints match the
 - **Mac:** stops if AutoPilot is already running or port 5005 is taken. It then runs `./gradlew :composeApp:run --debug-jvm`, which waits for the debugger. In Android Studio choose **AutoPilot Mac (local)** → Debug. Closing the app window ends the run.
 - **Legion:** checks that the `AutoPilot-Debug` task exists and that the installed app isn't open, since both would share `.autopilot`. It starts the task on the signed-in desktop and waits up to 15 minutes until the debug run listens on Legion's port 5005. It then opens `ssh -N -L 127.0.0.1:5005:127.0.0.1:5005 home-legion` on the Mac. In Android Studio choose **AutoPilot Windows (SSH tunnel)** → Debug; the window appears on Legion. Control-C in the Terminal closes the tunnel. Port 5005 is never opened to the network.
 
+## Server Windows VM — start, stop and test
+
+The VM is a Windows guest on the home server. It uses 8 GB of the server's 16 GB, so start it only for a build and stop it afterwards. Starting or stopping it never touches Debian or the websites. `desktop.sh vm` needs the VM running and stops with a hint if it isn't.
+
+### One line with the script
+
+From `private/scripts` (or as `private/scripts/server-vm.sh …` from the project root):
+
+| Command | What happens |
+| --- | --- |
+| `./server-vm.sh status` | Shows the server's uptime and memory, whether the VM process is running, and whether Windows answers over SSH |
+| `./server-vm.sh test` | Signs in to Windows and shows the user, uptime, Java, Git, the checkout's commit, local changes and free disk space |
+| `./server-vm.sh start` | Starts the VM. You type an 8-character VNC console password for Screen Sharing. It then waits for Windows and runs `test` |
+| `./server-vm.sh start --headless` | Same, but the console password is random and never shown, so there's no prompt. Use this for builds; the console can't be opened until the next normal `start` |
+| `./server-vm.sh stop` | Refuses while a Gradle build runs in the VM. Otherwise it shuts Windows down cleanly and waits until the VM process has ended |
+| add `--remote` | Go through Cloudflare (`home-server-remote`, `home-server-build-remote`) |
+
+A typical VM build:
+
+```sh
+cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts
+./server-vm.sh start --headless && ./desktop.sh vm && ./server-vm.sh stop
+```
+
+The script never force-kills the VM. If Windows doesn't answer, or takes longer than 5 minutes to shut down (often because it's installing updates), the script stops and says to check it with Screen Sharing.
+
+### Separately, by hand
+
+**Check whether it's running** (Mac Terminal):
+
+```sh
+ssh home-server "pgrep -af '^/usr/bin/qemu-system-x86_64 -name windows-build '"
+```
+
+A line with a process number means it's running; no output means it's stopped.
+
+**Start it**, then type the 8-character console password when asked:
+
+```sh
+ssh -t home-server /srv/vms/windows-build/start.sh
+```
+
+`VM already running.` means there's nothing to do. Windows takes about 20–60 seconds to boot, longer while installing updates.
+
+**Test the connection to Windows:**
+
+```sh
+ssh home-server-build whoami
+```
+
+Expected: `jagdeep\builduser`. *Connection refused* or a timeout soon after starting means Windows is still booting: wait and try again.
+
+**Stop it** after any build has finished. The VM's default shell is PowerShell, so this runs as is:
+
+```sh
+ssh home-server-build Stop-Computer -Force
+```
+
+The SSH connection closes as Windows shuts down. Then repeat the first command until it prints nothing. Don't use Debian's `shutdown`, `reboot` or `poweroff`: they stop the whole server, websites included. For more detail (resource monitoring, Screen Sharing, troubleshooting), see [11_START_STOP_WINDOWS_BUILD_VM.md](11_START_STOP_WINDOWS_BUILD_VM.md).
+
+### Recorded test — 11 November 2026
+
+| Command | Result |
+| --- | --- |
+| `server-vm.sh status` | Server up 4 days, 5.6 GB memory available; VM running; Windows SSH answering |
+| `server-vm.sh test` | Signed in as `jagdeep\builduser`; Java 21.0.13, Git 2.56.0; checkout clean at `ac90a44`; 59.4 GB free |
+| `server-vm.sh stop` | No build running; Windows shut down cleanly; VM process ended after about 225 s |
+| `server-vm.sh start --headless` | VM started without a prompt; Windows answered SSH after about 20 s; connection test passed |
+
+The interactive `start` (typing the console password) runs `start.sh` through `ssh -t` and wasn't run in this test.
+
 ## Where the scripts live
 
 All build, install and debug scripts are in `private/scripts/` (moved from `tools/` on 11 November 2026): `private/scripts/desktop.sh` for the Mac, and `private/scripts/windows/` for Windows. They're tracked in Git, because Gradle runs the two MSI patch scripts during packaging and the build machines need them. The `AutoPilot-Debug` task on Legion stores its launcher's path. `desktop.sh legion debug` re-registers it automatically when that path is out of date.
@@ -114,7 +185,7 @@ All build, install and debug scripts are in `private/scripts/` (moved from `tool
 | *AutoPilot is running on the Mac* | Quit it normally, rerun |
 | *The installed AutoPilot is open on Legion* | Close it normally on Legion, rerun |
 | *Version … is not newer than the installed …* | Commit a change and rerun, or uninstall first ([03, S6](03_INSTALL_AND_TEST_WINDOWS.md)) |
-| *the Windows VM isn't running* | `ssh -t home-server /srv/vms/windows-build/start.sh`, wait a minute, rerun |
+| *the Windows VM isn't running* | `private/scripts/server-vm.sh start --headless`, then rerun |
 | *The AutoPilot-Debug task is not registered* | Run `private\scripts\windows\Register-DebugLauncher.ps1` once on the Legion desktop ([21](21_SET_UP_WINDOWS_DEBUG_LAUNCHER.md)) |
 | *port 5005 is already in use* | Close the earlier tunnel or debug run (`lsof -nP -iTCP:5005`) |
 | A build or test failure | Read the Gradle output above the message; nothing was installed |
@@ -125,6 +196,7 @@ All build, install and debug scripts are in `private/scripts/` (moved from `tool
 | --- | --- | --- |
 | `private/scripts/desktop.sh` | Mac | The single command: sync, build, install, copy, debug |
 | `private/scripts/windows/legion.sh` | Mac | Shortcut for `desktop.sh legion` |
+| `private/scripts/server-vm.sh` | Mac | Start, stop, check and test the server's Windows VM |
 | `private/scripts/windows/Build-Distribution.ps1` | Legion, VM | Focused tests and MSI build |
 | `private/scripts/windows/Install-Msi.ps1` | Legion | Silent install or update, plus checks |
 | `private/scripts/windows/Remove-UnsignedMsiHelper.ps1`, `Use-SignedJavaLauncher.ps1` | Legion, VM (during packaging) | Smart App Control fixes inside the MSI |

@@ -235,7 +235,7 @@ server_fetch() {
 vm_build() {
     step "Server VM: check it's running"
     ssh "$SERVER_HOST" "pgrep -f '^/usr/bin/qemu-system-x86_64 -name windows-build ' >/dev/null" \
-        || fail "the Windows VM isn't running. Start it with: ssh -t $SERVER_HOST /srv/vms/windows-build/start.sh"
+        || fail "the Windows VM isn't running. Start it with: private/scripts/server-vm.sh start --headless"
     windows_sync "Server VM" "$VM_HOST" "$VM_DIR"
     step "Server VM: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the MSI"
     windows_ps "$VM_HOST" "$VM_DIR" "& .\\private\\scripts\\windows\\Build-Distribution.ps1$( [ "$TESTS" -eq 1 ] || echo ' -SkipTests')" \
