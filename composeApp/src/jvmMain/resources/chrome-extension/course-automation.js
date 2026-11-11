@@ -203,6 +203,17 @@
         try { await node.play(); success = true; } catch {}
       } else if ((action.kind === 'click' && !/quiz|assessment|exam|submit|delete|purchase/i.test(label(node))) || progressActionAllowed(action, node) || assessmentActionAllowed(action, node)) {
         node.scrollIntoView({ block: 'center' });
+        // A radio click does not navigate away. Verify that the site actually selected the
+        // requested answer before acknowledging it; otherwise the Kotlin runner would wait for
+        // a change that never happened and appear to have answered the question.
+        if (action.kind === 'assessmentAnswer') {
+          try { node.click(); } catch {}
+          const assessment = assessmentInventory();
+          success = assessment?.questions.some((question) => question.options.some((option) =>
+            option.id === action.element && option.selected)) === true;
+          await chrome.runtime.sendMessage({ type: 'courseAction', session, document: documentId, request: action.request, success });
+          return;
+        }
         // Report before clicking, because navigation can destroy this document immediately.
         await chrome.runtime.sendMessage({ type: 'courseAction', session, document: documentId, request: action.request, success: true });
         const stillAuthorized = await chrome.runtime.sendMessage({ type: 'courseHello' });

@@ -523,10 +523,13 @@ class PageControllerTest {
         val action = lastCommand().courseAutomation!!.action!!
         bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("courseAction", session, request = action.request, success = true)))
         runCurrent()
-        val question = CourseQuestion("q0", "Unknown question?", listOf(CourseOption("a", "A"), CourseOption("b", "B")))
+        // A manually selected answer opens the save-to-bank dialog, but must not suppress the
+        // audible missing-answer warning.
+        val question = CourseQuestion("q0", "Unknown question?", listOf(CourseOption("a", "A"), CourseOption("b", "B", selected = true)))
         val test = course.copy(path = "/dashboard/courses/abc/test/test1", assessment = CourseAssessment("Wellness", listOf(question), totalQuestions = 1))
         send(test)
         assertEquals(1, desktop.alerts)
+        assertNotNull((controller.state.value.activity as PageActivity.Automation).manualAnswer)
         assertTrue((controller.state.value.activity as PageActivity.Automation).detail.contains("Unknown question?"))
         assertNull(lastCommand().courseAutomation!!.action)
         send(test)

@@ -224,7 +224,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         if (success && pending.kind != "play") clicks++
         if (success) nextActionAt = maxOf(nextActionAt, now + waitAfterClickMillis.coerceIn(0, 86_400_000))
         if (!success && pending.kind != "play") {
-            detail = "The page changed before the action. Stop and start again to retry."
+            detail = if (pending.kind == "assessmentAnswer") {
+                attention = "${pending.document}:answer:${pending.element}"
+                "Chrome could not select the saved answer. Select it manually in Chrome, then continue."
+            } else "The page changed before the action. Stop and start again to retry."
             blockedDocument = pending.document
         }
         action = null
@@ -330,7 +333,14 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 detail = "This run watches videos only. Assessments are left for a later run. Return to the course in Chrome to continue videos."
                 return
             }
-            val assessment = snapshot.assessment ?: return
+            val rawAssessment = snapshot.assessment ?: return
+            // Active assessment pages do not always include a course link or title. Preserve the
+            // course title already learned from the module page so the local answer bank still
+            // matches on the live test route.
+            val assessment = rawAssessment.copy(module = rawAssessment.module.takeIf { it.isNotBlank() }
+                ?: currentModule
+                ?: moduleTitles[path]
+                ?: "")
             assessment.questions.forEach { observedQuestions.getOrPut(path) { mutableMapOf() }[CourseAnswerBank.normalize(it.text) + it.options.map { option -> CourseAnswerBank.optionText(option.text) }.sorted().joinToString("|")] = it }
             if (assessment.result == "failed") {
                 val failureToken = "$reportedPath:${snapshot.document}:${assessmentEpochs[path] ?: 0}:failed"

@@ -20,6 +20,21 @@ class CourseAssessmentTest {
     }
 
     @Test
+    fun `blank live assessment module reuses the course title for automatic answers`() {
+        val runner = CourseAutomationSession("s", answerAssessments = true, assessmentMode = AssessmentMode.Automatic)
+        runner.configureAnswers(bank)
+        val snapshot = CourseSnapshot("s", "doc", "$course/test/active", elements = listOf(
+            CourseElement("module", tag = "a", label = "Wellness", href = course), submit),
+            assessment = CourseAssessment("", listOf(q), submit = "submit", totalQuestions = 1))
+
+        runner.read(snapshot, 0)
+
+        assertEquals("Wellness", runner.currentModule)
+        assertEquals("assessmentAnswer", runner.action?.kind)
+        assertEquals("b", runner.action?.element)
+    }
+
+    @Test
     fun `review resumes answers automatically while manual never operates assessment controls`() {
         for (mode in listOf(AssessmentMode.Review, AssessmentMode.Manual)) {
             val runner = CourseAutomationSession("s", answerAssessments = true, assessmentMode = mode)

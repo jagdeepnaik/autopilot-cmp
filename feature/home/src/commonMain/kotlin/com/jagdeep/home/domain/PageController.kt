@@ -797,7 +797,7 @@ class PageController(
             kind = AssessmentAlertKind.Failure
         } else {
             val question = runner.attention
-            if (question == null || runner.manualAnswer != null) {
+            if (question == null) {
                 questionAlertKey = null
                 questionAlertAt = null
                 return
