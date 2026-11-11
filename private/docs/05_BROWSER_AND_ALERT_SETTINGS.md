@@ -1,4 +1,4 @@
-# 24 — Check the Chrome Extension and Alert Sounds
+# 05 — Check the Chrome Extension and Alert Sounds
 
 [All guides](00_INDEX.md) · [Install and test](03_INSTALL_AND_TEST_WINDOWS.md)
 

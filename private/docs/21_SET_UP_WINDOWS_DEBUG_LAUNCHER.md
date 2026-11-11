@@ -1,4 +1,4 @@
-# 13 — Set Up the AutoPilot Windows Debug Launcher
+# 21 — Set Up the AutoPilot Windows Debug Launcher
 
 [All guides](00_INDEX.md) · [Use the debugger](04_DEBUG_WINDOWS_FROM_MAC.md)
 

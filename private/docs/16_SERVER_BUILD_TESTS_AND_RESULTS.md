@@ -1,4 +1,4 @@
-# 18 — AutoPilot Server Build Tests and Recorded Results
+# 16 — AutoPilot Server Build Tests and Recorded Results
 
 [All guides](00_INDEX.md)
 
@@ -36,4 +36,4 @@ Fix/report test failures before release. Keep interactive UI/browser tests on th
 - A portable dependency cache was seeded at Windows `C:\BuildCache`; the stopped assistant build used it via a process-local environment setting. Ordinary commands above still work without it and may download uncached dependencies.
 - No build monitoring or automatic reruns will continue after the stop request. The Windows VM and existing website containers are left running.
 
-Full installation reference: [Debian and Windows setup](23_SERVER_SETUP_QUICK_LINKS.md).
+Full installation reference: [Debian and Windows setup](26_SERVER_SETUP_QUICK_LINKS.md).

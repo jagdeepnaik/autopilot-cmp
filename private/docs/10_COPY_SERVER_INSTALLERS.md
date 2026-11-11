@@ -1,4 +1,4 @@
-# 09 — Copy AutoPilot Installers from the Home Server
+# 10 — Copy AutoPilot Installers from the Home Server
 
 [All guides](00_INDEX.md)
 

@@ -21,7 +21,7 @@
 #
 # Remote machines always build from Git: the Mac's work must be committed; unpushed commits are
 # pushed; the target pulls and must end on the same commit. Uncommitted changes on either side are
-# never overwritten: the script stops and says what to do. See private/docs/26_ONE_COMMAND_BUILDS.md.
+# never overwritten: the script stops and says what to do. See private/docs/01_ONE_COMMAND_BUILDS.md.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -260,7 +260,7 @@ case "$TARGET" in
             sync) windows_sync Legion "$LEGION_HOST" "$LEGION_DIR" ;; build) legion_build ;;
             install) legion_build; legion_install ;; debug) legion_debug ;;
             all) legion_build; legion_install; legion_debug ;;
-            fetch) unsupported "Legion installs its own MSI; to copy it, see private/docs/02_COPY_WINDOWS_INSTALLER.md." ;;
+            fetch) unsupported "Legion installs its own MSI; to copy it, see private/docs/07_COPY_WINDOWS_INSTALLER.md." ;;
         esac ;;
     server)
         case "$ACTION" in

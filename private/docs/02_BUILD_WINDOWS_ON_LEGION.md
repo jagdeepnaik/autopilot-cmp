@@ -1,10 +1,10 @@
-# 01 — Build AutoPilot for Windows on Legion
+# 02 — Build AutoPilot for Windows on Legion
 
-[All guides](00_INDEX.md) · [Copy installer](02_COPY_WINDOWS_INSTALLER.md) · [Install and test](03_INSTALL_AND_TEST_WINDOWS.md)
+[All guides](00_INDEX.md) · [Copy installer](07_COPY_WINDOWS_INSTALLER.md) · [Install and test](03_INSTALL_AND_TEST_WINDOWS.md)
 
 ## ONE COMMAND — sync, build, install, debug
 
-From the Mac: `tools/desktop.sh legion` (or `tools/windows/legion.sh`). It pushes, pulls on Legion, builds with tests, installs and checks, then starts the debug run and tunnel. Add `install`, `build`, `debug` or `sync` to run only part of it. How it works, and the commands for the Mac and the home server: [26_ONE_COMMAND_BUILDS.md](26_ONE_COMMAND_BUILDS.md).
+From the Mac: `tools/desktop.sh legion` (or `tools/windows/legion.sh`). It pushes, pulls on Legion, builds with tests, installs and checks, then starts the debug run and tunnel. Add `install`, `build`, `debug` or `sync` to run only part of it. How it works, and the commands for the Mac and the home server: [01_ONE_COMMAND_BUILDS.md](01_ONE_COMMAND_BUILDS.md).
 
 The manual steps below do the same thing one command at a time.
 

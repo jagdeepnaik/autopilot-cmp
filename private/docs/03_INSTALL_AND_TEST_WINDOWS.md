@@ -1,12 +1,12 @@
 # 03 — Install and Test AutoPilot on Windows
 
-[All guides](00_INDEX.md) · [Build installer](01_BUILD_WINDOWS_ON_LEGION.md) · [Fix installer errors](05_FIX_WINDOWS_INSTALLER.md)
+[All guides](00_INDEX.md) · [Build installer](02_BUILD_WINDOWS_ON_LEGION.md) · [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
 
 ## PART E — INSTALL AND TEST — Legion desktop
 
 Use the physical Legion desktop for installer dialogs and GUI testing. SSH alone does not show the Windows screen. To install or update without touching the laptop, use [PART S — install over SSH](#part-s--install-or-update-over-ssh--from-the-mac) below, then check the window on the desktop.
 
-The current AutoPilot build removes the blocked unsigned Java MSI helper through `tools/windows/Remove-UnsignedMsiHelper.ps1`, and its shortcuts start the app through the bundled, Microsoft-signed `javaw.exe` because Smart App Control blocks the generated `AutoPilot.exe`. Always open AutoPilot from its Start menu or desktop shortcut. The recorded installation result and remaining validation are in [Windows installer diagnosis](17_WINDOWS_INSTALLER_DIAGNOSIS.md). Keep Smart App Control enabled. Successful installation on Legion does not establish trust on every recipient's PC; trusted signing remains a separate distribution step.
+The current AutoPilot build removes the blocked unsigned Java MSI helper through `tools/windows/Remove-UnsignedMsiHelper.ps1`, and its shortcuts start the app through the bundled, Microsoft-signed `javaw.exe` because Smart App Control blocks the generated `AutoPilot.exe`. Always open AutoPilot from its Start menu or desktop shortcut. The recorded installation result and remaining validation are in [Windows installer diagnosis](14_WINDOWS_INSTALLER_DIAGNOSIS.md). Keep Smart App Control enabled. Successful installation on Legion does not establish trust on every recipient's PC; trusted signing remains a separate distribution step.
 
 ### E1. Close AutoPilot normally
 
@@ -128,7 +128,7 @@ $sh = New-Object -ComObject WScript.Shell
 "Smart App Control blocks: " + @(Get-WinEvent -LogName 'Microsoft-Windows-CodeIntegrity/Operational' -MaxEvents 50 | Where-Object { $_.TimeCreated -gt $start -and $_.Id -eq 3077 }).Count
 ```
 
-Expected: `Valid`, both shortcuts pointing at `C:\Program Files\AutoPilot\runtime\bin\javaw.exe`, and `0` blocks. If a shortcut points at `AutoPilot.exe`, the MSI was built without the Smart App Control fix; see [Fix installer errors](05_FIX_WINDOWS_INSTALLER.md).
+Expected: `Valid`, both shortcuts pointing at `C:\Program Files\AutoPilot\runtime\bin\javaw.exe`, and `0` blocks. If a shortcut points at `AutoPilot.exe`, the MSI was built without the Smart App Control fix; see [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md).
 
 Optional quick launch check. It starts the app inside the SSH session, so no window appears on the desktop, and it closes it again after 15 seconds:
 
@@ -158,11 +158,11 @@ Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='MsiInstalle
 
 | Exit code or message | Meaning | What to do |
 | --- | --- | --- |
-| 1603 with Error 1723 naming a `Jp…` action | The MSI still has the unsigned helper | Rebuild from a commit that has the fix ([05](05_FIX_WINDOWS_INSTALLER.md), H4) |
+| 1603 with Error 1723 naming a `Jp…` action | The MSI still has the unsigned helper | Rebuild from a commit that has the fix ([08](08_FIX_WINDOWS_INSTALLER.md), H4) |
 | 1638 | This version, or a newer one, is already installed | Build a newer commit, or uninstall (S6) |
 | 1618 | Another installation is running | Wait for it to finish, then repeat S4 |
 | 1925 or "insufficient privileges" | The SSH session isn't elevated | Run S4 in PowerShell as Administrator on the Legion desktop |
-| App blocked when opened | The shortcut starts `AutoPilot.exe` | Rebuild with the Smart App Control fix ([05](05_FIX_WINDOWS_INSTALLER.md), H0b) |
+| App blocked when opened | The shortcut starts `AutoPilot.exe` | Rebuild with the Smart App Control fix ([08](08_FIX_WINDOWS_INSTALLER.md), H0b) |
 
 ### S8. One command from the Mac
 

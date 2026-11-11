@@ -1,6 +1,6 @@
-# 05 — Fix and Verify the AutoPilot Windows Installer
+# 08 — Fix and Verify the AutoPilot Windows Installer
 
-[All guides](00_INDEX.md) · [Normal installation](03_INSTALL_AND_TEST_WINDOWS.md) · [Diagnosis evidence](17_WINDOWS_INSTALLER_DIAGNOSIS.md)
+[All guides](00_INDEX.md) · [Normal installation](03_INSTALL_AND_TEST_WINDOWS.md) · [Diagnosis evidence](14_WINDOWS_INSTALLER_DIAGNOSIS.md)
 
 ## PART H — MSI UNDER SMART APP CONTROL — build, check, reinstall
 
@@ -36,7 +36,7 @@ To check an installed copy:
 
 Expected: `Valid`, then `C:\Program Files\AutoPilot\runtime\bin\javaw.exe`.
 
-Full evidence: [Windows installer diagnosis](17_WINDOWS_INSTALLER_DIAGNOSIS.md).
+Full evidence: [Windows installer diagnosis](14_WINDOWS_INSTALLER_DIAGNOSIS.md).
 
 ### H1. Push the code from the Mac
 

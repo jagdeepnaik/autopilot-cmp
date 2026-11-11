@@ -1,6 +1,6 @@
-# 06 — Start, Stop, and Monitor the Windows Build VM
+# 11 — Start, Stop, and Monitor the Windows Build VM
 
-[All guides](00_INDEX.md) · [Build in the VM](07_BUILD_WINDOWS_IN_SERVER_VM.md)
+[All guides](00_INDEX.md) · [Build in the VM](12_BUILD_WINDOWS_IN_SERVER_VM.md)
 
 ### 1.1 Windows VM: connect, check, start, monitor and stop
 

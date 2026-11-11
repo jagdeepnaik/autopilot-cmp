@@ -1,65 +1,62 @@
 # 00 — AutoPilot Documentation Index
 
-**Open this file first.** Files are numbered for sorting, not a requirement to run every step. Use 01–05 most often; 10–14 are one-time setup. Each guide links back here and to related tasks.
+**Open this file first.** The guides are numbered by how often you'll need them: 01–08 are everyday tasks, 09–12 are the home-server route, 13–17 are background reading, and 18–26 are one-time setup and old shortcut pages. Each guide links back here. Opening a guide doesn't start any build, installation or connection.
 
-## One command for every desktop machine
+Updated 11 November 2026.
 
-**[26_ONE_COMMAND_BUILDS.md](26_ONE_COMMAND_BUILDS.md)**: `tools/desktop.sh mac | legion | server | vm | all` syncs with Git, builds, installs or copies, and debugs. The guides below are the same steps done by hand.
+## 01–08 · Everyday
 
-## 01–05 · Frequently used — Legion Windows laptop
-
-| What you want to do | Open this file |
+| What you want to do | Guide |
 | --- | --- |
-| **Build and run focused tests** | [01_BUILD_WINDOWS_ON_LEGION.md](01_BUILD_WINDOWS_ON_LEGION.md) |
-| Copy the MSI to the Mac | [02_COPY_WINDOWS_INSTALLER.md](02_COPY_WINDOWS_INSTALLER.md) |
-| Install the MSI and test AutoPilot | [03_INSTALL_AND_TEST_WINDOWS.md](03_INSTALL_AND_TEST_WINDOWS.md) |
-| Debug the Windows app from the Mac | [04_DEBUG_WINDOWS_FROM_MAC.md](04_DEBUG_WINDOWS_FROM_MAC.md) |
-| Diagnose or verify the installer DLL fix | [05_FIX_WINDOWS_INSTALLER.md](05_FIX_WINDOWS_INSTALLER.md) |
+| **Sync, build, install and debug on any machine with one command** (`tools/desktop.sh`) | [01_ONE_COMMAND_BUILDS.md](01_ONE_COMMAND_BUILDS.md) |
+| Build the Windows MSI on Legion, step by step | [02_BUILD_WINDOWS_ON_LEGION.md](02_BUILD_WINDOWS_ON_LEGION.md) |
+| Install, update and test AutoPilot on Windows (desktop or over SSH) | [03_INSTALL_AND_TEST_WINDOWS.md](03_INSTALL_AND_TEST_WINDOWS.md) |
+| Debug the Windows app from Android Studio on the Mac | [04_DEBUG_WINDOWS_FROM_MAC.md](04_DEBUG_WINDOWS_FROM_MAC.md) |
+| Check the Chrome extension version and alert sounds after an update | [05_BROWSER_AND_ALERT_SETTINGS.md](05_BROWSER_AND_ALERT_SETTINGS.md) |
+| Add or update a versioned answer bank | [06_UPDATE_ANSWER_BANK.md](06_UPDATE_ANSWER_BANK.md) |
+| Copy an MSI between Legion and the Mac | [07_COPY_WINDOWS_INSTALLER.md](07_COPY_WINDOWS_INSTALLER.md) |
+| Fix installer errors: Error 1723, "Smart App Control blocked an app", "already installed" | [08_FIX_WINDOWS_INSTALLER.md](08_FIX_WINDOWS_INSTALLER.md) |
 
-**Usual order: Build → optionally copy → install and test.** Use `ssh home-legion` from Mac Terminal. The checkout is `C:\Users\jagde\Projects\autopilot-cmp`. Each task guide says which computer/window to use. Setup is already complete; do not repeat it for each build.
+**Usual order:** run `tools/desktop.sh legion` (or `mac`, `server`, `all`) from the Mac, then open the app on that machine and check it. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
 
-## 06–09 · Alternative builds — home server
+## 09–12 · Home server — Linux DEB and the Windows VM
+
+| What you want to do | Guide |
+| --- | --- |
+| Build the Linux DEB on Debian | [09_BUILD_LINUX_ON_SERVER.md](09_BUILD_LINUX_ON_SERVER.md) |
+| Copy server-built installers to the Mac | [10_COPY_SERVER_INSTALLERS.md](10_COPY_SERVER_INSTALLERS.md) |
+| Start, stop or monitor the server's Windows VM | [11_START_STOP_WINDOWS_BUILD_VM.md](11_START_STOP_WINDOWS_BUILD_VM.md) |
+| Build the MSI inside that VM (alternative to Legion) | [12_BUILD_WINDOWS_IN_SERVER_VM.md](12_BUILD_WINDOWS_IN_SERVER_VM.md) |
+
+`tools/desktop.sh server` and `tools/desktop.sh vm` run these steps in one command. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.
+
+## 13–17 · Background and recorded evidence
+
+| Topic | Guide |
+| --- | --- |
+| How AutoPilot works, from launch to the last click | [13_HOW_AUTOPILOT_WORKS.md](13_HOW_AUTOPILOT_WORKS.md) |
+| Why the Windows installer and app were blocked, and how that was verified | [14_WINDOWS_INSTALLER_DIAGNOSIS.md](14_WINDOWS_INSTALLER_DIAGNOSIS.md) |
+| Windows build and debug details, with recorded tests | [15_WINDOWS_BUILD_DEBUG_REFERENCE.md](15_WINDOWS_BUILD_DEBUG_REFERENCE.md) |
+| Server tests and earlier build results | [16_SERVER_BUILD_TESTS_AND_RESULTS.md](16_SERVER_BUILD_TESTS_AND_RESULTS.md) |
+| How SSH and its keys work | [17_UNDERSTAND_SSH_AND_KEYS.md](17_UNDERSTAND_SSH_AND_KEYS.md) |
+
+## 18–22 · One-time setup — already done
+
+Legion, the server and the VM are already set up. Use these only for a new machine, or to repair one.
 
 | Task | Guide |
 | --- | --- |
-| Start, stop, or monitor the Windows VM | [06_START_STOP_WINDOWS_BUILD_VM.md](06_START_STOP_WINDOWS_BUILD_VM.md) |
-| Build Windows inside that VM | [07_BUILD_WINDOWS_IN_SERVER_VM.md](07_BUILD_WINDOWS_IN_SERVER_VM.md) |
-| Build Linux on Debian | [08_BUILD_LINUX_ON_SERVER.md](08_BUILD_LINUX_ON_SERVER.md) |
-| Download server-built installers | [09_COPY_SERVER_INSTALLERS.md](09_COPY_SERVER_INSTALLERS.md) |
+| Set up SSH and PowerShell access on Legion | [18_SET_UP_WINDOWS_SSH.md](18_SET_UP_WINDOWS_SSH.md) |
+| Set up protected keys and the macOS Keychain | [19_SET_UP_PASSWORD_FREE_SSH.md](19_SET_UP_PASSWORD_FREE_SSH.md) |
+| Clone AutoPilot on Legion for the first time | [20_CLONE_AUTOPILOT_ON_LEGION.md](20_CLONE_AUTOPILOT_ON_LEGION.md) |
+| Register the `AutoPilot-Debug` launcher on Legion | [21_SET_UP_WINDOWS_DEBUG_LAUNCHER.md](21_SET_UP_WINDOWS_DEBUG_LAUNCHER.md) |
+| Install the home server and its Windows VM | [22_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md](22_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md) |
 
-These are separate machines and checkouts. Use the Legion guide for the laptop; use server guides only when choosing that route.
+## 23–26 · Old shortcut pages
 
-## 10–14 · One-time preparation — use only when needed
+Short pages left from an earlier layout. They only link to the guides above.
 
-| Task | Guide |
-| --- | --- |
-| Configure Legion SSH and Windows PowerShell access | [10_SET_UP_WINDOWS_SSH.md](10_SET_UP_WINDOWS_SSH.md) |
-| Configure protected keys and macOS Keychain | [11_SET_UP_PASSWORD_FREE_SSH.md](11_SET_UP_PASSWORD_FREE_SSH.md) |
-| Clone AutoPilot for the first time | [12_CLONE_AUTOPILOT_ON_LEGION.md](12_CLONE_AUTOPILOT_ON_LEGION.md) |
-| Register the interactive debug launcher | [13_SET_UP_WINDOWS_DEBUG_LAUNCHER.md](13_SET_UP_WINDOWS_DEBUG_LAUNCHER.md) |
-| Install the server and Windows VM | [14_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md](14_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md) |
-
-## 15–19 · Explanations and recorded evidence — occasional reference
-
-- [SSH principles and key types](15_UNDERSTAND_SSH_AND_KEYS.md)
-- [Windows build/debug details and recorded tests](16_WINDOWS_BUILD_DEBUG_REFERENCE.md)
-- [Installer diagnosis and verification evidence](17_WINDOWS_INSTALLER_DIAGNOSIS.md)
-- [Server tests and earlier build results](18_SERVER_BUILD_TESTS_AND_RESULTS.md)
-
-Updated 11 November 2026. Instructions are AutoPilot-specific; general explanations are kept in reference guides. No build, installation, or connection is started by opening these files.
-
-- [19 — How AutoPilot works](19_HOW_AUTOPILOT_WORKS.md)
-
-## 20–23 · Shortcut pages
-
-These compact pages group related tasks; the numbered task guides above contain the actual instructions.
-
-- [20 — Windows tasks](20_WINDOWS_TASKS_QUICK_LINKS.md)
-- [21 — Initial setup tasks](21_INITIAL_SETUP_QUICK_LINKS.md)
-- [22 — Build tasks](22_BUILD_TASKS_QUICK_LINKS.md)
-- [23 — Server setup tasks](23_SERVER_SETUP_QUICK_LINKS.md)
-
-## 24–25 · Browser, alerts, and answer-bank updates
-
-- [24 — Check extension versions and sounds](24_BROWSER_AND_ALERT_SETTINGS.md)
-- [25 — Update a versioned answer bank](25_UPDATE_ANSWER_BANK.md)
+- [23 — Windows tasks](23_WINDOWS_TASKS_QUICK_LINKS.md)
+- [24 — Initial setup tasks](24_INITIAL_SETUP_QUICK_LINKS.md)
+- [25 — Build tasks](25_BUILD_TASKS_QUICK_LINKS.md)
+- [26 — Server setup tasks](26_SERVER_SETUP_QUICK_LINKS.md)

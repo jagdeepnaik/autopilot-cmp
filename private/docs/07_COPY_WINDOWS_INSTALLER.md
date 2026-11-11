@@ -1,6 +1,6 @@
-# 02 — Copy the AutoPilot Windows Installer
+# 07 — Copy the AutoPilot Windows Installer
 
-[All guides](00_INDEX.md) · [Build first](01_BUILD_WINDOWS_ON_LEGION.md) · [Install and test](03_INSTALL_AND_TEST_WINDOWS.md)
+[All guides](00_INDEX.md) · [Build first](02_BUILD_WINDOWS_ON_LEGION.md) · [Install and test](03_INSTALL_AND_TEST_WINDOWS.md)
 
 ## PART D — COPY INSTALLERS — fresh Mac Terminal
 
@@ -24,7 +24,7 @@ scp 'home-legion:C:/Users/jagde/Projects/autopilot-cmp/composeApp/build/compose/
 shasum -a 256 "$HOME/Downloads/Builds/autopilot-cmp/"AutoPilot-*.msi
 ```
 
-Compare the same filename's hash with [the Windows build hash](01_BUILD_WINDOWS_ON_LEGION.md#c6-locate-the-autopilot-installer). If old versions are also present, identify the newly built version before sharing.
+Compare the same filename's hash with [the Windows build hash](02_BUILD_WINDOWS_ON_LEGION.md#c6-locate-the-autopilot-installer). If old versions are also present, identify the newly built version before sharing.
 
 ### D4. Optional: send a Mac-held installer back to Legion
 

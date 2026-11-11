@@ -26,7 +26,7 @@ tools/desktop.sh legion            # sync with Git, build, install, then debug o
 tools/desktop.sh mac | server | vm | all
 ```
 
-`tools/windows/legion.sh` is a shortcut for `tools/desktop.sh legion`. The commands for the Mac and the home server, and how it works, are in `private/docs/26_ONE_COMMAND_BUILDS.md`.
+`tools/windows/legion.sh` is a shortcut for `tools/desktop.sh legion`. The commands for the Mac and the home server, and how it works, are in `private/docs/01_ONE_COMMAND_BUILDS.md`.
 
 ## Install or update remotely from the Mac
 

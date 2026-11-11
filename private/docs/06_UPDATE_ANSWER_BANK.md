@@ -1,6 +1,6 @@
-# 25 — Update a Versioned Answer Bank
+# 06 — Update a Versioned Answer Bank
 
-[All guides](00_INDEX.md) · [Browser and alerts](24_BROWSER_AND_ALERT_SETTINGS.md)
+[All guides](00_INDEX.md) · [Browser and alerts](05_BROWSER_AND_ALERT_SETTINGS.md)
 
 ## Names and folders
 

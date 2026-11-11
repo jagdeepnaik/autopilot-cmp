@@ -1,6 +1,6 @@
-# 26 — One Command: Sync, Build, Install and Debug on Every Desktop Machine
+# 01 — One Command: Sync, Build, Install and Debug on Every Desktop Machine
 
-[All guides](00_INDEX.md) · [Manual Legion build](01_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](08_BUILD_LINUX_ON_SERVER.md)
+[All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](09_BUILD_LINUX_ON_SERVER.md)
 
 `tools/desktop.sh` runs the whole build chain for one machine, or all of them, from a Mac Terminal. Every step stops with a plain reason when something isn't right. The manual guides still work; this script runs the same commands in order.
 
@@ -66,7 +66,7 @@ Windows commands go through `ssh` → the remote default shell (Command Prompt o
 ### 4. Build
 
 - **Mac:** `./gradlew` with the focused tests, then `:composeApp:createReleaseDistributable`.
-- **Legion and the VM:** `tools/windows/Build-Distribution.ps1`. It runs the focused tests and then `:composeApp:packageReleaseMsi`, with two workers and a 2 GB heap. Packaging also patches the MSI so it installs and runs under Smart App Control: it removes jpackage's unsigned helper DLL and points the shortcuts at the signed `javaw.exe` (see [05](05_FIX_WINDOWS_INSTALLER.md)). The build output shows `Removed JpCaDll …` and `Pointed 2 shortcuts …`.
+- **Legion and the VM:** `tools/windows/Build-Distribution.ps1`. It runs the focused tests and then `:composeApp:packageReleaseMsi`, with two workers and a 2 GB heap. Packaging also patches the MSI so it installs and runs under Smart App Control: it removes jpackage's unsigned helper DLL and points the shortcuts at the signed `javaw.exe` (see [08](08_FIX_WINDOWS_INSTALLER.md)). The build output shows `Removed JpCaDll …` and `Pointed 2 shortcuts …`.
 - **Server:** the same Gradle settings, run with `nice` and `ionice`, so the websites keep priority.
 
 The focused tests are `core:automation`, the DGS study tests, the desktop data-path tests and the version test. They're quick checks, not the full suite.
@@ -95,7 +95,7 @@ Both debug runs build from source at the synced commit, so breakpoints match the
 | *The installed AutoPilot is open on Legion* | Close it normally on Legion, rerun |
 | *Version … is not newer than the installed …* | Commit a change and rerun, or uninstall first ([03, S6](03_INSTALL_AND_TEST_WINDOWS.md)) |
 | *the Windows VM isn't running* | `ssh -t home-server /srv/vms/windows-build/start.sh`, wait a minute, rerun |
-| *The AutoPilot-Debug task is not registered* | Run `tools\windows\Register-DebugLauncher.ps1` once on the Legion desktop ([13](13_SET_UP_WINDOWS_DEBUG_LAUNCHER.md)) |
+| *The AutoPilot-Debug task is not registered* | Run `tools\windows\Register-DebugLauncher.ps1` once on the Legion desktop ([21](21_SET_UP_WINDOWS_DEBUG_LAUNCHER.md)) |
 | *port 5005 is already in use* | Close the earlier tunnel or debug run (`lsof -nP -iTCP:5005`) |
 | A build or test failure | Read the Gradle output above the message; nothing was installed |
 
@@ -110,3 +110,20 @@ Both debug runs build from source at the synced commit, so breakpoints match the
 | `tools/windows/Remove-UnsignedMsiHelper.ps1`, `Use-SignedJavaLauncher.ps1` | Legion, VM (during packaging) | Smart App Control fixes inside the MSI |
 | `tools/windows/Start-Debug.ps1` | Legion (via the `AutoPilot-Debug` task) | Debug run from source |
 | `.run/AutoPilot-Mac-local.run.xml`, `.run/AutoPilot-Windows-SSH.run.xml` | Android Studio | Attach to `127.0.0.1:5005` |
+
+## Recorded run — 11 November 2026
+
+`tools/desktop.sh all` at commit `1a13630` (version 1.0.30):
+
+| Step | Result |
+| --- | --- |
+| Mac check and push | 1 commit pushed; Mac and GitHub on `1a13630` |
+| Mac build | Focused tests and `createReleaseDistributable`: BUILD SUCCESSFUL |
+| Mac install | `/Applications/AutoPilot.app` replaced; signature verified; version 1.0.30 |
+| Legion sync | Pulled to `1a13630` |
+| Legion build | BUILD SUCCESSFUL in 57 s; `JpCaDll` removed and both shortcuts pointed at the signed `javaw.exe` |
+| Legion install | Updated 1.0.29 → 1.0.30 in place; running 15 s after opening the shortcut; 0 Smart App Control blocks |
+| Server sync | Pulled to `1a13630` |
+| Server build | Focused tests and `packageReleaseDeb`: BUILD SUCCESSFUL in 1 min 13 s |
+| Server copy | `~/Downloads/Builds/AutoPilot/autopilot_1.0.30_amd64.deb`, SHA256 `37a14674…1133635`, matching the server |
+

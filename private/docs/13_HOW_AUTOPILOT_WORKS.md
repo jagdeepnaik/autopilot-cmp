@@ -1,4 +1,4 @@
-# 19 — How AutoPilot works
+# 13 — How AutoPilot works
 
 [All guides](00_INDEX.md)
 

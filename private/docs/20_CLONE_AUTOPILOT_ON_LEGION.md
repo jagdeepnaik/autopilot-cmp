@@ -1,6 +1,6 @@
-# 12 — Clone AutoPilot on Legion for the First Time
+# 20 — Clone AutoPilot on Legion for the First Time
 
-[All guides](00_INDEX.md) · [SSH setup](10_SET_UP_WINDOWS_SSH.md) · [Build after cloning](01_BUILD_WINDOWS_ON_LEGION.md)
+[All guides](00_INDEX.md) · [SSH setup](18_SET_UP_WINDOWS_SSH.md) · [Build after cloning](02_BUILD_WINDOWS_ON_LEGION.md)
 
 ## PART B — NEW PROJECT PREPARATION — once per app
 
@@ -28,4 +28,4 @@ git clone https://github.com/jagdeepnaik/autopilot-cmp.git C:\Users\jagde\Projec
 if ($LASTEXITCODE -ne 0) { throw 'Clone failed. Stop here.' }
 ```
 
-Continue with [C2: open AutoPilot](01_BUILD_WINDOWS_ON_LEGION.md#c2-open-autopilot) in the same window.
+Continue with [C2: open AutoPilot](02_BUILD_WINDOWS_ON_LEGION.md#c2-open-autopilot) in the same window.

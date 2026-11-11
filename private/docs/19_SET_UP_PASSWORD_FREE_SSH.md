@@ -1,6 +1,6 @@
-# 11 — Set Up Password-Free SSH with a Protected Key
+# 19 — Set Up Password-Free SSH with a Protected Key
 
-[All guides](00_INDEX.md) · [SSH setup](10_SET_UP_WINDOWS_SSH.md) · [Key explanations](15_UNDERSTAND_SSH_AND_KEYS.md)
+[All guides](00_INDEX.md) · [SSH setup](18_SET_UP_WINDOWS_SSH.md) · [Key explanations](17_UNDERSTAND_SSH_AND_KEYS.md)
 
 ## 8. Password authentication and connection sharing
 

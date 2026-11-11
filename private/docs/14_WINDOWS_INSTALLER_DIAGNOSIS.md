@@ -1,4 +1,4 @@
-# 17 — Windows installer failure — Legion diagnosis
+# 14 — Windows installer failure — Legion diagnosis
 
 [All guides](00_INDEX.md)
 

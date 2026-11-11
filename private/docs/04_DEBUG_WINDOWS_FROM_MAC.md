@@ -1,6 +1,6 @@
 # 04 — Debug AutoPilot on Windows from the Mac
 
-[All guides](00_INDEX.md) · [One-time launcher setup](13_SET_UP_WINDOWS_DEBUG_LAUNCHER.md)
+[All guides](00_INDEX.md) · [One-time launcher setup](21_SET_UP_WINDOWS_DEBUG_LAUNCHER.md)
 
 ## PART F — REMOTE DEBUGGING — selected app only
 
@@ -14,7 +14,7 @@ Sign into the Legion desktop. In **Windows SSH PowerShell**:
 Start-ScheduledTask -TaskName 'AutoPilot-Debug'
 ```
 
-This uses the configured interactive launcher on the signed-in desktop. If the task is missing, follow [initial debug launcher setup](13_SET_UP_WINDOWS_DEBUG_LAUNCHER.md#14-how-the-debug-launcher-was-created). If AutoPilot is already running or port 5005 is occupied, close the intended previous debug session first; do not launch duplicates.
+This uses the configured interactive launcher on the signed-in desktop. If the task is missing, follow [initial debug launcher setup](21_SET_UP_WINDOWS_DEBUG_LAUNCHER.md#14-how-the-debug-launcher-was-created). If AutoPilot is already running or port 5005 is occupied, close the intended previous debug session first; do not launch duplicates.
 
 ### F2. Open the debugger tunnel
 

@@ -1,4 +1,4 @@
-# 15 — Understand SSH Connections and Keys
+# 17 — Understand SSH Connections and Keys
 
 [All guides](00_INDEX.md)
 
@@ -123,7 +123,7 @@ Never send the private file to Windows, put it in Git, or paste it into a chat. 
 
 The Debian machine has a direct LAN shortcut, `ssh home-server`, and an existing Cloudflare SSH endpoint, `ssh home-server-remote`. The latter invokes `/opt/homebrew/bin/cloudflared access ssh --hostname %h` from the Mac SSH configuration. Cloudflare browser authentication is separate from the server's SSH-key authentication.
 
-On 10 November 2026, after the owner completed Cloudflare Access sign-in, independent commands through the LAN and Cloudflare routes both succeeded with strict host-key checking and password prompts disabled. The hostname, Linux username, machine-identity hash and SSH host-key fingerprint matched exactly, confirming the same Debian destination. This verified the public Cloudflare route from the current network, rather than a separate mobile/external-network test. The complete commands, route-specific file copies, future Windows VM jump commands, and verification status are maintained in [the Debian build-server installation guide](14_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md#internet-access-through-cloudflare).
+On 10 November 2026, after the owner completed Cloudflare Access sign-in, independent commands through the LAN and Cloudflare routes both succeeded with strict host-key checking and password prompts disabled. The hostname, Linux username, machine-identity hash and SSH host-key fingerprint matched exactly, confirming the same Debian destination. This verified the public Cloudflare route from the current network, rather than a separate mobile/external-network test. The complete commands, route-specific file copies, future Windows VM jump commands, and verification status are maintained in [the Debian build-server installation guide](22_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md#internet-access-through-cloudflare).
 
 
 ## 24. References
