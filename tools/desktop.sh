@@ -190,7 +190,9 @@ while (-not (Get-NetTCPConnection -LocalPort $DEBUG_PORT -State Listen -ErrorAct
     step "Mac: debugger tunnel on 127.0.0.1:$DEBUG_PORT"
     echo "In Android Studio, choose \"AutoPilot Windows (SSH tunnel)\" and click Debug. The window appears on Legion."
     echo "Press Control-C here to close the tunnel."
-    ssh -N -o ExitOnForwardFailure=yes -L "127.0.0.1:$DEBUG_PORT:127.0.0.1:$DEBUG_PORT" "$LEGION_HOST"
+    # Its own connection (-S none): through a shared ControlMaster connection, -N opens a shell and
+    # the forward outlives Control-C.
+    ssh -S none -N -o ExitOnForwardFailure=yes -L "127.0.0.1:$DEBUG_PORT:127.0.0.1:$DEBUG_PORT" "$LEGION_HOST"
 }
 
 # --- Home server (Debian DEB) -------------------------------------------------------------------
