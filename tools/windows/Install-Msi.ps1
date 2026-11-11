@@ -6,7 +6,9 @@
 [CmdletBinding()]
 param(
     [string]$Msi,
-    [switch]$LaunchCheck
+    [switch]$LaunchCheck,
+    # Exit successfully, without reinstalling, when this version is already installed.
+    [switch]$SkipIfInstalled
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -30,6 +32,10 @@ $installed = Get-InstalledVersion
 Write-Output "MSI:       $Msi"
 Write-Output "SHA256:    $((Get-FileHash -LiteralPath $Msi).Hash)"
 Write-Output "Installed: $(if ($installed) { $installed } else { 'none' })"
+if ($SkipIfInstalled -and $installed -and $newVersion -and ([version]$newVersion -eq [version]$installed)) {
+    Write-Output "Version $installed is already installed; nothing to do."
+    return
+}
 if ($installed -and $newVersion -and ([version]$newVersion -le [version]$installed)) {
     throw "Version $newVersion is not newer than the installed $installed, so Windows won't update it. Build a newer commit, or uninstall first."
 }

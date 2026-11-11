@@ -6,7 +6,8 @@ $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Push-Location $projectRoot
 try {
     if (-not (Get-Command java -ErrorAction SilentlyContinue)) { throw 'Install a full JDK 21 and reopen PowerShell first.' }
-    $gradleTasks = @('--no-daemon', '--console=plain')
+    # Low-memory settings: the build laptop also runs Chrome and the app.
+    $gradleTasks = @('--no-daemon', '--console=plain', '--max-workers=2', '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8', '-Pkotlin.compiler.execution.strategy=in-process')
     if (-not $SkipTests) {
         $gradleTasks += @(':core:automation:jvmTest', ':feature:home:jvmTest', '--tests', '*DgsStudy*', ':composeApp:jvmTest', '--tests', '*DesktopDataPathsTest*')
     }

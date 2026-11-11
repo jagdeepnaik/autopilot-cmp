@@ -19,6 +19,15 @@ AutoPilot's Windows MSI must be built on Windows. GitHub Actions can produce it 
 3. Enable **OpenSSH Server** through Windows Settings → Optional features. Start the **OpenSSH SSH Server** service and set its startup type to Automatic. Windows may require administrator approval. Limit its firewall rule to your Mac's private-network address or subnet. Do not port-forward SSH or the debugger from your router. Use the same Windows account that will run AutoPilot. See [Microsoft's instructions](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse).
 4. On Windows, note the output of `whoami`, `hostname` and `ipconfig`. On the Mac, test `ssh WINDOWS_USER@WINDOWS_LAN_IP`. Verify the host-key fingerprint on the Windows laptop before accepting the new host. Never send passwords/private keys in chat. SSH-key authentication can be set up afterwards.
 
+## One command from the Mac
+
+```bash
+tools/windows/legion.sh            # sync with Git, build, install, then debug
+tools/windows/legion.sh install    # or: sync | build | debug; add --no-tests to skip tests
+```
+
+It pushes unpushed commits, pulls on Legion, and refuses to run if either side has uncommitted changes. It then builds with `Build-Distribution.ps1` and installs with `Install-Msi.ps1`. Last, it starts the `AutoPilot-Debug` task and opens the 5005 tunnel for the **AutoPilot Windows (SSH tunnel)** configuration. Set `LEGION_HOST` and `LEGION_DIR` for another machine or folder.
+
 ## Install or update remotely from the Mac
 
 After a build, `Install-Msi.ps1` installs or updates AutoPilot silently from the newest MSI and checks the result. Close AutoPilot normally on the desktop first:
