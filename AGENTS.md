@@ -5,6 +5,8 @@ This file has two parts:
 - **Part A — Core CMP instructions:** reusable coding preferences, project structure, and engineering guidelines applicable to all CMP projects using this template.
 - **Part B — Vaulty-specific instructions:** project conventions and constraints that supplement Part A.
 
+**Project guides:** start at [the documentation index](private/docs/00_INDEX.md). It lists every guide in `private/docs/` by how often it is used: one-command builds, installing, debugging, the home server, the Git guide and setup.
+
 All implementation plans, proposals, roadmaps, and project-specific planning decisions belong in `private/plans/`. Keep product requirements, phase tracking, and implementation status out of `AGENTS.md`.
 
 # Part A — Core CMP instructions
@@ -249,4 +251,5 @@ private/
 ## Project documentation
 
 - Keep plans, proposals, roadmaps, phase tracking, and implementation status in `private/plans/`; follow Part A's "Private folder" layout for the rest of `private/`. Part B contains durable project instructions and links, not the plans themselves.
+- [The documentation index](private/docs/00_INDEX.md) is the entry point to every guide in `private/docs/`. Keep it current whenever a guide is added, renamed or renumbered.
 - `private/zynk-cmp-main/` is a read-only reference copy of the Zynk template project (git-ignored). Use it to match patterns; never edit it or depend on it from the build.
