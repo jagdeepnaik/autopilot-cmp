@@ -153,7 +153,13 @@ internal fun RunPanel(
                     dismissButton = { TextButton(onClick = onStop) { Text("Not now — stop routine") } },
                 )
             }
-            if (activity is PageActivity.Automation && activity.approval != null) {
+            if (activity is PageActivity.Automation && activity.approval?.kind == com.jagdeep.home.domain.CourseApprovalKind.SubmitAssessment) {
+                AlertDialog(onDismissRequest = {}, title = { Text("Submit assessment?") },
+                    text = { Text("All answers for ${activity.approval.module} are selected. Review them in Chrome before approving the final submission.") },
+                    confirmButton = { TextButton(onClick = { onApproveAssessment(activity.approval.token) }) { Text("Approve submission") } },
+                    dismissButton = { TextButton(onClick = onStop) { Text("Stop without submitting") } })
+            }
+            if (activity is PageActivity.Automation && activity.approval != null && activity.approval.kind != com.jagdeep.home.domain.CourseApprovalKind.SubmitAssessment) {
                 Button(onClick = { onApproveAssessment(activity.approval.token) }) {
                     Text(when(activity.approval.kind) {
                         com.jagdeep.home.domain.CourseApprovalKind.StartAssessment -> "Allow assessment attempt"

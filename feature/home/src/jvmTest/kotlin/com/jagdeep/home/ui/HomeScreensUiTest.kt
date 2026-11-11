@@ -62,7 +62,7 @@ class HomeScreensUiTest {
         runOnIdle {
             val saved=repo.library.value!!.selected as com.jagdeep.home.domain.DgsELearningRoutine
             assertEquals(1.0,saved.playbackSpeed)
-            assertEquals("dgs-elearning.json",saved.answerBankFile)
+            assertEquals(com.jagdeep.shared.answers.DEFAULT_DGS_ANSWER_BANK_FILE,saved.answerBankFile)
         }
     }
 

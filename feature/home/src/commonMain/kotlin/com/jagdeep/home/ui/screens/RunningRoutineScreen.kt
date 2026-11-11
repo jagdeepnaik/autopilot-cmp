@@ -109,8 +109,8 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                     Detail("Wait after each click","${page.routine.waitAfterClickMillis/1000} seconds")
                     Detail("Learning order",if(page.routine.learningOrder==LearningOrder.VideosFirst) "All videos first; confirm before assessments" else "Assessment after each module")
                     Detail("Assessment mode",if(!page.routine.answerAssessments) "Manual outside the routine" else when(page.routine.assessmentMode) {
-                        AssessmentMode.Manual -> "Manual answers; approve starts and submissions"
-                        AssessmentMode.Review -> "Saved answers; approve starts and submissions"
+                        AssessmentMode.Manual -> "Fully manual in Chrome"
+                        AssessmentMode.Review -> "Automatic answers; confirm final submission"
                         AssessmentMode.Automatic -> "Automatic; unknown answers pause for help"
                     })
                     Detail("Answer bank",page.routine.answerBankFile)

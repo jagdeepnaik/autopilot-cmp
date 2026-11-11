@@ -23,16 +23,16 @@ internal fun CourseAutomationGuide() {
                     "2. Open https://sagarmeinyog.com/dashboard in Chrome and sign in yourself. Wait until your courses are visible. The app does not sign in for you.",
                     "3. Select a Sagar Mein Yog automation routine. Check its assessment mode, playback speed and wait after each click. Start the routine, then leave the course tab selected with Chrome in front. Keep the app running.")
                 GuideSection("Progress for each user",
-                    "Before a run, confirm your local profile name in the app. Reuse it for the same website account; choose distinct profile names if users share a displayed name. No password is stored.",
-                    "The app reads every page of Your Progress before continuing and after each completed module. Keep All Time selected and clear progress filters. Assessment attempts and scores are saved locally; video completion is checked on course pages. Earlier confirmed passes are preserved even when a newer attempt is unsubmitted.",
-                    "Use Saved progress by user inside the course routine’s options to view history later. A changed signed-in name, failed progress import or local save error pauses the run.")
+                    "At each start, choose a saved profile or create one. The most recently used profile appears first. Pick the account signed into Chrome; assessment pages do not need to show a username. No password is stored.",
+                    "After you select a profile, the app reads Your Progress at every start and saves the results before choosing courses. Keep All Time selected and clear filters. Video completions and assessment results are saved as they happen; a final verification runs only if there are new completions. An already active assessment defers the startup check until it is safe to leave. Earlier confirmed passes are preserved even when a newer attempt is unsubmitted.",
+                    "Use Saved progress by user inside the course routine’s options to view history later. Your chosen profile stays active throughout this run. A failed progress import or local save error pauses the run.")
                 GuideSection("App: follow the course",
                     "Reads the visible course controls and completion status, opens available unfinished video lessons, waits for playback to finish and looks for the next lesson. After a module’s videos finish, it handles the assessment according to your routine settings, then returns to the dashboard to continue.",
                     "Completed content is skipped when the site reports it complete. Locked, unavailable or unrecognized steps require your attention; the app cannot guarantee every course will finish.")
                 GuideSection("You: choose assessment behavior",
                     "Assessments off: handle quizzes and assessments yourself.",
-                    "Manual: approve starts and submissions, and choose each answer in Chrome.",
-                    "Review approvals: the app selects saved answers; you approve each assessment start and submission.",
+                    "Manual: start, answer, move between questions and submit yourself in Chrome. The app does not click assessment controls.",
+                    "Review approvals: the app starts assessments and selects saved answers automatically. A popup asks for approval before final submission.",
                     "Automatic: starting this routine authorizes assessment starts, saved-answer selection and submission. Starts can consume attempts. Unknown answers still pause; failed assessments still require a retry choice.")
                 GuideSection("When your help is needed",
                     "Unknown answer: check the bottom status bar. With Assessment sounds enabled in Settings, a reminder plays every 30 seconds. Choose an answer in Chrome, return to the app, then approve Save and continue only after checking it. Continue without saving uses it for this attempt only.",

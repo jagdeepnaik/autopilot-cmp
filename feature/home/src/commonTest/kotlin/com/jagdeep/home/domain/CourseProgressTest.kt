@@ -6,6 +6,58 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class CourseProgressTest {
+    @Test fun `profile picker is ready without any page snapshot and most recently used sorts first`() = runTest {
+        val store = Store().apply { profiles = listOf(
+            LearningAccount("sagarmeinyog:older", "Older", 900), LearningAccount("sagarmeinyog:recent", "Recent", 100),
+            LearningAccount("dgs:other", "DGS account", 1000)) }
+        val first = CourseProgressSession(store,"first",0)
+        first.prepareProfiles()
+        assertEquals(listOf("Older", "Recent"),first.request!!.profiles.map { it.displayName })
+        assertTrue(first.confirm(first.request!!.token,"sagarmeinyog:recent",10000))
+        val next = CourseProgressSession(store,"next",0)
+        next.prepareProfiles()
+        assertEquals(listOf("Recent", "Older"),next.request!!.profiles.map { it.displayName })
+        assertNull(next.summary)
+        assertTrue(next.blocksActions)
+        assertFalse(next.confirm("stale","Other",10001))
+    }
+
+    @Test fun `new profile can answer an active assessment without username and defer website verification`() = runTest {
+        val store = Store()
+        val tracking = CourseProgressSession(store,"run",0)
+        tracking.prepareProfiles()
+        assertTrue(tracking.confirm(tracking.request!!.token,"New person",100))
+        val question = CourseQuestion("q","Known?",listOf(CourseOption("a","A"),CourseOption("b","B")))
+        val active = snapshot().copy(path="/dashboard/courses/module/test/live",profileName=null,
+            assessment=CourseAssessment("Wellness",listOf(question),totalQuestions=1))
+        assertFalse(tracking.process(active,200))
+        assertNull(tracking.action)
+        assertFalse(tracking.blocksActions)
+        assertFalse(tracking.isChecking)
+        val runner = CourseAutomationSession("run",answerAssessments=true,assessmentMode=AssessmentMode.Automatic)
+        runner.configureAnswers(CourseAnswerBank.decode("""{"Wellness":[{"question":"Known?","options":["A","B"],"answer":"B"}]}"""))
+        runner.read(active,200)
+        assertEquals("assessmentAnswer",runner.action?.kind)
+        tracking.capture(active.copy(assessment=CourseAssessment("Wellness",result="passed")),runner,300)
+        assertTrue(store.saved.values.any { it.account=="sagarmeinyog:new person" && it.status=="passed" })
+        assertTrue(tracking.process(snapshot().copy(profileName=null),400))
+        assertEquals("progress",tracking.action?.element)
+    }
+
+    @Test fun `selected profiles isolate records when website username is absent`() = runTest {
+        val store=Store().apply {
+            profiles=listOf(LearningAccount("sagarmeinyog:a","A",10),LearningAccount("sagarmeinyog:b","B",10))
+            saved["a-record"]=LearningRecord("sagarmeinyog:a","a-record","Wellness","assessment","Assessment","passed",observedAt=10)
+        }
+        val tracking=CourseProgressSession(store,"run",0)
+        tracking.prepareProfiles()
+        assertTrue(tracking.confirm(tracking.request!!.token,"sagarmeinyog:b",20))
+        assertFalse(tracking.process(snapshot().copy(profileName=null),30))
+        assertEquals("sagarmeinyog:b",tracking.summary!!.account)
+        assertTrue(tracking.summary!!.records.isEmpty())
+        assertEquals(1,store.saved.values.count {it.account=="sagarmeinyog:a"})
+    }
+
     @Test fun `saved verified profile is restored without visiting progress and explicit refresh still works`() = runTest {
         val store = Store().apply {
             profiles = listOf(LearningAccount("sagarmeinyog:person", "Person", 500))
@@ -105,12 +157,18 @@ class CourseProgressTest {
     private class Store : CourseProgressRepository {
         override val available = true
         val saved = mutableMapOf<String, LearningRecord>()
+        val metadata = mutableMapOf<String, LearningRecord>()
         var fails = false
         var writes = 0
         var profiles = emptyList<LearningAccount>()
         override fun accounts() = flowOf(profiles)
-        override suspend fun records(account: String) = saved.values.filter { it.account == account }
-        override suspend fun save(account: LearningAccount, records: List<LearningRecord>) { if(fails) error("test write failed"); writes++; records.forEach { saved[it.account + it.key] = it } }
+        override suspend fun records(account: String) = (saved.values + metadata.values).filter { it.account == account }
+        override suspend fun save(account: LearningAccount, records: List<LearningRecord>) {
+            if(fails) error("test write failed")
+            profiles = profiles.filterNot { it.key == account.key } + account
+            if (records.any { it.kind != "profile-use" }) writes++
+            records.forEach { if (it.kind == "profile-use") metadata[it.account + it.key] = it else saved[it.account + it.key] = it }
+        }
     }
     private fun row(status: String = "YES", attempt: String = "1") = mapOf("Course Name" to "Wellness", "Test Title" to "Course Assessment", "Test Type" to "ASSESSMENT", "Attempt Number" to attempt, "Started At" to "09/11/2026, 00:01", "Completed At" to "09/11/2026, 00:10", "Passed" to status, "Percentage" to if(status == "NOT SUBMITTED") "—" else "90%")
     private fun snapshot(table: ProgressTable? = null, name: String = "Person") = CourseSnapshot("run","doc",if(table == null) "/dashboard" else "/dashboard/progress", profileName = name, progress = table,
@@ -142,7 +200,7 @@ class CourseProgressTest {
         runner.process(snapshot(),0); runner.confirm(runner.request!!.token,"Person")
         runner.process(snapshot(ProgressTable(true,page=1,pages=1,total=1,rows=listOf(row()),unfiltered=true)),1000)
         assertNull(runner.summary); assertTrue(runner.blocksActions); assertNull(runner.action)
-        assertTrue(runner.detail.contains("Could not save progress"))
+        assertTrue(runner.detail.contains("Could not"))
     }
 
     @Test fun `given chapters repeat part numbers then keep lessons distinct and update observed completion`() = runTest {
@@ -166,13 +224,14 @@ class CourseProgressTest {
         assertEquals("test",records.single().kind)
     }
 
-    @Test fun `given a local profile belongs to another user then do not merge records`() = runTest {
+    @Test fun `explicit saved profile selection works independently of website display name`() = runTest {
         val store = Store().apply { profiles = listOf(LearningAccount("sagarmeinyog:existing","Another person",1)) }
         val runner = CourseProgressSession(store,"run",0)
         runner.process(snapshot(),0); runner.confirm(runner.request!!.token,"existing")
         runner.process(snapshot(),1000)
         assertEquals(0,store.writes); assertNull(runner.action)
-        assertTrue(runner.detail.contains("different displayed user"))
+        assertEquals("Another person",runner.summary!!.displayName)
+        assertEquals("sagarmeinyog:existing",runner.summary!!.account)
     }
 
     @Test fun `given paginated history then save all pages before courses and retain earlier pass`() = runTest {
@@ -197,14 +256,16 @@ class CourseProgressTest {
         runner.process(snapshot(),0); runner.confirm(runner.request!!.token,"Person one")
         val table=ProgressTable(true,page=1,pages=1,total=1,rows=listOf(row()),unfiltered=false)
         assertTrue(runner.process(snapshot(table),1000)); assertEquals(0,store.writes)
-        assertTrue(runner.process(snapshot(table.copy(unfiltered=true),name="Someone else"),2000,learningActionPending=true)); assertNull(runner.action)
-        assertTrue(runner.detail.contains("user changed")); assertEquals(0,store.writes)
+        assertFalse(runner.process(snapshot(table.copy(unfiltered=true),name="Someone else"),2000,learningActionPending=true))
+        assertNull(runner.action)
+        assertEquals("Person one",runner.summary!!.displayName)
+        assertEquals(0,store.writes)
     }
     @Test fun `given invalid result or partial row counts then do not save or assume pass`() = runTest {
         assertNull(assessmentRecords("a",listOf(row("MAYBE")),0))
         val store=Store(); val runner=CourseProgressSession(store,"run",0)
         runner.process(snapshot(),0); runner.confirm(runner.request!!.token,"Person")
         runner.process(snapshot(ProgressTable(true,page=1,pages=1,total=2,rows=listOf(row()),unfiltered=true)),1000)
-        assertNull(runner.summary); assertEquals(0,store.writes); assertTrue(runner.isChecking)
+        assertTrue(runner.summary!!.records.isEmpty()); assertEquals(0,store.writes); assertTrue(runner.isChecking)
     }
 }

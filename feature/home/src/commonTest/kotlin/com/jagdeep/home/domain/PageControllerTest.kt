@@ -61,6 +61,13 @@ class PageControllerTest {
         val complete=CourseSnapshot(session,"doc","/dashboard/courses/a",profileName="Person",elements=listOf(CourseElement("done",label="Rewatch video",context="Part:1 Completed")))
         send(complete)
         controller.confirmProgressProfile((controller.state.value.activity as PageActivity.Automation).progressProfile!!.token,"u")
+        runCurrent()
+        val progress=complete.copy(path="/dashboard/progress",elements=listOf(CourseElement("home",href="/dashboard")),
+            progress=ProgressTable(true,page=1,pages=1,total=0,unfiltered=true))
+        send(progress);send(progress)
+        val back=command().courseAutomation!!.action!!
+        localBridge.messages.emit(Json.encodeToString(CourseWireEvent.serializer(),CourseWireEvent("courseAction",session,request=back.request,success=true)));runCurrent()
+        advanceTimeBy(1000)
         send(complete);advanceTimeBy(2000);send(complete)
         advanceTimeBy(1000);runCurrent()
         assertNotNull(controller.state.value.activity,"Do not end before the durable completion write")
@@ -335,6 +342,156 @@ class PageControllerTest {
         assertNull(lastCommand().courseAutomation)
     }
 
+    @Test fun `every start verifies website history even when selected profile was previously checked`() = runTest {
+        val localBridge=FakeBridge()
+        val account=com.jagdeep.persistence.room.learning.LearningAccount("sagarmeinyog:user","User",999)
+        val saved=mutableMapOf<String,com.jagdeep.persistence.room.learning.LearningRecord>()
+        saved["videos"]=com.jagdeep.persistence.room.learning.LearningRecord(account.key,"videos","Wellness","module-videos","Videos","completed",details="/dashboard/courses/module",observedAt=999)
+        val repository=object:CourseProgressRepository {
+            override val available=true
+            override fun accounts()=kotlinx.coroutines.flow.flowOf(listOf(account))
+            override suspend fun records(account:String)=saved.values.filter {it.account==account}
+            override suspend fun save(account:com.jagdeep.persistence.room.learning.LearningAccount,rows:List<com.jagdeep.persistence.room.learning.LearningRecord>) {rows.forEach {saved[it.key]=it}}
+        }
+        val controller=PageController(FakeDesktop(),localBridge,MutableStateFlow(AppPreferences()),backgroundScope,
+            FakeRunHistory(),{currentTime},{"start-check"},progressRepository=repository)
+        runCurrent();controller.start(CourseAutomationRoutine("r","Course",waitAfterClickMillis=0));runCurrent()
+        fun command()=Json.decodeFromString(HelperCommand.serializer(),localBridge.published.last())
+        val session=command().courseAutomation!!.session
+        val request=(controller.state.value.activity as PageActivity.Automation).progressProfile!!
+        controller.confirmProgressProfile(request.token,account.key);runCurrent()
+        var index=0
+        suspend fun send(snapshot:CourseSnapshot) {
+            val chunks=json.encodeToString(CourseSnapshot.serializer(),snapshot).chunked(1000)
+            val id="check-${++index}"
+            chunks.forEachIndexed {i,chunk->localBridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(),CourseWireEvent("courseChunk",session,id,i,chunks.size,chunk)));runCurrent()}
+        }
+        val dashboard=CourseSnapshot(session,"doc","/dashboard",elements=listOf(
+            CourseElement("progress",tag="a",href="/dashboard/progress"),
+            CourseElement("course",tag="a",href="/dashboard/courses/module",courseTitle="Wellness",context="Wellness In Progress Min. Pass 75% Duration 20min")))
+        send(dashboard)
+        assertEquals("progress",command().courseAutomation!!.action?.element,"Refresh history before opening any course")
+        val action=command().courseAutomation!!.action!!
+        localBridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(),CourseWireEvent("courseAction",session,request=action.request,success=true)));runCurrent()
+        advanceTimeBy(1000)
+        val row=mapOf("Course Name" to "Wellness","Test Title" to "Course Assessment","Test Type" to "ASSESSMENT",
+            "Attempt Number" to "1","Started At" to "today","Completed At" to "today","Passed" to "YES","Percentage" to "90%")
+        val table=dashboard.copy(path="/dashboard/progress",elements=dashboard.elements+CourseElement("home",href="/dashboard"),progress=ProgressTable(true,page=1,pages=1,total=1,rows=listOf(row),unfiltered=true))
+        send(table)
+        assertTrue(saved.values.any {it.account==account.key && it.course=="Wellness" && it.status=="passed"})
+        val summary=(controller.state.value.activity as PageActivity.Automation).progressSummary!!
+        assertEquals(90.0,summary.records.single {it.kind=="assessment"}.score)
+        assertEquals(1000,summary.checkedAt)
+        send(table)
+        val home=command().courseAutomation!!.action!!
+        assertEquals("home",home.element)
+        localBridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(),CourseWireEvent("courseAction",session,request=home.request,success=true)));runCurrent()
+        advanceTimeBy(1000);send(dashboard)
+        advanceTimeBy(2000);send(dashboard)
+        advanceTimeBy(100);runCurrent()
+        assertNull(controller.state.value.activity,"Everything is already completed; finish without a second progress scan")
+        val progressClicks=localBridge.published.map {Json.decodeFromString(HelperCommand.serializer(),it).courseAutomation?.action}
+            .filterNotNull().filter {it.element=="progress"}.distinctBy {it.request}
+        assertEquals(1,progressClicks.size)
+    }
+
+    @Test
+    fun `chosen profile unlocks username-less questions and each mode controls answering and submission`() = runTest {
+        for (mode in AssessmentMode.entries) {
+            val localBridge=FakeBridge()
+            val account=com.jagdeep.persistence.room.learning.LearningAccount("sagarmeinyog:user","Saved user",1)
+            val records=mutableMapOf<String,com.jagdeep.persistence.room.learning.LearningRecord>()
+            val repository=object : CourseProgressRepository {
+                override val available=true
+                override fun accounts()=kotlinx.coroutines.flow.flowOf(listOf(account))
+                override suspend fun records(account:String)=records.values.filter {it.account==account}
+                override suspend fun save(account:com.jagdeep.persistence.room.learning.LearningAccount,rows:List<com.jagdeep.persistence.room.learning.LearningRecord>) {rows.forEach {records[it.key]=it}}
+            }
+            val store=object : CourseAnswerBankStore {override suspend fun load()=CourseAnswerBank.decode("""{"Wellness":[{"question":"Known?","options":["A","B"],"answer":"B"}]}""")}
+            val controller=PageController(FakeDesktop(),localBridge,MutableStateFlow(AppPreferences()),backgroundScope,
+                FakeRunHistory(),{currentTime},{"profile-$mode"},answerBankStore=store,progressRepository=repository)
+            runCurrent()
+            assertNull(controller.start(CourseAutomationRoutine("r","Course",waitAfterClickMillis=0,
+                answerAssessments=true,assessmentMode=mode,learningOrder=LearningOrder.VideosFirst)))
+            runCurrent()
+            fun command()=Json.decodeFromString(HelperCommand.serializer(),localBridge.published.last())
+            val request=(controller.state.value.activity as PageActivity.Automation).progressProfile!!
+            assertEquals(account,request.profiles.single(),"Show picker before receiving any page")
+            assertNull(command().courseAutomation!!.action)
+            controller.confirmProgressProfile(request.token,account.key);runCurrent()
+            val session=command().courseAutomation!!.session
+            var index=0
+            suspend fun send(snapshot:CourseSnapshot) {
+                val chunks=json.encodeToString(CourseSnapshot.serializer(),snapshot).chunked(1000)
+                val id="sample-${++index}"
+                chunks.forEachIndexed {i,chunk->localBridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(),CourseWireEvent("courseChunk",session,id,i,chunks.size,chunk)));runCurrent()}
+            }
+            suspend fun acknowledge() {
+                val action=command().courseAutomation!!.action!!
+                localBridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(),CourseWireEvent("courseAction",session,request=action.request,success=true)));runCurrent()
+            }
+            val question=CourseQuestion("q0","Known?",listOf(CourseOption("a","A"),CourseOption("b","B")))
+            val snapshot=CourseSnapshot(session,"doc","/dashboard/courses/module/test/active",
+                elements=listOf(CourseElement("submit",label="Submit Assessment"),CourseElement("confirm",label="End Test"),CourseElement("home",href="/dashboard")),
+                assessment=CourseAssessment("Wellness",listOf(question),submit="submit",totalQuestions=1))
+            send(snapshot)
+            assertNull((controller.state.value.activity as PageActivity.Automation).progressProfile)
+            if(mode!=AssessmentMode.Manual) {assertEquals("assessmentAnswer",command().courseAutomation!!.action?.kind);acknowledge()}
+            else assertNull(command().courseAutomation!!.action)
+            val selected=snapshot.copy(assessment=snapshot.assessment!!.copy(questions=listOf(question.copy(options=question.options.map {it.copy(selected=it.id=="b")}))))
+            send(selected)
+            when(mode) {
+                AssessmentMode.Automatic->assertEquals("assessmentSubmit",command().courseAutomation!!.action?.kind)
+                AssessmentMode.Review->{
+                    assertNull(command().courseAutomation!!.action)
+                    val approval=(controller.state.value.activity as PageActivity.Automation).approval!!
+                    assertEquals(CourseApprovalKind.SubmitAssessment,approval.kind)
+                    controller.approveAssessment(approval.token);runCurrent();send(selected)
+                    assertEquals("assessmentSubmit",command().courseAutomation!!.action?.kind)
+                }
+                AssessmentMode.Manual->{assertNull(command().courseAutomation!!.action);assertNull((controller.state.value.activity as PageActivity.Automation).approval)}
+            }
+            if(mode!=AssessmentMode.Manual) {
+                acknowledge()
+                send(selected.copy(assessment=selected.assessment!!.copy(confirmSubmit="confirm")))
+                assertEquals("assessmentConfirmSubmit",command().courseAutomation!!.action?.kind)
+                acknowledge()
+            }
+            send(selected.copy(path="/dashboard/courses/module/assessment/result/result",assessment=CourseAssessment("Wellness",result="passed")))
+            assertTrue(records.values.any {it.account==account.key && it.kind=="assessment" && it.status=="passed"})
+            assertTrue(records.values.none {it.account!=account.key})
+            controller.stop();runCurrent()
+        }
+    }
+
+    @Test
+    fun `automatic open assessment flows through extension inventory to answer command`() = runTest {
+        val store = object : CourseAnswerBankStore {
+            override suspend fun load() = CourseAnswerBank.decode("""{"Wellness":[{"question":"Known?","options":["A","B"],"answer":"B"}]}""")
+        }
+        val controller = PageController(desktop, bridge, MutableStateFlow(AppPreferences()), backgroundScope, history,
+            { currentTime }, { "resume" }, answerBankStore = store)
+        runCurrent()
+        assertNull(controller.start(CourseAutomationRoutine("auto", "Course", waitAfterClickMillis = 0,
+            answerAssessments = true, assessmentMode = AssessmentMode.Automatic)))
+        runCurrent()
+        val session = lastCommand().courseAutomation!!.session
+        val snapshot = CourseSnapshot(session, "test-doc", "/dashboard/courses/abc/test/active",
+            assessment = CourseAssessment("Wellness", listOf(CourseQuestion("q0", "Known?",
+                listOf(CourseOption("a", "A"), CourseOption("b", "B")))), totalQuestions = 1))
+        val chunks = json.encodeToString(CourseSnapshot.serializer(), snapshot).chunked(1000)
+        chunks.forEachIndexed { index, chunk ->
+            bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(),
+                CourseWireEvent("courseChunk", session, "resumed-snapshot", index, chunks.size, chunk)))
+            runCurrent()
+        }
+        val action = lastCommand().courseAutomation!!.action!!
+        assertEquals("assessmentAnswer", action.kind)
+        assertEquals("b", action.element)
+        assertNull((controller.state.value.activity as PageActivity.Automation).approval)
+        controller.stop(); runCurrent()
+    }
+
     @Test
     fun `given unmatched assessment questions then alert once per question show status and never guess`() = runTest {
         val store = object : CourseAnswerBankStore {
@@ -362,12 +519,7 @@ class PageControllerTest {
         send(course)
         advanceTimeBy(2000)
         send(course)
-        val approval = (controller.state.value.activity as PageActivity.Automation).approval!!
-        controller.approveAssessment("stale")
-        assertEquals(2, desktop.broughtForward.size)
-        controller.approveAssessment(approval.token)
-        assertEquals(3, desktop.broughtForward.size, "Return focus to Chrome after app approval")
-        send(course)
+        assertNull((controller.state.value.activity as PageActivity.Automation).approval)
         val action = lastCommand().courseAutomation!!.action!!
         bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("courseAction", session, request = action.request, success = true)))
         runCurrent()

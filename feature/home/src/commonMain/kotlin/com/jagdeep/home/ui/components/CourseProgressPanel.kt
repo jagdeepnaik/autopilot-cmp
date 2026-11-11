@@ -13,14 +13,29 @@ import com.jagdeep.persistence.room.learning.LearningAccount
 @Composable
 internal fun CourseProgressPanel(request: ProgressProfileRequest?, summary: CourseProgressSummary?, confirm: (String,String)->Unit) {
     if (request != null) {
-        var name by remember(request.token) { mutableStateOf(request.displayName) }
-        AlertDialog(onDismissRequest = {}, title = { Text("Confirm progress profile") }, text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Signed in as ${request.displayName}. Progress will be stored locally under the profile below.")
-                OutlinedTextField(value = name, onValueChange = { if(it.length <= 120) name = it }, label = { Text("Local profile name") }, singleLine = true)
-                Text("Reuse the same profile for this account. If two users share a name, give each a different profile name. Never enter a password here.")
+        var selected by remember(request.token, request.profiles) { mutableStateOf(request.profiles.firstOrNull()?.key) }
+        var name by remember(request.token) { mutableStateOf("") }
+        AlertDialog(onDismissRequest = {}, title = { Text("Choose progress profile") }, text = {
+            Column(Modifier.heightIn(max = 450.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Choose the profile for the account signed into Chrome. The website does not show a username on assessment pages, so the app uses your choice throughout this run.")
+                if (request.loading) Text("Loading saved profiles…")
+                request.profiles.forEachIndexed { index, profile ->
+                    TextButton(modifier = Modifier.fillMaxWidth(), onClick = { selected = profile.key }) {
+                        RadioButton(selected = selected == profile.key, onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(profile.displayName)
+                            Text(profile.key.removePrefix("sagarmeinyog:") + if (index == 0) " · Most recent" else "", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                TextButton(enabled = !request.loading, onClick = { selected = null }) { Text("Create new profile") }
+                if (selected == null && !request.loading) {
+                    OutlinedTextField(value = name, onValueChange = { if(it.length <= 120) name = it }, label = { Text("Profile name") }, singleLine = true)
+                }
+                Text("Select the correct account before continuing. Use a distinct profile for each person. Never enter a password here.")
             }
-        }, confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { confirm(request.token,name) }) { Text("Use this profile") } })
+        }, confirmButton = { TextButton(enabled = !request.loading && (selected != null || name.isNotBlank()), onClick = { confirm(request.token, selected ?: name.trim()) }) { Text("Use this profile") } })
     }
     summary?.let { Text("Progress saved for ${it.displayName}: ${it.records.count { row -> row.kind == "assessment" && row.status == "passed" }} passed assessment attempts.", style = MaterialTheme.typography.bodySmall) }
 }

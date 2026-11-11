@@ -24,7 +24,8 @@ object NoCourseProgressRepository : CourseProgressRepository {
     val pageSize: Int? = null, val pageSizeControl: String? = null,
     val pageSizeOpen: Boolean = false, val pageSizeOptions: List<ProgressPageSize> = emptyList())
 @Serializable internal data class ProgressPageSize(val id: String, val value: Int)
-data class ProgressProfileRequest(val token: String, val displayName: String)
+data class ProgressProfileRequest(val token: String, val displayName: String = "",
+    val profiles: List<LearningAccount> = emptyList(), val loading: Boolean = false)
 data class CourseProgressSummary(val account: String, val displayName: String, val checkedAt: Long, val records: List<LearningRecord>)
 
 internal fun assessmentRecords(account: String, rows: List<Map<String,String>>, now: Long): List<LearningRecord>? = runCatching {

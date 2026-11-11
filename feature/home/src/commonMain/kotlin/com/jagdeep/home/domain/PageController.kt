@@ -191,19 +191,28 @@ class PageController(
         historySelection = account
         scope.launch {
             try {
-                val rows = progressRepository.records(account)
+                val rows = progressRepository.records(account).filter { it.kind != "profile-use" }
                 if (historySelection == account) mutableState.update { it.copy(savedProgress = CourseProgressSummary(account,profile.displayName,profile.checkedAt,rows), progressHistoryError = null) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { mutableState.update { it.copy(progressHistoryError = "Could not load saved progress.") } }
         }
     }
     override fun confirmProgressProfile(token: String, localName: String) {
-        if (courseProgress?.confirm(token, localName) != true) return
-        mutableState.update { state ->
-            val activity = state.activity as? PageActivity.Automation ?: return@update state
-            state.copy(activity = activity.copy(progressProfile = null))
+        val tracking = courseProgress ?: return
+        scope.launch {
+            courseProgressMutex.withLock {
+                if (courseProgress !== tracking) return@withLock
+                val accepted = tracking.confirm(token, localName, now())
+                if (accepted) tracking.requireSync()
+                mutableState.update { state ->
+                    val activity = state.activity as? PageActivity.Automation ?: return@update state
+                    state.copy(activity = activity.copy(progressProfile = tracking.request,
+                        progressSummary = tracking.summary, detail = tracking.detail))
+                }
+                publish()
+                if (accepted) automation.apps.bringToFront(BROWSER_APP_NAME)
+            }
         }
-        automation.apps.bringToFront(BROWSER_APP_NAME)
     }
     override fun confirmManualAnswer(token: String, save: Boolean) {
         val runner = courseAutomation ?: return
@@ -404,8 +413,8 @@ class PageController(
                 finalProgressCheckRequested = false
                 manualProgressCheckRequested = false
                 courseChunks.clear()
-                launchActivity(PageActivity.Automation(routine.copy(answerBankFile = bankFile), courseAutomation!!.detail), scrolling = false) { performCourseAutomation(routine) }
-                automation.apps.bringToFront(BROWSER_APP_NAME)
+                launchActivity(PageActivity.Automation(routine.copy(answerBankFile = bankFile), courseProgress?.detail ?: courseAutomation!!.detail, progressProfile = courseProgress?.request), scrolling = false) { performCourseAutomation(routine) }
+                if (courseProgress == null) automation.apps.bringToFront(BROWSER_APP_NAME)
                 null
             }
             is ScrollClickRoutine -> {
@@ -525,17 +534,27 @@ class PageController(
         val runner = courseAutomation
         var outcome = RunOutcome.StoppedByUser
         try {
+            courseProgress?.let { tracking ->
+                courseProgressMutex.withLock {
+                    tracking.prepareProfiles()
+                    mutableState.update { state ->
+                        val activity = state.activity as? PageActivity.Automation ?: return@update state
+                        state.copy(activity = activity.copy(progressProfile = tracking.request, detail = tracking.detail))
+                    }
+                    publish()
+                }
+            }
             if (routine.answerAssessments) {
                 val bank = try { activeAnswerBankStore.load() }
                 catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                 catch (_: Exception) { null }
                 runner?.configureAnswers(bank)
             }
-            automation.apps.bringToFront(BROWSER_APP_NAME)
+            if (courseProgress?.request == null) automation.apps.bringToFront(BROWSER_APP_NAME)
             while (true) {
                 if (!state.value.isConnected) { outcome = RunOutcome.BrowserDisconnected; break }
                 if (runner != null) updateAssessmentAlerts(runner)
-                if (runner != null && now() - lastCourseInventoryAt > 5_000 && runner.approval == null && runner.attention == null && runner.failure == null && runner.manualAnswer == null) {
+                if (runner != null && now() - lastCourseInventoryAt > 5_000 && runner.approval == null && runner.attention == null && runner.failure == null && runner.manualAnswer == null && courseProgress?.request == null) {
                     mutableState.update { state ->
                         val activity = state.activity as? PageActivity.Automation ?: return@update state
                         val progressStep = courseProgress?.takeIf { it.isChecking }?.detail
@@ -728,7 +747,7 @@ class PageController(
                 runner.read(snapshot, now())
                 tracking?.capture(snapshot, runner, now())
                 runner.configureProgress(tracking?.summary)
-                if (runner.completed && tracking != null && !finalProgressCheckRequested) {
+                if (runner.completed && tracking != null && tracking.hasLocalChanges && !finalProgressCheckRequested) {
                     finalProgressCheckRequested = true
                     tracking.requireSync()
                 }

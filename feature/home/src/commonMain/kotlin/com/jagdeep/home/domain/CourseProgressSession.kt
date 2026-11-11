@@ -5,13 +5,14 @@ import kotlinx.coroutines.flow.first
 
 /** Serial snapshot consumer. A complete, validated import must be durable before navigation resumes. */
 internal class CourseProgressSession(private val repository: CourseProgressRepository, private val token: String, private val wait: Long) {
-    private var identityMissing = true
+    private var identityMissing = false
     val blocksActions get() = fatal || request != null || identityMissing
     val isChecking get() = phase != "ready" || fatal
-    var request: ProgressProfileRequest? = null; private set
+    var request: ProgressProfileRequest? = ProgressProfileRequest("$token:profile", loading = true); private set
     var summary: CourseProgressSummary? = null; private set
+    var hasLocalChanges = false; private set
     var action: CourseAction? = null; private set
-    var detail = "Checking the signed-in user and saved progress."; private set
+    var detail = "Choose a saved progress profile or create one to continue."; private set
     private var profile: LearningAccount? = null
     private var phase = "check"
     private var sequence = 1_000_000_000L
@@ -25,16 +26,44 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
     private var sizeTarget: Int? = null
     private var scanSize: Int? = null
     private val collected = mutableListOf<Map<String,String>>()
-    private var profileChecked = false
+    private var profilesPrepared = false
+    private var deferredVerification = false
     private var lessonDigest = ""
     private var fatal = false
-    fun confirm(requestToken: String, localName: String): Boolean {
-        val current = request?.takeIf { it.token == requestToken } ?: return false
+    private fun learningRecords(rows: List<LearningRecord>) = rows.filter { it.kind != "profile-use" }
+    suspend fun prepareProfiles() {
+        if (profilesPrepared || fatal) return
+        try {
+            val profiles = repository.accounts().first().filter { it.key.startsWith("sagarmeinyog:") }
+            val lastUsed = profiles.associate { account -> account.key to
+                (repository.records(account.key).firstOrNull { it.key == "profile-last-used" }?.observedAt ?: account.checkedAt) }
+            request = request?.copy(profiles = profiles.sortedWith(
+                compareByDescending<LearningAccount> { lastUsed[it.key] ?: 0 }.thenBy { it.displayName.lowercase() }), loading = false)
+            profilesPrepared = true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { fatal = true; request = null; detail = "Could not load saved profiles. Check local storage and restart." }
+    }
+    suspend fun confirm(requestToken: String, localName: String, now: Long = 0): Boolean {
+        val current = request?.takeIf { it.token == requestToken && !it.loading } ?: return false
         val name = localName.trim()
-        if (name.isEmpty() || name.length > 120) return false
-        profile = LearningAccount("sagarmeinyog:" + CourseAnswerBank.normalize(name), current.displayName, 0)
-        request = null
-        return true
+        if (name.isEmpty()) return false
+        val existing = current.profiles.singleOrNull { it.key == name }
+            ?: current.profiles.singleOrNull { it.key == "sagarmeinyog:" + CourseAnswerBank.normalize(name) }
+        if (existing == null && name.length > 120) return false
+        val selected = existing ?: LearningAccount("sagarmeinyog:" + CourseAnswerBank.normalize(name), name, 0)
+        try {
+            val rows = repository.records(selected.key)
+            repository.save(selected, listOf(LearningRecord(selected.key, "profile-last-used", "", "profile-use",
+                "Last selected profile", "selected", observedAt = now)))
+            profile = selected
+            summary = CourseProgressSummary(selected.key, selected.displayName, selected.checkedAt, learningRecords(rows))
+            phase = if (selected.checkedAt > 0) "ready" else "check"
+            request = null
+            identityMissing = false
+            detail = "Using progress profile ${selected.displayName}."
+            return true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { fatal = true; detail = "Could not save the selected profile. Check local storage and restart."; return false }
     }
     fun requireSync() { if (!fatal) { phase = "check"; expectedPage = 1; totalPages = 0; totalRows = 0; collected.clear(); sizeChecked = false; sizeOpenAttempts = 0; sizeTarget = null; scanSize = null } }
     fun acknowledge(id: Long, success: Boolean, now: Long): Boolean {
@@ -52,7 +81,7 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
     }
     suspend fun capture(snapshot: CourseSnapshot, runner: CourseAutomationSession, now: Long) {
         val account = profile ?: return
-        if (fatal || identityMissing || request != null || !snapshot.top || snapshot.profileName?.trim() != account.displayName) return
+        if (fatal || identityMissing || request != null || !snapshot.top) return
         val updates = runner.pendingCompletions.values.toList()
         val records = updates.map { value -> LearningRecord(account.key, value.key, value.course, value.kind,
             value.title, "completed", details = value.details, observedAt = now) }.toMutableList()
@@ -67,7 +96,8 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
         if (changed.isEmpty()) { updates.forEach { runner.pendingCompletions.remove(it.key) }; return }
         try {
             repository.save(account, changed)
-            summary = CourseProgressSummary(account.key, account.displayName, account.checkedAt, repository.records(account.key))
+            hasLocalChanges = true
+            summary = CourseProgressSummary(account.key, account.displayName, account.checkedAt, learningRecords(repository.records(account.key)))
             updates.forEach { runner.pendingCompletions.remove(it.key) }
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: Exception) { fatal = true; action = null; detail = "Could not save completed course progress. Check local storage before continuing." }
@@ -77,17 +107,13 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
         if (!snapshot.top) return phase != "ready"
         if (fatal) return true
         if (snapshot.session != token || !snapshot.ready || snapshot.truncated) { identityMissing = true; detail = "Waiting for a complete page to check progress."; return true }
-        val name = snapshot.profileName?.trim()?.takeIf { it.isNotBlank() }
-        if (name == null) { identityMissing = true; detail = "Sign in to Sagar Mein Yog in Chrome, or reload the updated extension. Waiting for the displayed user name."; return true }
-        identityMissing = false
-        if (profile != null && profile!!.displayName != name) {
-            fatal = true; action = null; detail = "Signed-in user changed. Stop and restart to choose the correct progress profile."; return true
-        }
+        prepareProfiles()
+        if (fatal) return true
         if (profile == null) {
-            request = ProgressProfileRequest("$token:$name", name)
-            detail = "Confirm the progress profile for $name in the app."
+            detail = "Choose a saved progress profile or create one in the app. Use the profile for the account signed into Chrome."
             return true
         }
+        identityMissing = false
         if (learningActionPending) return false
         if (action != null) {
             if (now - pendingAt > 15_000) { fatal = true; action = null; detail = "Progress navigation was not confirmed. Stop and restart to retry." }
@@ -95,28 +121,16 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
         }
         if (now < nextAt && phase != "ready") return true
         val account = profile!!
-        if (!profileChecked) {
-            try {
-                val existing = repository.accounts().first().singleOrNull { it.key == account.key }
-                if (existing != null && existing.displayName != account.displayName) {
-                    fatal = true; detail = "This local profile belongs to a different displayed user. Stop, restart and choose a different local profile name."; return true
-                }
-                if (existing != null) {
-                    profile = existing
-                    summary = CourseProgressSummary(existing.key, existing.displayName, existing.checkedAt, repository.records(existing.key))
-                    if (existing.checkedAt > 0 && snapshot.path.trimEnd('/') != "/dashboard/progress") {
-                        phase = "ready"
-                        detail = "Using saved video and assessment progress for ${existing.displayName}."
-                    }
-                }
-                profileChecked = true
-            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (_: Exception) { fatal = true; detail = "Could not verify the local profile. Stop and restart after checking storage."; return true }
-        }
         val isProgress = snapshot.path.trimEnd('/') == "/dashboard/progress"
-        // Never leave a live timed attempt in order to refresh history.
-        if (phase != "ready" && snapshot.assessment?.let { it.result == null && it.questions.isNotEmpty() } == true) {
-            detail = "An assessment is active. Finish it manually before starting a progress-checked run."; return true
+        // A selected local profile is sufficient on test pages, which omit the account header.
+        // Defer the initial website import instead of navigating away from an active attempt.
+        if (phase != "ready" && snapshot.assessment?.let { it.result == null } == true) {
+            phase = "ready"
+            deferredVerification = true
+        }
+        if (deferredVerification && snapshot.assessment == null && snapshot.path in setOf("/dashboard", "/dashboard/courses", "/dashboard/progress")) {
+            deferredVerification = false
+            requireSync()
         }
         if (phase == "leaving" && !isProgress) phase = "ready"
         if (phase == "leaving") { detail = "Waiting for the course dashboard."; return true }
@@ -137,7 +151,7 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
                         val previous = summary?.records.orEmpty().associateBy { it.key }
                         val safe = observations.filterNot { previous[it.key]?.status == "completed" && it.status != "completed" }
                         repository.save(profile!!, safe)
-                        summary = CourseProgressSummary(account.key, account.displayName, profile!!.checkedAt, repository.records(account.key))
+                        summary = CourseProgressSummary(account.key, account.displayName, profile!!.checkedAt, learningRecords(repository.records(account.key)))
                         lessonDigest = digest
                     }
                     catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
@@ -216,7 +230,8 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
         try {
             val checked = account.copy(checkedAt = now)
             repository.save(checked, records)
-            summary = CourseProgressSummary(account.key,account.displayName,now,repository.records(account.key))
+            hasLocalChanges = false
+            summary = CourseProgressSummary(account.key,account.displayName,now,learningRecords(repository.records(account.key)))
             profile = checked
             phase = "return"
             detail = "Saved ${records.size} assessment and quiz attempts for ${account.displayName}."

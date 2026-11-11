@@ -308,7 +308,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             detail = message
         }
         fun requireApproval(kind: CourseApprovalKind, module: String, signature: String): Boolean {
-            if (assessmentMode == AssessmentMode.Automatic && !(kind == CourseApprovalKind.StartAssessment && CourseAnswerBank.normalize(module) in savedFailedTitles)) return true
+            val failedRetry = kind == CourseApprovalKind.StartAssessment && CourseAnswerBank.normalize(module) in savedFailedTitles
+            if (kind == CourseApprovalKind.StartAssessment && !failedRetry) return true
+            if (assessmentMode == AssessmentMode.Automatic && !failedRetry) return true
             val token = "$pageId:$kind:$signature"
             if (kind == CourseApprovalKind.StartAssessment && path in approvedStarts) return true
             if (kind == CourseApprovalKind.SubmitAssessment && approvedSubmission == token) return true
@@ -321,6 +323,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             return false
         }
         if (view == CourseView.Assessment) {
+            if (!snapshot.top) return
+            // An already active attempt must not be stranded by the video's-first run setting.
+            if (learningOrder == LearningOrder.VideosFirst && snapshot.assessment?.questions?.isNotEmpty() == true) assessmentPass = true
             if (learningOrder == LearningOrder.VideosFirst && !assessmentPass) {
                 detail = "This run watches videos only. Assessments are left for a later run. Return to the course in Chrome to continue videos."
                 return
@@ -364,6 +369,20 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 return
             }
             retryStartedAt = null
+            if (answerAssessments && assessmentMode == AssessmentMode.Manual && assessment.result == null) {
+                val unknown = assessment.questions.firstOrNull { answerBank?.answer(assessment.module, it) == null }
+                if (unknown != null) {
+                    attention = "$path:${CourseAnswerBank.normalize(unknown.text)}:" + unknown.options.map { CourseAnswerBank.optionText(it.text) }.sorted().joinToString("|")
+                    val selected = unknown.options.singleOrNull { it.selected && it.visible && it.enabled }
+                    if (selected != null && unknown.options.map { CourseAnswerBank.optionText(it.text) }.distinct().size == unknown.options.size) {
+                        manualAnswer = ManualAnswerRequest("$attention:${CourseAnswerBank.optionText(selected.text)}", assessment.module, unknown.text,
+                            unknown.options.map { it.text }, selected.text, persistedAnswerBank?.entry(assessment.module, unknown)?.answer)
+                    }
+                }
+                detail = if (unknown != null) "No exact saved answer for “${unknown.text.take(180)}”. Answer manually in Chrome; saving to the bank requires your approval."
+                    else "Manual mode: start, answer, move between questions and submit in Chrome. The app will not click assessment controls."
+                return
+            }
             if (answerAssessments && assessment.start != null) {
                 if (path in explicitlyStartedAssessments || path in submittedAssessments) {
                     detail = "This assessment was already started in this run. No additional attempt will be started."
@@ -379,12 +398,23 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 if (start != null) {
                     assessmentCourse = path
                     explicitlyStartedAssessments.add(path)
-                    issue(start, "assessmentStart", "Starting the explicitly approved module assessment.")
+                    issue(start, "assessmentStart", "Starting the module assessment using this routine’s mode.")
                 } else detail = "Waiting for the recognized Start Assessment control."
                 return
             }
-            if (!answerAssessments || (path !in videoFinishedCourses && path !in explicitlyStartedAssessments && path !in approvedRetryCourses) || assessmentCourse != path) {
-                detail = "Assessment paused. Start from the module and finish all its videos first."
+            if (!answerAssessments) {
+                detail = "Assessment handling is disabled. Enable Handle module assessments in this routine's options."
+                return
+            }
+            // An existing attempt can outlive the app session. Resume its questions without
+            // sending another start/retry or claiming the module videos are complete.
+            if (assessment.questions.isNotEmpty() && assessment.result == null && assessmentCourse != path) {
+                assessmentCourse = path
+                explicitlyStartedAssessments.add(path)
+            }
+            if (assessment.result == "passed") assessmentCourse = path
+            if (assessment.result != "passed" && ((path !in videoFinishedCourses && path !in explicitlyStartedAssessments && path !in approvedRetryCourses) || assessmentCourse != path)) {
+                detail = "Assessment paused. Start from the module or open its active assessment questions to continue."
                 return
             }
             if (assessment.result == "passed") {
@@ -417,7 +447,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 detail = "Assessment paused: duplicate question controls need review."; return
             }
             val answers = assessment.questions.map { q -> q to bank?.answer(assessment.module, q) }
-            val unknown = answers.firstOrNull { it.second == null || (assessmentMode == AssessmentMode.Manual && it.second?.selected != true) }?.first
+            val unknown = answers.firstOrNull { it.second == null }?.first
             if (unknown != null) {
                 attention = "$path:${CourseAnswerBank.normalize(unknown.text)}:" +
                     unknown.options.map { CourseAnswerBank.normalize(it.text) }.sorted().joinToString("|")
@@ -426,8 +456,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     manualAnswer = ManualAnswerRequest("$attention:${CourseAnswerBank.optionText(selected.text)}", assessment.module, unknown.text, unknown.options.map { it.text }, selected.text,
                         persistedAnswerBank?.entry(assessment.module, unknown)?.answer)
                 }
-                detail = if (assessmentMode == AssessmentMode.Manual) "Choose an answer manually in Chrome for “${unknown.text.take(180)}”."
-                    else "Assessment paused: no exact saved answer for “${unknown.text.take(180)}”. Check the question and options in $answerBankFile."
+                detail = "Assessment paused: no exact saved answer for “${unknown.text.take(180)}”. Check the question and options in $answerBankFile."
                 return
             }
             val confirmed = confirmedAnswers.getOrPut(path) { mutableMapOf() }

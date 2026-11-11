@@ -60,7 +60,11 @@ class LiveCourseAutomationTest {
         verifyFlow(spa = true, multiple = true, directNext = true, assessmentMode = true)
 
     @Test
-    fun `given the observed live test route and div question layout then the app answers only after approvals`() =
+    fun `automatic mode answers and submits in real Chrome without assessment approvals`() =
+        verifyFlow(spa = true, multiple = true, directNext = true, assessmentMode = true, liveLayout = true, automaticAssessment = true)
+
+    @Test
+    fun `given the observed live test route and div question layout then the app answers automatically and confirms final submission`() =
         verifyFlow(spa = true, multiple = true, directNext = true, assessmentMode = true, liveLayout = true)
 
     @Test
@@ -71,7 +75,7 @@ class LiveCourseAutomationTest {
     fun `given a live NOT CLEARED result then the app reports failure without retrying`() =
         verifyFlow(spa = true, multiple = true, directNext = true, assessmentMode = true, liveLayout = true, failedResult = true)
 
-    private fun verifyFlow(spa: Boolean, multiple: Boolean = false, pageFocused: Boolean = true, directNext: Boolean = false, assessmentMode: Boolean = false, liveLayout: Boolean = false, unknownAnswer: Boolean = false, manualStart: Boolean = false, failedResult: Boolean = false) {
+    private fun verifyFlow(spa: Boolean, multiple: Boolean = false, pageFocused: Boolean = true, directNext: Boolean = false, assessmentMode: Boolean = false, liveLayout: Boolean = false, unknownAnswer: Boolean = false, manualStart: Boolean = false, failedResult: Boolean = false, automaticAssessment: Boolean = false) {
         val chrome = System.getenv("AUTOPILOT_LIVE_CHROME_TEST") ?: return
         val reports = ConcurrentLinkedQueue<String>()
         val scripts = """
@@ -150,7 +154,7 @@ class LiveCourseAutomationTest {
             const listeners = [];
             Object.defineProperty(document, 'hasFocus', {value: () => $pageFocused});
             window.chrome = {
-              runtime: {id:'test', getPlatformInfo() {}, onMessage:{addListener(l){listeners.push(l)}}, onStartup:{addListener(){}}, onInstalled:{addListener(){}},
+              runtime: {id:'test', getManifest:()=>(${bundled("manifest.json")}), getPlatformInfo() {}, onMessage:{addListener(l){listeners.push(l)}}, onStartup:{addListener(){}}, onInstalled:{addListener(){}},
                 sendMessage(message){return new Promise(resolve => {let waiting=false; const sender={documentId:'fixture-document',tab:{id:1,url:'https://sagarmeinyog.com'+location.pathname},frameId:0,url:'https://sagarmeinyog.com'+${if (spa) "'/dashboard'" else "location.pathname"}}; for(const l of listeners) waiting=l(message,sender,resolve)===true || waiting; if(!waiting) resolve();});}},
               tabs:{query:async()=>[{id:1}],sendMessage:async()=>null},
               windows:{getLastFocused:async()=>({focused:true}),onFocusChanged:{addListener(){}}},alarms:{create(){},onAlarm:{addListener(){}}}
@@ -227,7 +231,7 @@ class LiveCourseAutomationTest {
             .redirectErrorStream(true).redirectOutput(File(profile, "chrome.log")).start()
         try {
             waitUntil("extension connected") { controller.state.value.isConnected }
-            assertNull(controller.start(CourseAutomationRoutine("new", "Course automation", waitAfterClickMillis = if (multiple) 0 else 5000, playbackSpeed = if (directNext) 2.0 else 1.0, answerAssessments = assessmentMode)))
+            assertNull(controller.start(CourseAutomationRoutine("new", "Course automation", waitAfterClickMillis = if (multiple) 0 else 5000, playbackSpeed = if (directNext) 2.0 else 1.0, answerAssessments = assessmentMode, assessmentMode = if (automaticAssessment) com.jagdeep.home.domain.AssessmentMode.Automatic else com.jagdeep.home.domain.AssessmentMode.Review)))
             if (unknownAnswer) {
                 waitUntil("unknown question alert") {
                     (controller.state.value.activity as? com.jagdeep.home.domain.PageActivity.Automation)?.approval?.let { controller.approveAssessment(it.token) }
@@ -250,9 +254,9 @@ class LiveCourseAutomationTest {
             }
             // These approvals apply only to the isolated fixture, never the user's account.
             waitUntil("automation completed; reports=$reports") {
-                (controller.state.value.activity as? com.jagdeep.home.domain.PageActivity.Automation)?.approval?.let {
-                    controller.approveAssessment(it.token)
-                }
+                val approval = (controller.state.value.activity as? com.jagdeep.home.domain.PageActivity.Automation)?.approval
+                if (automaticAssessment) assertNull(approval, "Automatic mode must not wait for assessment approval")
+                else approval?.let { controller.approveAssessment(it.token) }
                 history.records.value.isNotEmpty()
             }
             assertEquals(RunOutcome.Completed, history.records.value.single().outcome)

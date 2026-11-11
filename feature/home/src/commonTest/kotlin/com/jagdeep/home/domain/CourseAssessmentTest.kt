@@ -9,6 +9,40 @@ import kotlin.test.assertTrue
 
 class CourseAssessmentTest {
     @Test
+    fun `automatic mode resumes existing questions without starting another attempt`() {
+        val runner = CourseAutomationSession("s", answerAssessments = true, assessmentMode = AssessmentMode.Automatic)
+        runner.configureAnswers(bank)
+        runner.read(page(assessment = CourseAssessment("Wellness", listOf(q))).copy(path = "$course/test/existing"), 0)
+        assertEquals("assessmentAnswer", runner.action?.kind)
+        assertEquals("b", runner.action?.element)
+        assertNull(runner.approval)
+        assertTrue(runner.pendingCompletions.isEmpty(), "Resuming must not invent video completion")
+    }
+
+    @Test
+    fun `review resumes answers automatically while manual never operates assessment controls`() {
+        for (mode in listOf(AssessmentMode.Review, AssessmentMode.Manual)) {
+            val runner = CourseAutomationSession("s", answerAssessments = true, assessmentMode = mode)
+            runner.configureAnswers(bank)
+            runner.read(page(assessment = CourseAssessment("Wellness", listOf(q))), 0)
+            assertNull(runner.approval)
+            if (mode == AssessmentMode.Review) assertEquals("assessmentAnswer", runner.action?.kind)
+            else { assertNull(runner.action); assertNull(runner.attention); assertTrue(runner.detail.contains("Manual mode")) }
+        }
+    }
+
+    @Test
+    fun `resuming still pauses for unknown answers and disabled handling`() {
+        for (enabled in listOf(true, false)) {
+            val runner = CourseAutomationSession("s", answerAssessments = enabled, assessmentMode = AssessmentMode.Automatic)
+            runner.configureAnswers(bank)
+            runner.read(page(assessment = CourseAssessment("Wellness", listOf(q.copy(text = "Unknown?")))) , 0)
+            assertNull(runner.action)
+            if (enabled) assertNotNull(runner.attention) else assertTrue(runner.detail.contains("disabled"))
+        }
+    }
+
+    @Test
     fun `videos first pauses even in automatic mode then revisits only unfinished assessments after approval`() {
         val runner = CourseAutomationSession("s",0,answerAssessments=true,assessmentMode=AssessmentMode.Automatic,learningOrder=LearningOrder.VideosFirst)
         runner.configureAnswers(bank)
@@ -126,15 +160,20 @@ class CourseAssessmentTest {
     }
 
     @Test
-    fun `given manual mode without answer bank then approved start works`() {
+    fun `manual mode without a bank leaves starts and selected-question navigation to the user`() {
         val runner = CourseAutomationSession("s", 0, answerAssessments = true, assessmentMode = AssessmentMode.Manual)
-        val start = page(CourseElement("start", label = "Start Assessment"), assessment = CourseAssessment("Wellness", start = "start"))
-        runner.read(start, 0)
-        assertEquals(CourseApprovalKind.StartAssessment, runner.approval?.kind)
+        runner.read(page(CourseElement("start", label = "Start Assessment"), assessment = CourseAssessment("Wellness", start = "start")), 0)
+        assertNull(runner.approval)
         assertNull(runner.action)
-        runner.approveAssessment(runner.approval!!.token)
-        runner.read(start, 1000)
-        assertEquals("assessmentStart", runner.action?.kind)
+        val selected = q.copy(options = q.options.map { it.copy(selected = it.id == "b") })
+        runner.read(page(submit, CourseElement("next", label="Next"), assessment = CourseAssessment("Wellness", listOf(selected), next="next", submit="submit", totalQuestions=1)), 1000)
+        assertNull(runner.action)
+        assertNull(runner.approval)
+        assertNotNull(runner.manualAnswer)
+        assertTrue(runner.acceptManualAnswer(runner.manualAnswer!!.token))
+        runner.read(page(submit, assessment = CourseAssessment("Wellness", listOf(selected), submit="submit", totalQuestions=1)), 2000)
+        assertNull(runner.action)
+        assertNull(runner.approval)
     }
 
     @Test
@@ -145,8 +184,6 @@ class CourseAssessmentTest {
             val complete = CourseElement("rewatch", label = "Rewatch video", context = "Part:1 Completed")
             val snapshot = page(complete, CourseElement("assessment", label = "Assessment"))
             runner.read(snapshot, 0)
-            runner.read(snapshot, 2000)
-            if (mode != AssessmentMode.Automatic) runner.approveAssessment(runner.approval!!.token)
             runner.read(snapshot, 2000)
             runner.action?.let { runner.acknowledge(it.request, true, 2000) }
             return runner
@@ -159,7 +196,7 @@ class CourseAssessmentTest {
         val manual = started(AssessmentMode.Manual)
         manual.read(page(submit, assessment = CourseAssessment("Wellness", listOf(q), submit = "submit", totalQuestions = 1)), 3000)
         assertNull(manual.action)
-        assertNotNull(manual.attention)
+        assertNull(manual.attention)
         val routine = CourseAutomationRoutine(id = "r", name = "Course", answerAssessments = true, assessmentMode = AssessmentMode.Automatic)
         assertEquals(AssessmentMode.Automatic, (routine.toDraft().toRoutine("r") as CourseAutomationRoutine).assessmentMode)
     }
@@ -227,12 +264,7 @@ class CourseAssessmentTest {
         val complete = CourseElement("rewatch", label = "Rewatch video", context = "Part:1 Completed")
         runner.read(page(complete, CourseElement("assessment", label = "Assessment")), 0)
         runner.read(page(complete, CourseElement("assessment", label = "Assessment")), 2000)
-        assertNull(runner.action)
-        assertEquals(CourseApprovalKind.StartAssessment, runner.approval?.kind)
-        runner.approveAssessment("wrong-token")
-        assertNotNull(runner.approval)
-        runner.approveAssessment(runner.approval!!.token)
-        runner.read(page(complete, CourseElement("assessment", label = "Assessment")), 2000)
+        assertNull(runner.approval)
         assertEquals("assessmentOpen", runner.action?.kind)
         runner.acknowledge(runner.action!!.request, true, 2000)
         return runner
@@ -307,18 +339,13 @@ class CourseAssessmentTest {
     }
 
     @Test
-    fun `given a manually opened start screen with incomplete videos then explicit approval allows one attempt only`() {
+    fun `review starts an open assessment once and answers without start approval`() {
         val runner = CourseAutomationSession("s", answerAssessments = true).apply { configureAnswers(bank) }
-        val start = CourseElement("start", label = "Start Assessment")
-        val modal = page(start, assessment = CourseAssessment("Wellness", start = "start"))
+        val modal = page(CourseElement("start", label = "Start Assessment"), assessment = CourseAssessment("Wellness", start = "start"))
         runner.read(modal, 0)
-        assertNull(runner.action)
-        assertNotNull(runner.approval)
-        assertTrue(runner.detail.contains("videos may be incomplete"))
-        runner.approveAssessment(runner.approval!!.token)
-        runner.read(modal, 1000)
+        assertNull(runner.approval)
         assertEquals("assessmentStart", runner.action?.kind)
-        runner.acknowledge(runner.action!!.request, true, 1000)
+        runner.acknowledge(runner.action!!.request, true, 0)
         runner.read(page(assessment = CourseAssessment("Wellness", listOf(q))).copy(path = "$course/test/test1"), 2000)
         assertEquals("assessmentAnswer", runner.action?.kind)
         runner.acknowledge(runner.action!!.request, true, 2000)
@@ -395,10 +422,10 @@ class CourseAssessmentTest {
     }
 
     @Test
-    fun `given direct assessment entry or child frame then answers are never selected`() {
+    fun `direct assessment entry answers but child frames cannot select answers`() {
         val runner = CourseAutomationSession("s", answerAssessments = true).apply { configureAnswers(bank) }
         runner.read(page(submit, assessment = CourseAssessment("Wellness", listOf(q))), 0)
-        assertNull(runner.action)
+        assertEquals("assessmentAnswer",runner.action?.kind)
         val ready = ready()
         ready.read(page(submit, assessment = CourseAssessment("Wellness", listOf(q)), top = false), 3000)
         assertNull(ready.action)

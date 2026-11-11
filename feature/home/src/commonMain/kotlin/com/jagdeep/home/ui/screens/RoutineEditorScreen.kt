@@ -164,8 +164,8 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                     )
                     if (draft.answerAssessments) {
                         val modes = listOf(
-                            Triple(com.jagdeep.home.domain.AssessmentMode.Manual, "Manual", "Choose answers yourself. Approve assessment starts and submissions."),
-                            Triple(com.jagdeep.home.domain.AssessmentMode.Review, "Review approvals", "Use saved answers, but approve assessment starts and submissions. Existing routines keep this mode."),
+                            Triple(com.jagdeep.home.domain.AssessmentMode.Manual, "Manual", "Start, answer, navigate questions and submit yourself in Chrome."),
+                            Triple(com.jagdeep.home.domain.AssessmentMode.Review, "Review approvals", "Start and answer using saved matches. Ask in a popup before final submission."),
                             Triple(com.jagdeep.home.domain.AssessmentMode.Automatic, "Automatic", "Automatically start, answer and submit unfinished assessments. Videos first still asks once before the assessment pass. Unknown questions pause; failed retries need your choice."),
                         )
                         ChoiceSetting("Assessment mode",draft.assessmentMode,modes) { mode -> update { it.copy(assessmentMode=mode) } }
