@@ -59,7 +59,7 @@ core/persistence/           # preferences/, room/ (dao/, entity/, per-domain sto
 core/notifications/         # system notifications
 feature/shared/             # com.jagdeep.shared.<capability>: cross-feature contracts
 feature/<name>/             # one concrete feature each (layout below)
-private/                    # plans/, misc/, signing/ (misc/ and signing/ are git-ignored)
+private/                    # docs/, scripts/, plans/, data folders, misc/ (see "Private folder")
 ```
 
 - New package layout inside a concrete feature is:
@@ -181,9 +181,31 @@ When creating a new project from this template, perform a targeted product clean
 - When adding a database-backed repository, secure store, discovery service, or transfer runtime, initialize its platform implementation before the first feature uses it, expose it by interface, and keep lifecycle ownership at the app/Koin composition root. Close/cancel app-scoped resources through the appropriate platform lifecycle hook; do not recreate them on recomposition.
 - Platform `actual` factories may create platform implementations, but must not embed feature UI or business rules. Android/iOS/desktop settings persistence must all implement the same common store interface before being called cross-platform.
 
+## Private folder
+
+`private/` holds everything about the project that isn't app source: guides, scripts, plans, project data and scratch files. Keep this layout in every project built from this template:
+
+```text
+private/
+  docs/        # tracked: numbered user guides; 00_INDEX.md lists them by how often they're used
+  scripts/     # tracked: build, install and debug scripts (desktop.sh on the Mac, windows/ for Windows)
+  plans/       # git-ignored: implementation plans, proposals, roadmaps, phase tracking
+  <data>/      # tracked: project data the app or build needs, one folder per kind (for example answer-banks/)
+  signing/     # git-ignored: release keys and keystore.properties material; never commit
+  misc/        # git-ignored: anything temporary or unimportant
+```
+
+- **`misc/` is the default for anything temporary or unimportant:** backups, screenshots, captures, research notes, reports, scratch files, old copies and one-off helpers. It's git-ignored as a whole, so nothing in it reaches GitHub. Never make the build, the app or a tracked guide depend on a file in `misc/`; move the file to its proper folder first.
+- `docs/`: number the guides `NN_TOPIC.md` by how often they're used, keep `00_INDEX.md` current, and update every link when renumbering. Guides hold instructions and recorded results, not plans.
+- `scripts/` is tracked because the build machines pull it from Git and the build may run scripts from it. Reference scripts by their path under `private/scripts/` from Gradle, CI and the guides.
+- `plans/` follows the planning rule at the top of this file, and stays local.
+- Keep a data folder only for data that's part of the project. Put temporary exports and captures of it in `misc/`.
+- Don't add other top-level folders under `private/` without a reason. When unsure, use `misc/`.
+- Remote build machines (laptops, servers, VMs) build only from Git: commit and push on the Mac, pull on the machine, then build. Never copy source files to a build machine directly.
+
 ## Release builds and private files
 
-- Keep plans in `private/plans/`, personal notes in the git-ignored `private/misc/`, and signing material in the git-ignored `private/signing/`. Never commit keystores, `keystore.properties`, or passwords.
+- Keep plans in `private/plans/`, temporary and personal files in the git-ignored `private/misc/`, and signing material in the git-ignored `private/signing/` (see "Private folder"). Never commit keystores, `keystore.properties`, or passwords.
 - Android release signing reads a git-ignored `keystore.properties` at the project root (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`). Without it the release build is unsigned, so CI still builds. Generate a dedicated key per app with a random password and long validity, and keep an off-machine backup: losing it blocks app updates.
 - Build Android, Apple Silicon macOS, and iOS releases locally on the Mac. CI builds only what the Mac cannot (Windows first; Linux and Intel macOS when needed), and runs only when asked.
 - A packaged macOS app that uses the local network must declare `NSLocalNetworkUsageDescription` and its Bonjour service types (`NSBonjourServices`) in the Info.plist; otherwise macOS blocks discovery in the packaged app even though IDE runs work.
@@ -225,5 +247,5 @@ When creating a new project from this template, perform a targeted product clean
 
 ## Project documentation
 
-- Keep plans, proposals, roadmaps, phase tracking, and implementation status in `private/` (plans in `private/plans/`, personal notes in the git-ignored `private/misc/`). Part B contains durable project instructions and links, not the plans themselves.
+- Keep plans, proposals, roadmaps, phase tracking, and implementation status in `private/plans/`; follow Part A's "Private folder" layout for the rest of `private/`. Part B contains durable project instructions and links, not the plans themselves.
 - `private/zynk-cmp-main/` is a read-only reference copy of the Zynk template project (git-ignored). Use it to match patterns; never edit it or depend on it from the build.
