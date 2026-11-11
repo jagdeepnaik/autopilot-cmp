@@ -4,6 +4,19 @@
 
 Updated 11 November 2026.
 
+## Find it fast
+
+| I want to… | Go to |
+| --- | --- |
+| Build, install and debug with one command | [01 · Quick reference](01_ONE_COMMAND_BUILDS.md#quick-reference) |
+| Go to the scripts folder | [01 · Go to the scripts folder](01_ONE_COMMAND_BUILDS.md#go-to-the-scripts-folder) |
+| Start, stop or test the server VM | [11 · One line with the script](11_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script) · [by hand](11_START_STOP_WINDOWS_BUILD_VM.md#separately-by-hand) |
+| Install or update on Legion over SSH | [03 · Part S](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) |
+| Fix "Error 1723" or "Smart App Control blocked an app" | [08 · Fix installer errors](08_FIX_WINDOWS_INSTALLER.md) |
+| Fix "already installed" | [08 · H5 Updating an installed copy](08_FIX_WINDOWS_INSTALLER.md#h5-updating-an-installed-copy) |
+| See why a one-command run stopped | [01 · When it stops](01_ONE_COMMAND_BUILDS.md#when-it-stops) |
+| Debug the Windows app from the Mac | [04 · Debug from the Mac](04_DEBUG_WINDOWS_FROM_MAC.md) |
+
 ## 01–08 · Everyday
 
 | What you want to do | Guide |
@@ -25,7 +38,7 @@ Updated 11 November 2026.
 | --- | --- |
 | Build the Linux DEB on Debian | [09_BUILD_LINUX_ON_SERVER.md](09_BUILD_LINUX_ON_SERVER.md) |
 | Copy server-built installers to the Mac | [10_COPY_SERVER_INSTALLERS.md](10_COPY_SERVER_INSTALLERS.md) |
-| Start, stop or monitor the server's Windows VM (one line: `private/scripts/server-vm.sh start \| stop \| status \| test`, see [01](01_ONE_COMMAND_BUILDS.md#server-windows-vm--start-stop-and-test)) | [11_START_STOP_WINDOWS_BUILD_VM.md](11_START_STOP_WINDOWS_BUILD_VM.md) |
+| Start, stop, test or monitor the server's Windows VM (one line: `private/scripts/server-vm.sh`) | [11_START_STOP_WINDOWS_BUILD_VM.md](11_START_STOP_WINDOWS_BUILD_VM.md) |
 | Build the MSI inside that VM (alternative to Legion) | [12_BUILD_WINDOWS_IN_SERVER_VM.md](12_BUILD_WINDOWS_IN_SERVER_VM.md) |
 
 `private/scripts/desktop.sh server` and `private/scripts/desktop.sh vm` run these steps in one command. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.

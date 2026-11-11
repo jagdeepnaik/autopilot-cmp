@@ -2,6 +2,10 @@
 
 [All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](09_BUILD_LINUX_ON_SERVER.md)
 
+**On this page:** [Go to the scripts folder](#go-to-the-scripts-folder) · [Quick reference](#quick-reference) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
+
+**Related:** [Start/stop/test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
+
 `private/scripts/desktop.sh` runs the whole build chain for one machine, or all of them, from a Mac Terminal. Every step stops with a plain reason when something isn't right. The manual guides still work; this script runs the same commands in order.
 
 ## Go to the scripts folder
@@ -100,76 +104,9 @@ Both debug runs build from source at the synced commit, so breakpoints match the
 - **Mac:** stops if AutoPilot is already running or port 5005 is taken. It then runs `./gradlew :composeApp:run --debug-jvm`, which waits for the debugger. In Android Studio choose **AutoPilot Mac (local)** → Debug. Closing the app window ends the run.
 - **Legion:** checks that the `AutoPilot-Debug` task exists and that the installed app isn't open, since both would share `.autopilot`. It starts the task on the signed-in desktop and waits up to 15 minutes until the debug run listens on Legion's port 5005. It then opens `ssh -N -L 127.0.0.1:5005:127.0.0.1:5005 home-legion` on the Mac. In Android Studio choose **AutoPilot Windows (SSH tunnel)** → Debug; the window appears on Legion. Control-C in the Terminal closes the tunnel. Port 5005 is never opened to the network.
 
-## Server Windows VM — start, stop and test
+## Server Windows VM — start and stop
 
-The VM is a Windows guest on the home server. It uses 8 GB of the server's 16 GB, so start it only for a build and stop it afterwards. Starting or stopping it never touches Debian or the websites. `desktop.sh vm` needs the VM running and stops with a hint if it isn't.
-
-### One line with the script
-
-From `private/scripts` (or as `private/scripts/server-vm.sh …` from the project root):
-
-| Command | What happens |
-| --- | --- |
-| `./server-vm.sh status` | Shows the server's uptime and memory, whether the VM process is running, and whether Windows answers over SSH |
-| `./server-vm.sh test` | Signs in to Windows and shows the user, uptime, Java, Git, the checkout's commit, local changes and free disk space |
-| `./server-vm.sh start` | Starts the VM. You type an 8-character VNC console password for Screen Sharing. It then waits for Windows and runs `test` |
-| `./server-vm.sh start --headless` | Same, but the console password is random and never shown, so there's no prompt. Use this for builds; the console can't be opened until the next normal `start` |
-| `./server-vm.sh stop` | Refuses while a Gradle build runs in the VM. Otherwise it shuts Windows down cleanly and waits until the VM process has ended |
-| add `--remote` | Go through Cloudflare (`home-server-remote`, `home-server-build-remote`) |
-
-A typical VM build:
-
-```sh
-cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts
-./server-vm.sh start --headless && ./desktop.sh vm && ./server-vm.sh stop
-```
-
-The script never force-kills the VM. If Windows doesn't answer, or takes longer than 5 minutes to shut down (often because it's installing updates), the script stops and says to check it with Screen Sharing.
-
-### Separately, by hand
-
-**Check whether it's running** (Mac Terminal):
-
-```sh
-ssh home-server "pgrep -af '^/usr/bin/qemu-system-x86_64 -name windows-build '"
-```
-
-A line with a process number means it's running; no output means it's stopped.
-
-**Start it**, then type the 8-character console password when asked:
-
-```sh
-ssh -t home-server /srv/vms/windows-build/start.sh
-```
-
-`VM already running.` means there's nothing to do. Windows takes about 20–60 seconds to boot, longer while installing updates.
-
-**Test the connection to Windows:**
-
-```sh
-ssh home-server-build whoami
-```
-
-Expected: `jagdeep\builduser`. *Connection refused* or a timeout soon after starting means Windows is still booting: wait and try again.
-
-**Stop it** after any build has finished. The VM's default shell is PowerShell, so this runs as is:
-
-```sh
-ssh home-server-build Stop-Computer -Force
-```
-
-The SSH connection closes as Windows shuts down. Then repeat the first command until it prints nothing. Don't use Debian's `shutdown`, `reboot` or `poweroff`: they stop the whole server, websites included. For more detail (resource monitoring, Screen Sharing, troubleshooting), see [11_START_STOP_WINDOWS_BUILD_VM.md](11_START_STOP_WINDOWS_BUILD_VM.md).
-
-### Recorded test — 11 November 2026
-
-| Command | Result |
-| --- | --- |
-| `server-vm.sh status` | Server up 4 days, 5.6 GB memory available; VM running; Windows SSH answering |
-| `server-vm.sh test` | Signed in as `jagdeep\builduser`; Java 21.0.13, Git 2.56.0; checkout clean at `ac90a44`; 59.4 GB free |
-| `server-vm.sh stop` | No build running; Windows shut down cleanly; VM process ended after about 225 s |
-| `server-vm.sh start --headless` | VM started without a prompt; Windows answered SSH after about 20 s; connection test passed |
-
-The interactive `start` (typing the console password) runs `start.sh` through `ssh -t` and wasn't run in this test.
+`desktop.sh vm` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [11 — Start, stop and test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script).
 
 ## Where the scripts live
 

@@ -1,8 +1,79 @@
-# 11 — Start, Stop, and Monitor the Windows Build VM
+# 11 — Start, Stop, Test and Monitor the Server's Windows VM
 
-[All guides](00_INDEX.md) · [Build in the VM](12_BUILD_WINDOWS_IN_SERVER_VM.md)
+[All guides](00_INDEX.md) · [Build in the VM](12_BUILD_WINDOWS_IN_SERVER_VM.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md)
 
-**One line from the Mac:** `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. See [01 — Server Windows VM](01_ONE_COMMAND_BUILDS.md#server-windows-vm--start-stop-and-test). The steps below do the same by hand.
+**On this page:** [One line with the script](#one-line-with-the-script) · [Separately, by hand](#separately-by-hand) · [Recorded test](#recorded-test--11-november-2026) · [Detailed steps: monitor, Screen Sharing, troubleshooting](#11-windows-vm-connect-check-start-monitor-and-stop) · [Cancel, disconnect or shut down](#5-cancel-disconnect-or-shut-down--choose-the-right-action)
+
+The VM is a Windows guest on the home server. It uses 8 GB of the server's 16 GB, so start it only for a build and stop it afterwards. Starting or stopping it never touches Debian or the websites. `desktop.sh vm` needs the VM running and stops with a hint if it isn't.
+
+## One line with the script
+
+From `private/scripts` (or as `private/scripts/server-vm.sh …` from the project root):
+
+| Command | What happens |
+| --- | --- |
+| `./server-vm.sh status` | Shows the server's uptime and memory, whether the VM process is running, and whether Windows answers over SSH |
+| `./server-vm.sh test` | Signs in to Windows and shows the user, uptime, Java, Git, the checkout's commit, local changes and free disk space |
+| `./server-vm.sh start` | Starts the VM. You type an 8-character VNC console password for Screen Sharing. It then waits for Windows and runs `test` |
+| `./server-vm.sh start --headless` | Same, but the console password is random and never shown, so there's no prompt. Use this for builds; the console can't be opened until the next normal `start` |
+| `./server-vm.sh stop` | Refuses while a Gradle build runs in the VM. Otherwise it shuts Windows down cleanly and waits until the VM process has ended |
+| add `--remote` | Go through Cloudflare (`home-server-remote`, `home-server-build-remote`) |
+
+A typical VM build:
+
+```sh
+cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts
+./server-vm.sh start --headless && ./desktop.sh vm && ./server-vm.sh stop
+```
+
+The script never force-kills the VM. If Windows doesn't answer, or takes longer than 5 minutes to shut down (often because it's installing updates), the script stops and says to check it with Screen Sharing.
+
+## Separately, by hand
+
+**Check whether it's running** (Mac Terminal):
+
+```sh
+ssh home-server "pgrep -af '^/usr/bin/qemu-system-x86_64 -name windows-build '"
+```
+
+A line with a process number means it's running; no output means it's stopped.
+
+**Start it**, then type the 8-character console password when asked:
+
+```sh
+ssh -t home-server /srv/vms/windows-build/start.sh
+```
+
+`VM already running.` means there's nothing to do. Windows takes about 20–60 seconds to boot, longer while installing updates.
+
+**Test the connection to Windows:**
+
+```sh
+ssh home-server-build whoami
+```
+
+Expected: `jagdeep\builduser`. *Connection refused* or a timeout soon after starting means Windows is still booting: wait and try again.
+
+**Stop it** after any build has finished. The VM's default shell is PowerShell, so this runs as is:
+
+```sh
+ssh home-server-build Stop-Computer -Force
+```
+
+The SSH connection closes as Windows shuts down. Then repeat the first command until it prints nothing. Don't use Debian's `shutdown`, `reboot` or `poweroff`: they stop the whole server, websites included. For resource monitoring, Screen Sharing and troubleshooting, see [the detailed steps below](#11-windows-vm-connect-check-start-monitor-and-stop).
+
+## Recorded test — 11 November 2026
+
+| Command | Result |
+| --- | --- |
+| `server-vm.sh status` | Server up 4 days, 5.6 GB memory available; VM running; Windows SSH answering |
+| `server-vm.sh test` | Signed in as `jagdeep\builduser`; Java 21.0.13, Git 2.56.0; checkout clean at `ac90a44`; 59.4 GB free |
+| `server-vm.sh stop` | No build running; Windows shut down cleanly; VM process ended after about 225 s |
+| `server-vm.sh start --headless` | VM started without a prompt; Windows answered SSH after about 20 s; connection test passed |
+
+The interactive `start` (typing the console password) runs `start.sh` through `ssh -t` and wasn't run in this test.
+
+## Detailed steps
 
 ### 1.1 Windows VM: connect, check, start, monitor and stop
 
