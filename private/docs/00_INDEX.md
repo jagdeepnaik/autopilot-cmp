@@ -78,3 +78,7 @@ Short pages left from an earlier layout. They only link to the guides above.
 - [25 — Initial setup tasks](25_INITIAL_SETUP_QUICK_LINKS.md)
 - [26 — Build tasks](26_BUILD_TASKS_QUICK_LINKS.md)
 - [27 — Server setup tasks](27_SERVER_SETUP_QUICK_LINKS.md)
+
+## 26 · Saved course progress
+
+- [26 — Resume saved Sagar Mein Yog progress](26_SAVED_COURSE_PROGRESS.md)
