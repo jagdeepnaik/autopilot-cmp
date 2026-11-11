@@ -42,7 +42,7 @@ These are separate machines and checkouts. Use the Legion guide for the laptop; 
 - [Installer diagnosis and verification evidence](17_WINDOWS_INSTALLER_DIAGNOSIS.md)
 - [Server tests and earlier build results](18_SERVER_BUILD_TESTS_AND_RESULTS.md)
 
-Updated 10 November 2026. Instructions are AutoPilot-specific; general explanations are kept in reference guides. No build, installation, or connection is started by opening these files.
+Updated 11 November 2026. Instructions are AutoPilot-specific; general explanations are kept in reference guides. No build, installation, or connection is started by opening these files.
 
 - [19 — How AutoPilot works](19_HOW_AUTOPILOT_WORKS.md)
 
@@ -54,3 +54,8 @@ These compact pages group related tasks; the numbered task guides above contain 
 - [21 — Initial setup tasks](21_INITIAL_SETUP_QUICK_LINKS.md)
 - [22 — Build tasks](22_BUILD_TASKS_QUICK_LINKS.md)
 - [23 — Server setup tasks](23_SERVER_SETUP_QUICK_LINKS.md)
+
+## 24–25 · Browser, alerts, and answer-bank updates
+
+- [24 — Check extension versions and sounds](24_BROWSER_AND_ALERT_SETTINGS.md)
+- [25 — Update a versioned answer bank](25_UPDATE_ANSWER_BANK.md)

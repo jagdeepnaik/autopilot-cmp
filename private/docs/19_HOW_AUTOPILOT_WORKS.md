@@ -1,4 +1,4 @@
-# 19 — How AutoClicker works
+# 19 — How AutoPilot works
 
 [All guides](00_INDEX.md)
 
@@ -108,7 +108,7 @@ To add a kind: add a `Routine` subtype and a `RoutineKind` entry, teach `Routine
 
 ## 3. What happens at launch
 
-1. **`main.kt`** starts logging and opens the desktop window, restoring its size and position. `DesktopTitleBar` fits the window to the desktop shell: on a Mac the title bar is see-through with the content running under it, so the app's toolbar shares the row with the system's window buttons (as in Android Studio), and `apple.awt.application.appearance=system` keeps those buttons in the Mac's light or dark style. On Windows the system title bar stays, coloured through DWM (Windows 11 takes exact colours, Windows 10 only dark or light), with the toolbar below it.
+1. **`main.kt`** starts logging and opens the desktop window, restoring its size and position. `DesktopTitleBar` fits the window to the desktop shell: on a Mac the title bar is see-through with the content running under it, so the app's toolbar shares the row with the system's window buttons (as in Android Studio), and `apple.awt.application.appearance=system` keeps those buttons in the Mac's light or dark style. On Windows, one custom toolbar row contains the app identity and caption controls. `WindowsNativeCaption` retains the native resizable-frame and caption capabilities Windows uses for Snap Layouts, while removing the extra native title row. It exposes the maximize control to native Windows hit testing and empty caption space for dragging and double-click maximize/restore. Resize edges retain their native behavior. Other controls retain their regular app input. The app icon navigates Home. `DesktopCaptionClicks` handles unconsumed double-clicks without taking drag or button gestures.
 2. **`App.kt`** runs and calls `AppServices.get()`, which creates the process-wide services once.
 3. **`AppServices`** creates, in order:
    - the preference store, for settings
@@ -744,3 +744,13 @@ AUTOCLICKER_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveI
 | Page change timeout | 15 seconds | `ScrollClickRun` |
 | History kept | 200 runs | `PreferencesRunHistoryStore` |
 | Link port | 47613 | `BrowserExtension.kt` |
+
+## Assessment modes and learning order
+
+Sagar Mein Yog stores assessment mode and learning order separately. With **Videos first**, the routine waits for a single confirmation after all available videos are complete before beginning the assessment pass, including in Automatic mode. Select **Assessment after each module** to handle assessments as each module's videos finish.
+
+- **Automatic:** starts, answers saved exact matches, and submits unfinished assessments. A saved unsubmitted status does not by itself add a start approval. Unknown answers pause for help. A failed assessment still requires an explicit retry choice.
+- **Review approvals:** saved answers are available, but starts and submissions require approval.
+- **Manual:** approved starts work without an answer-bank match; the user supplies answers and approves submission.
+
+No assessment is started merely by opening AutoPilot. Run the saved routine to apply its options.
