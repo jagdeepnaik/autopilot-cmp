@@ -28,4 +28,4 @@ git clone https://github.com/jagdeepnaik/autopilot-cmp.git C:\Users\jagde\Projec
 if ($LASTEXITCODE -ne 0) { throw 'Clone failed. Stop here.' }
 ```
 
-Continue with [C2: open AutoPilot](02_BUILD_WINDOWS_ON_LEGION.md) in the same window.
+Continue with [C2: open AutoPilot](02_BUILD_WINDOWS_ON_LEGION.md#c2-open-autopilot) in the same window.

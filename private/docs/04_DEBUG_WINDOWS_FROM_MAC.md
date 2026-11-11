@@ -14,7 +14,7 @@ Sign into the Legion desktop. In **Windows SSH PowerShell**:
 Start-ScheduledTask -TaskName 'AutoPilot-Debug'
 ```
 
-This uses the configured interactive launcher on the signed-in desktop. If the task is missing, follow [initial debug launcher setup](22_SET_UP_WINDOWS_DEBUG_LAUNCHER.md). If AutoPilot is already running or port 5005 is occupied, close the intended previous debug session first; do not launch duplicates.
+This uses the configured interactive launcher on the signed-in desktop. If the task is missing, follow [initial debug launcher setup](22_SET_UP_WINDOWS_DEBUG_LAUNCHER.md#14-how-the-debug-launcher-was-created). If AutoPilot is already running or port 5005 is occupied, close the intended previous debug session first; do not launch duplicates.
 
 ### F2. Open the debugger tunnel
 

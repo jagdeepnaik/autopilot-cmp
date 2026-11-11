@@ -6,25 +6,25 @@ This document follows the app from launch to the last click: what each part does
 
 ## Contents
 
-1. The big picture
-2. Project layout
-3. What happens at launch
-4. Talking to the operating system
-5. Hot keys
-6. Routines: the clicker
-7. How the app talks to Chrome
-8. The Chrome extension
-9. Page helper by hand
-10. Scroll and click, step by step
-11. Videos, step by step
-12. Every way a run can stop
-13. What gets saved, and where
-14. Screens, ViewModels and navigation
-15. Privacy and security
-16. Build, install and release
-17. Testing
-18. Limits and troubleshooting
-19. Timings and limits reference
+1. [The big picture](#1-the-big-picture)
+2. [Project layout](#2-project-layout)
+3. [What happens at launch](#3-what-happens-at-launch)
+4. [Talking to the operating system](#4-talking-to-the-operating-system)
+5. [Hot keys](#5-hot-keys)
+6. [Routines: the clicker](#6-routines-the-clicker)
+7. [How the app talks to Chrome](#7-how-the-app-talks-to-chrome)
+8. [The Chrome extension](#8-the-chrome-extension)
+9. [Page helper by hand](#9-page-helper-by-hand)
+10. [Scroll and click, step by step](#10-scroll-and-click-step-by-step)
+11. [Videos, step by step](#11-videos-step-by-step)
+12. [Every way a run can stop](#12-every-way-a-run-can-stop)
+13. [What gets saved, and where](#13-what-gets-saved-and-where)
+14. [Screens, ViewModels and navigation](#14-screens-viewmodels-and-navigation)
+15. [Privacy and security](#15-privacy-and-security)
+16. [Build, install and release](#16-build-install-and-release)
+17. [Testing](#17-testing)
+18. [Limits and troubleshooting](#18-limits-and-troubleshooting)
+19. [Timings and limits reference](#19-timings-and-limits-reference)
 
 ---
 
@@ -96,11 +96,11 @@ The Routines page lists every routine, whatever its kind, and **New routine** as
 
 | Kind | Saved as | Runs in | What it does |
 | --- | --- | --- | --- |
-| Click routine | `ClickRoutine` (`click`) with the pointer as its target | `ClickController` with `ClickRun` | Clicks wherever the pointer is, in any app (section 6) |
+| Click routine | `ClickRoutine` (`click`) with the pointer as its target | `ClickController` with `ClickRun` | Clicks wherever the pointer is, in any app ([section 6](#6-routines-the-clicker)) |
 | Multi-point click | `ClickRoutine` (`click`) with a list of points | `ClickController` with `ClickRun` | Clicks a list of steps in order, each with its own wait and button, once or repeated |
-| Scroll and click | `ScrollClickRoutine` (`scrollClick`) | `PageController` with `ScrollClickRun` | Scrolls a Chrome page to the bottom, plays videos, clicks a spot, repeats (section 10) |
-| Web page helper | `PageHelperRoutine` (`pageHelper`) | `PageController` | Highlights the next button in Chrome while it runs; F8 clicks it and F9 scrolls (section 9) |
-| Course helper | `CourseHelperRoutine` (`courseHelper`) | `PageController` | For sagarmeinyog.com: outlines the next unfinished part or Back to Course; each key press opens it (Course helper) |
+| Scroll and click | `ScrollClickRoutine` (`scrollClick`) | `PageController` with `ScrollClickRun` | Scrolls a Chrome page to the bottom, plays videos, clicks a spot, repeats ([section 10](#10-scroll-and-click-step-by-step)) |
+| Web page helper | `PageHelperRoutine` (`pageHelper`) | `PageController` | Highlights the next button in Chrome while it runs; F8 clicks it and F9 scrolls ([section 9](#9-page-helper-by-hand)) |
+| Course helper | `CourseHelperRoutine` (`courseHelper`) | `PageController` | For sagarmeinyog.com: outlines the next unfinished part or Back to Course; each key press opens it ([Course helper](#course-helper)) |
 
 To add a kind: add a `Routine` subtype and a `RoutineKind` entry, teach `RoutineDraft` to edit it, add its editor section, and give it a runner that `ClickController.start` hands it to. Routines saved before kinds existed have no `type` and load as click routines.
 
@@ -209,7 +209,7 @@ stateDiagram-v2
 Each pass does the following:
 
 1. Finish if the limit is reached.
-2. Run the **safety checks** (section 12).
+2. Run the **safety checks** ([section 12](#12-every-way-a-run-can-stop)).
 3. Work out the next point, and check whether it should wait:
    - **Wrong app in front** (`WaitingForApp`), when "only in this app" is set.
    - **On its own window** (`OverOwnWindow`), when the click would land on AutoClicker's focused window. This keeps Stop reachable.
@@ -485,7 +485,7 @@ With **Stop for videos** on, `content.js` does this on each tick (`checkVideos`)
 | Not started yet | Centre it and call `play()` | `playing` |
 | Started, now paused | Leave it alone, because pausing is your choice | `needsPlay` |
 
-4. **If no real video needs anything,** look for a play button (below).
+4. **If no real video needs anything,** look for a play button ([below](#pictures-with-a-play-button)).
 
 `background.js` combines all frames into one state, and turns scrolling off for the page while it's anything but `none`. The app sees the same state in the `page` event and won't click. Moving the pointer doesn't end the run while a video plays, so you can use the player's controls.
 
@@ -620,7 +620,7 @@ The log is `LiveLog` in `feature:shared`, implemented by `MemoryLiveLog` in `com
 
 **What's stored:** routine names and screen positions, timings, run counts and stop reasons, and your settings. History doesn't record screen contents or the page you were on. Nothing here is encrypted, as none of it is meant to be secret.
 
-**Clicking without a key press:** routines and Scroll and click runs both click on their own once you start them, on whatever is at that screen position. The extension's own clicks need a key press, with one exception, the play button described in section 11.
+**Clicking without a key press:** routines and Scroll and click runs both click on their own once you start them, on whatever is at that screen position. The extension's own clicks need a key press, with one exception, the play button described in [section 11](#pictures-with-a-play-button).
 
 **Use on courses and tests:** the page helper's hands-on mode is designed for working through pages yourself. It doesn't answer questions or get around course checks. Scroll and click isn't meant for completing recorded training with nobody there.
 

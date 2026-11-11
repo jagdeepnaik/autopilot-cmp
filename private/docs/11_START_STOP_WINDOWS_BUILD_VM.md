@@ -2,6 +2,8 @@
 
 [All guides](00_INDEX.md) · [Build in the VM](12_BUILD_WINDOWS_IN_SERVER_VM.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md)
 
+**On this page:** [One line with the script](#one-line-with-the-script) · [Separately, by hand](#separately-by-hand) · [Recorded test](#recorded-test--11-november-2026) · [Detailed steps: monitor, Screen Sharing, troubleshooting](#11-windows-vm-connect-check-start-monitor-and-stop) · [Cancel, disconnect or shut down](#5-cancel-disconnect-or-shut-down--choose-the-right-action)
+
 The VM is a Windows guest on the home server. It uses 8 GB of the server's 16 GB, so start it only for a build and stop it afterwards. Starting or stopping it never touches Debian or the websites. `desktop.sh vm` needs the VM running and stops with a hint if it isn't.
 
 ## One line with the script
@@ -58,7 +60,7 @@ Expected: `jagdeep\builduser`. *Connection refused* or a timeout soon after star
 ssh home-server-build Stop-Computer -Force
 ```
 
-The SSH connection closes as Windows shuts down. Then repeat the first command until it prints nothing. Don't use Debian's `shutdown`, `reboot` or `poweroff`: they stop the whole server, websites included. For resource monitoring, Screen Sharing and troubleshooting, see the detailed steps below.
+The SSH connection closes as Windows shuts down. Then repeat the first command until it prints nothing. Don't use Debian's `shutdown`, `reboot` or `poweroff`: they stop the whole server, websites included. For resource monitoring, Screen Sharing and troubleshooting, see [the detailed steps below](#11-windows-vm-connect-check-start-monitor-and-stop).
 
 ## Recorded test — 11 November 2026
 

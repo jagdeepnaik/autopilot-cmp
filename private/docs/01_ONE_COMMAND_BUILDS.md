@@ -1,8 +1,10 @@
 # 01 — One Command: Sync, Build, Install and Debug on Every Desktop Machine
 
-[All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md) · [Manual server build](09_BUILD_LINUX_ON_SERVER.md)
+[All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](09_BUILD_LINUX_ON_SERVER.md)
 
-**Related:** [Git guide](18_GIT_GUIDE.md) · [Start/stop/test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md) · [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
+**On this page:** [Go to the scripts folder](#go-to-the-scripts-folder) · [Quick reference](#quick-reference) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
+
+**Related:** [Git guide](18_GIT_GUIDE.md) · [Start/stop/test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
 
 `private/scripts/desktop.sh` runs the whole build chain for one machine, or all of them, from a Mac Terminal. Every step stops with a plain reason when something isn't right. The manual guides still work; this script runs the same commands in order.
 
@@ -104,7 +106,7 @@ Both debug runs build from source at the synced commit, so breakpoints match the
 
 ## Server Windows VM — start and stop
 
-`desktop.sh vm` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [11 — Start, stop and test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md).
+`desktop.sh vm` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [11 — Start, stop and test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script).
 
 ## Where the scripts live
 
