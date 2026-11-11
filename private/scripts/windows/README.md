@@ -80,8 +80,3 @@ MSI output: `composeApp/build/compose/binaries/main-release/msi/`. Copy the exac
 ## First Windows acceptance check
 
 Install the MSI in the signed-in desktop. Start it and check the window, saved settings, sound and display-awake controls. AutoPilot writes its bundled Chrome extension to `%USERPROFILE%\.autopilot\extensions\chrome` at every start, rewriting only changed files. Load that folder in Chrome once (`chrome://extensions` → Developer mode → Load unpacked); after an app update, press reload on the extension card. Verify Chrome connected. The app also ships `composeApp/src/jvmMain/resources/answer-banks/sagarmeinyog-ver-1.0.json` and copies it to `%USERPROFILE%\.autopilot\answer-banks` only when that folder has no file of that name, so answers saved on a PC are never replaced. To release another bank, use a new versioned JSON filename and update the default deliberately. Keep personal answer-bank updates out of a public push unless explicitly approved. Test a short ordinary course session, Stop, restart, and confirm cumulative progress. The course database is not in Git. Keep Windows and Mac databases separate during live testing.
-
-## One-time SSH key setup
-
-`setup-windows-ssh-key.command` creates the Mac's passphrase-protected key for Legion, stores it in the macOS Keychain, checks Legion's host fingerprint, and installs only the public key on Legion. It's already been run; see `private/docs/19_SET_UP_PASSWORD_FREE_SSH.md` before running it again.
-
