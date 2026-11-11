@@ -22,11 +22,11 @@ AutoPilot's Windows MSI must be built on Windows. GitHub Actions can produce it 
 ## One command from the Mac
 
 ```bash
-tools/windows/legion.sh            # sync with Git, build, install, then debug
-tools/windows/legion.sh install    # or: sync | build | debug; add --no-tests to skip tests
+tools/desktop.sh legion            # sync with Git, build, install, then debug on Legion
+tools/desktop.sh mac | server | vm | all
 ```
 
-It pushes unpushed commits, pulls on Legion, and refuses to run if either side has uncommitted changes. It then builds with `Build-Distribution.ps1` and installs with `Install-Msi.ps1`. Last, it starts the `AutoPilot-Debug` task and opens the 5005 tunnel for the **AutoPilot Windows (SSH tunnel)** configuration. Set `LEGION_HOST` and `LEGION_DIR` for another machine or folder.
+`tools/windows/legion.sh` is a shortcut for `tools/desktop.sh legion`. The commands for the Mac and the home server, and how it works, are in `private/docs/26_ONE_COMMAND_BUILDS.md`.
 
 ## Install or update remotely from the Mac
 

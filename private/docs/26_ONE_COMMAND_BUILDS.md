@@ -1,0 +1,112 @@
+# 26 — One Command: Sync, Build, Install and Debug on Every Desktop Machine
+
+[All guides](00_INDEX.md) · [Manual Legion build](01_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](08_BUILD_LINUX_ON_SERVER.md)
+
+`tools/desktop.sh` runs the whole build chain for one machine, or all of them, from a Mac Terminal. Every step stops with a plain reason when something isn't right. The manual guides still work; this script runs the same commands in order.
+
+## Quick reference
+
+Run from `/Users/jagdeep/Projects/AndroidStudio/AutoPilot` on the Mac:
+
+| Command | What happens |
+| --- | --- |
+| `tools/desktop.sh mac` | Build the macOS app with tests, install it in `/Applications`, then start a debug run |
+| `tools/desktop.sh mac install` | Build and install only |
+| `tools/desktop.sh mac debug` | Debug run from source, waiting on port 5005 |
+| `tools/desktop.sh legion` | Sync Legion, build the MSI with tests, install and check it, then start a debug run and tunnel |
+| `tools/desktop.sh legion install` | Sync, build, install and check only |
+| `tools/desktop.sh legion debug` | Sync, then debug run and tunnel only |
+| `tools/desktop.sh server` | Sync the home server, build the Linux DEB with tests, copy it to the Mac |
+| `tools/desktop.sh vm` | Sync the server's Windows VM, build the MSI with tests, copy it to the Mac |
+| `tools/desktop.sh all` | Mac build and install, Legion build and install, server DEB build and copy |
+| any target + `sync` | Push and pull only |
+| any target + `build` | Sync, then build only |
+| add `--no-tests` | Skip the focused tests |
+| add `--remote` | Reach the home server through Cloudflare instead of the local network |
+
+`tools/windows/legion.sh` is a shortcut for `tools/desktop.sh legion`.
+
+## What each machine does
+
+| Machine | Target | Builds | Installs | Debug |
+| --- | --- | --- | --- | --- |
+| This Mac | `mac` | macOS app (`createReleaseDistributable`) | Copies it to `/Applications/AutoPilot.app` | `gradlew :composeApp:run --debug-jvm`; attach **AutoPilot Mac (local)** |
+| Legion laptop (`home-legion`) | `legion` | MSI (`Build-Distribution.ps1`) | Silent update with `Install-Msi.ps1`, then checks | `AutoPilot-Debug` task on the desktop, SSH tunnel; attach **AutoPilot Windows (SSH tunnel)** |
+| Home server, Debian (`home-server`) | `server` | DEB (`packageReleaseDeb`, at low priority) | No: it's a headless website host. The DEB is copied to `~/Downloads/Builds/AutoPilot` | No |
+| Home server, Windows VM (`home-server-build`) | `vm` | MSI (`Build-Distribution.ps1`) | No. The MSI is copied to `~/Downloads/Builds/AutoPilot`; install it on Legion | No |
+
+Install a copied DEB on a Linux desktop with `sudo apt install ./autopilot_<version>_amd64.deb`, not on the server.
+
+## How it works
+
+### 1. Git is the only way code reaches a build machine
+
+The rule for every remote machine is **push, pull, then build**. Nothing is copied over directly, and the script never builds from a side folder.
+
+1. **Mac check.** The Mac must have no uncommitted changes, be on `main`, and not be behind GitHub. If any of these fails, the script stops and tells you what to do: commit, or pull on the Mac.
+2. **Push.** Any unpushed Mac commits are pushed to GitHub.
+3. **Pull on the target.** The target's checkout must be clean. The script runs `git pull --ff-only`, then checks that the target is on exactly the Mac's commit.
+4. **Uncommitted changes are never overwritten.** If the target has local changes, the script stops. Compare them with GitHub and stash them as a backup (`git stash push -u -m "backup …"`), then run the script again.
+
+The Mac target builds from your working folder and doesn't need a push. If you have uncommitted changes, it says so, because the version number only rises with a commit.
+
+### 2. One version number per commit
+
+Every desktop build uses `<major>.<minor>.<commit count>`, for example `1.0.30`. Major and minor come from `versionName` in `gradle/libs.versions.toml`; the third part is `git rev-list --count HEAD`. The same number goes on:
+
+- the MSI, DMG and DEB (`packageVersion` in `composeApp/build.gradle.kts`);
+- the app's About screen and status bar (passed to the app as `-Dautopilot.version`).
+
+Each commit's MSI is therefore newer than the last one, so Windows updates the installed app in place. Building the same commit twice gives the same version: `Install-Msi.ps1 -SkipIfInstalled` then reports *already installed* and moves on, instead of failing. Android and iOS keep `versionName` from the version catalog.
+
+### 3. Talking to Windows over SSH
+
+Windows commands go through `ssh` → the remote default shell (Command Prompt on Legion, PowerShell in the VM) → PowerShell. Quotes get mangled along that path. So the script sends each PowerShell block **base64-encoded** with `powershell -EncodedCommand`. Nothing in it is reinterpreted on the way, and both machines' default shells handle it the same way.
+
+### 4. Build
+
+- **Mac:** `./gradlew` with the focused tests, then `:composeApp:createReleaseDistributable`.
+- **Legion and the VM:** `tools/windows/Build-Distribution.ps1`. It runs the focused tests and then `:composeApp:packageReleaseMsi`, with two workers and a 2 GB heap. Packaging also patches the MSI so it installs and runs under Smart App Control: it removes jpackage's unsigned helper DLL and points the shortcuts at the signed `javaw.exe` (see [05](05_FIX_WINDOWS_INSTALLER.md)). The build output shows `Removed JpCaDll …` and `Pointed 2 shortcuts …`.
+- **Server:** the same Gradle settings, run with `nice` and `ionice`, so the websites keep priority.
+
+The focused tests are `core:automation`, the DGS study tests, the desktop data-path tests and the version test. They're quick checks, not the full suite.
+
+### 5. Install
+
+- **Mac:** stops if AutoPilot is running, since quitting it could lose a routine's progress. Otherwise it replaces `/Applications/AutoPilot.app` with the new build and checks its signature. `~/.autopilot` isn't touched.
+- **Legion:** `tools/windows/Install-Msi.ps1 -LaunchCheck -SkipIfInstalled`. It refuses an older MSI and closes a running copy. Then it installs silently and checks four things: the installed version, the signed `javaw.exe`, that both shortcuts point to it, and a 15-second launch from the desktop shortcut. It finishes by counting Smart App Control blocks. `%USERPROFILE%\.autopilot` isn't touched.
+- **Server and VM:** the newest installer is copied to `~/Downloads/Builds/AutoPilot`, and the SHA256 of the copy must match the source.
+
+### 6. Debug
+
+Both debug runs build from source at the synced commit, so breakpoints match the code on the Mac.
+
+- **Mac:** stops if AutoPilot is already running or port 5005 is taken. It then runs `./gradlew :composeApp:run --debug-jvm`, which waits for the debugger. In Android Studio choose **AutoPilot Mac (local)** → Debug. Closing the app window ends the run.
+- **Legion:** checks that the `AutoPilot-Debug` task exists and that the installed app isn't open, since both would share `.autopilot`. It starts the task on the signed-in desktop and waits up to 15 minutes until the debug run listens on Legion's port 5005. It then opens `ssh -N -L 127.0.0.1:5005:127.0.0.1:5005 home-legion` on the Mac. In Android Studio choose **AutoPilot Windows (SSH tunnel)** → Debug; the window appears on Legion. Control-C in the Terminal closes the tunnel. Port 5005 is never opened to the network.
+
+## When it stops
+
+| Message | What to do |
+| --- | --- |
+| *the Mac has uncommitted changes* | Commit (or ask Claude to push), then rerun |
+| *GitHub has N commit(s) the Mac doesn't* | `git pull --ff-only` on the Mac, then rerun |
+| *Legion / the server has uncommitted changes* | Compare with GitHub, stash as a backup, rerun |
+| *AutoPilot is running on the Mac* | Quit it normally, rerun |
+| *The installed AutoPilot is open on Legion* | Close it normally on Legion, rerun |
+| *Version … is not newer than the installed …* | Commit a change and rerun, or uninstall first ([03, S6](03_INSTALL_AND_TEST_WINDOWS.md)) |
+| *the Windows VM isn't running* | `ssh -t home-server /srv/vms/windows-build/start.sh`, wait a minute, rerun |
+| *The AutoPilot-Debug task is not registered* | Run `tools\windows\Register-DebugLauncher.ps1` once on the Legion desktop ([13](13_SET_UP_WINDOWS_DEBUG_LAUNCHER.md)) |
+| *port 5005 is already in use* | Close the earlier tunnel or debug run (`lsof -nP -iTCP:5005`) |
+| A build or test failure | Read the Gradle output above the message; nothing was installed |
+
+## Files
+
+| File | Runs on | Role |
+| --- | --- | --- |
+| `tools/desktop.sh` | Mac | The single command: sync, build, install, copy, debug |
+| `tools/windows/legion.sh` | Mac | Shortcut for `desktop.sh legion` |
+| `tools/windows/Build-Distribution.ps1` | Legion, VM | Focused tests and MSI build |
+| `tools/windows/Install-Msi.ps1` | Legion | Silent install or update, plus checks |
+| `tools/windows/Remove-UnsignedMsiHelper.ps1`, `Use-SignedJavaLauncher.ps1` | Legion, VM (during packaging) | Smart App Control fixes inside the MSI |
+| `tools/windows/Start-Debug.ps1` | Legion (via the `AutoPilot-Debug` task) | Debug run from source |
+| `.run/AutoPilot-Mac-local.run.xml`, `.run/AutoPilot-Windows-SSH.run.xml` | Android Studio | Attach to `127.0.0.1:5005` |

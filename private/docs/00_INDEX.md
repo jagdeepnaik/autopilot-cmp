@@ -2,6 +2,10 @@
 
 **Open this file first.** Files are numbered for sorting, not a requirement to run every step. Use 01–05 most often; 10–14 are one-time setup. Each guide links back here and to related tasks.
 
+## One command for every desktop machine
+
+**[26_ONE_COMMAND_BUILDS.md](26_ONE_COMMAND_BUILDS.md)**: `tools/desktop.sh mac | legion | server | vm | all` syncs with Git, builds, installs or copies, and debugs. The guides below are the same steps done by hand.
+
 ## 01–05 · Frequently used — Legion Windows laptop
 
 | What you want to do | Open this file |

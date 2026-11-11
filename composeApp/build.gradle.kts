@@ -25,18 +25,19 @@ val generateAnswerBankIndex by tasks.registering {
     }
 }
 
-// Windows Installer only upgrades in place when the version rises, and it compares the first three
-// parts. Each commit therefore gets its own MSI version, <major>.<minor>.<commit count>, so a new
-// MSI replaces the installed app instead of stopping with "already installed". App data lives in
-// %USERPROFILE%\.autopilot, which the installer never touches.
-val windowsMsiVersion: String = run {
+// Every desktop build's version: <major>.<minor>.<commit count>, so each commit gets a higher one.
+// Windows Installer only upgrades in place when the version rises (it compares the first three
+// parts), so a new MSI replaces the installed app instead of stopping with "already installed".
+// The DMG, DEB and the app's About screen use the same number. App data lives in ~/.autopilot,
+// which no installer touches. Android and iOS keep versionName from the version catalog.
+val desktopVersion: String = run {
     val (major, minor) = libs.versions.versionName.get().split('.').map(String::toInt)
     val commits = providers.exec {
         commandLine("git", "rev-list", "--count", "HEAD")
         isIgnoreExitValue = true
     }.standardOutput.asText.get().trim().toIntOrNull()
-        ?: error("Windows MSI version needs the Git history: run the build inside a Git checkout.")
-    check(major in 0..255 && minor in 0..255 && commits in 1..65535) { "MSI version $major.$minor.$commits is out of range" }
+        ?: error("The desktop version needs the Git history: run the build inside a full Git checkout.")
+    check(major in 0..255 && minor in 0..255 && commits in 1..65535) { "Desktop version $major.$minor.$commits is out of range" }
     "$major.$minor.$commits"
 }
 
@@ -123,7 +124,7 @@ compose.desktop {
     application {
         mainClass = "com.jagdeep.autopilot.MainKt"
         // The version the desktop app shows (About, status bar): the same one the MSI carries.
-        jvmArgs += "-Dautopilot.version=$windowsMsiVersion"
+        jvmArgs += "-Dautopilot.version=$desktopVersion"
 
         buildTypes.release.proguard {
             // Matches the template: shrinking is off until the dependency graph is known to survive it.
@@ -133,7 +134,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "AutoPilot"
-            packageVersion = libs.versions.versionName.get()
+            packageVersion = desktopVersion
             // JDK modules the packaged runtime must contain (from :composeApp:suggestRuntimeModules).
             // jdk.unsupported: sun.misc.Unsafe (libraries fail at launch without it).
             modules(
@@ -154,7 +155,6 @@ compose.desktop {
                 menuGroup = "AutoPilot"
                 // Must remain stable across releases so MSI can upgrade the installed app.
                 upgradeUuid = "bcdbe1a6-ef5a-4214-a3b6-021a08293966"
-                msiPackageVersion = windowsMsiVersion
             }
             linux {
                 iconFile.set(project.file("app-icons/autopilot-icon-linux-512.png"))
@@ -225,7 +225,7 @@ tasks.withType<AbstractJPackageTask>()
 
 // Tests see the same version property the desktop launchers pass.
 tasks.withType<Test>().matching { it.name == "jvmTest" }.configureEach {
-    systemProperty("autopilot.version", windowsMsiVersion)
+    systemProperty("autopilot.version", desktopVersion)
 }
 
 // Release signing comes from the git-ignored keystore.properties at the project root.

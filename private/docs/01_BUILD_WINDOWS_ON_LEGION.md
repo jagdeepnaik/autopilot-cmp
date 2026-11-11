@@ -4,35 +4,7 @@
 
 ## ONE COMMAND — sync, build, install, debug
 
-From the Mac, in `/Users/jagdeep/Projects/AndroidStudio/AutoPilot`:
-
-```sh
-tools/windows/legion.sh
-```
-
-This runs the whole chain. Every step stops with a plain reason if something isn't right.
-
-1. **Sync.** It checks the Mac has no uncommitted changes and isn't behind GitHub, and pushes any unpushed commits. It then pulls on Legion and confirms Legion is on the same commit. Legion always builds from Git; nothing is copied over directly.
-2. **Build.** It runs `Build-Distribution.ps1` on Legion: focused tests, then `:composeApp:packageReleaseMsi` with the low-memory settings.
-3. **Install.** It runs `Install-Msi.ps1 -LaunchCheck -SkipIfInstalled`: a silent update, then checks of the version, the signed `javaw.exe`, both shortcuts, a 15-second launch and Smart App Control blocks. If this version is already installed, it skips the install.
-4. **Debug.** It starts the `AutoPilot-Debug` task on Legion's signed-in desktop and waits until the debug run listens on port 5005. It then opens the SSH tunnel on the Mac. In Android Studio choose **AutoPilot Windows (SSH tunnel)** and click **Debug**; the app window appears on Legion. Press Control-C in the Terminal to close the tunnel.
-
-Run only part of it:
-
-| Command | Does |
-| --- | --- |
-| `tools/windows/legion.sh sync` | Push and pull only |
-| `tools/windows/legion.sh build` | Sync, build |
-| `tools/windows/legion.sh install` | Sync, build, install and check |
-| `tools/windows/legion.sh debug` | Sync, start the debug run and the tunnel |
-| add `--no-tests` | Skip the focused tests during the build |
-
-Before running it:
-
-- Commit your work on the Mac. The script won't push uncommitted changes.
-- Close AutoPilot normally on Legion if it's open. The install closes a running copy, and the debug run refuses to start while the installed app is open, because both share `.autopilot`.
-- For debugging, Legion must be signed in, with `AutoPilot-Debug` registered once (see [debug launcher setup](13_SET_UP_WINDOWS_DEBUG_LAUNCHER.md)).
-- If Legion's checkout has local changes, the script stops. Compare them with GitHub and stash them as a backup, then run it again.
+From the Mac: `tools/desktop.sh legion` (or `tools/windows/legion.sh`). It pushes, pulls on Legion, builds with tests, installs and checks, then starts the debug run and tunnel. Add `install`, `build`, `debug` or `sync` to run only part of it. How it works, and the commands for the Mac and the home server: [26_ONE_COMMAND_BUILDS.md](26_ONE_COMMAND_BUILDS.md).
 
 The manual steps below do the same thing one command at a time.
 
