@@ -192,6 +192,7 @@ private/
   plans/       # git-ignored: implementation plans, proposals, roadmaps, phase tracking
   <data>/      # tracked: project data the app or build needs, one folder per kind (for example answer-banks/)
   signing/     # git-ignored: release keys and keystore.properties material; never commit
+  secrets/     # git-ignored: secrets .env files; never commit
   misc/        # git-ignored: anything temporary or unimportant
 ```
 
