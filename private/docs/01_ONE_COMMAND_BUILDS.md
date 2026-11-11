@@ -4,9 +4,25 @@
 
 `private/scripts/desktop.sh` runs the whole build chain for one machine, or all of them, from a Mac Terminal. Every step stops with a plain reason when something isn't right. The manual guides still work; this script runs the same commands in order.
 
+## Go to the scripts folder
+
+**Mac Terminal:**
+
+```sh
+cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts
+```
+
+From there, run the commands as `./desktop.sh …`, for example:
+
+```sh
+./desktop.sh legion
+```
+
+The script finds the project itself, so it works from any folder. From the project root, `/Users/jagdeep/Projects/AndroidStudio/AutoPilot`, use `private/scripts/desktop.sh …`, as in the table below.
+
 ## Quick reference
 
-Run from `/Users/jagdeep/Projects/AndroidStudio/AutoPilot` on the Mac:
+From the project root (or replace `private/scripts/desktop.sh` with `./desktop.sh` inside the scripts folder):
 
 | Command | What happens |
 | --- | --- |

@@ -24,7 +24,8 @@
 # never overwritten: the script stops and says what to do. See private/docs/01_ONE_COMMAND_BUILDS.md.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"   # absolute, so it still works after cd
+ROOT="$(cd "$(dirname "$SCRIPT")/../.." && pwd)"
 cd "$ROOT"
 
 LEGION_HOST="${LEGION_HOST:-home-legion}"
@@ -39,7 +40,7 @@ LOW_MEMORY=(--no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-X
 FOCUSED_TESTS=(:core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :composeApp:jvmTest --tests '*DesktopDataPathsTest*' --tests '*AppVersionTest*')
 
 # The help text is the comment block at the top of this file, up to the first line of code.
-usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; }
+usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$SCRIPT"; }
 
 TARGET="${1:-}"
 case "$TARGET" in -h|--help|help) usage; exit 0 ;; esac
