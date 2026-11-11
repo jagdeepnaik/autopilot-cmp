@@ -11,6 +11,7 @@ We solved this using an on-demand scheduled task tied to the logged-in Windows a
 Windows Home does not supply the built-in Remote Desktop host used by Pro editions. No alternative remote screen-sharing tool was installed in this work. The scheduled task solves launching, not screen viewing. The course workflow can additionally require Chrome to be unlocked and in the foreground; an interactive task does not bypass that requirement.
 
 
+<a id="14-how-the-debug-launcher-was-created"></a>
 ## 14. How the debug launcher was created
 
 Two small Windows scripts and one IDE configuration were added:

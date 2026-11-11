@@ -60,6 +60,7 @@ Open **AutoPilot** from Windows Start. Verify the window controls, sidebar Home 
 
 Record the commit, MSI version/hash, installation outcome, and tested routine. Building, installing, launching, and completing a routine are separate checks.
 
+<a id="part-s--install-or-update-over-ssh--from-the-mac"></a>
 ## PART S — INSTALL OR UPDATE OVER SSH — from the Mac
 
 Installs or updates AutoPilot silently, with no installer dialogs, from a Mac Terminal. The SSH session on Legion runs with administrator rights, so the per-machine install needs no extra prompt. Use this after a successful build (Part C), then open the app on the Legion desktop to check the window (E5).

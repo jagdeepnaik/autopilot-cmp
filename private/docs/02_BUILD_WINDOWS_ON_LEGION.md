@@ -26,6 +26,7 @@ powershell.exe -NoProfile
 
 Expected: `PS C:\Users\jagde>`. You are now in **Windows SSH PowerShell**. All remaining Part C commands run there.
 
+<a id="c2-open-autopilot"></a>
 ### C2. Open AutoPilot
 
 ```powershell
@@ -70,6 +71,7 @@ For changes to the desktop window/sidebar, also run:
 .\gradlew.bat :composeApp:jvmTest --tests '*WindowsWindowControlsTest' --tests '*DesktopShellUiTest' --console=plain
 ```
 
+<a id="c6-locate-the-autopilot-installer"></a>
 ### C6. Locate the AutoPilot installer
 
 ```powershell

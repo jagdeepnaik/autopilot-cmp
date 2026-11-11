@@ -108,6 +108,7 @@ ssh home-server-remote
 
 Enter credentials only into your own Terminal. Do not send them in chat.
 
+<a id="internet-access-through-cloudflare"></a>
 ### Internet access through Cloudflare
 
 There are two routes to the Debian machine:

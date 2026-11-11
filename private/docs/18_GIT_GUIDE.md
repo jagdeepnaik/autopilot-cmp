@@ -24,6 +24,7 @@ A complete guide to Git as this project uses it: the ideas behind it, every comm
 
 ---
 
+<a id="1-the-ideas-behind-git"></a>
 ## 1. The ideas behind Git
 
 ### 1.1 What Git is
@@ -67,6 +68,7 @@ Nothing travels between the Mac and Legion directly. That's why the build machin
 
 ---
 
+<a id="2-how-this-project-uses-git"></a>
 ## 2. How this project uses Git
 
 | Rule | Why |
@@ -82,6 +84,7 @@ Checkouts: Mac `/Users/jagdeep/Projects/AndroidStudio/AutoPilot` · Legion `C:\U
 
 ---
 
+<a id="3-one-time-setup"></a>
 ## 3. One-time setup
 
 ### 3.1 Who you are
@@ -128,8 +131,10 @@ git clone https://github.com/jagdeepnaik/autopilot-cmp.git my-folder    # into a
 
 ---
 
+<a id="4-everyday-commands"></a>
 ## 4. Everyday commands
 
+<a id="41-git-status--where-am-i"></a>
 ### 4.1 `git status` — where am I?
 
 ```sh
@@ -153,6 +158,7 @@ Short-format codes: two columns, *index* then *working tree*.
 
 `## main...origin/main [ahead 1]` means one commit to push.
 
+<a id="42-git-diff--what-exactly-changed"></a>
 ### 4.2 `git diff` — what exactly changed?
 
 ```sh
@@ -167,6 +173,7 @@ git diff -- path/to/file      # one file only
 
 `+` lines were added, `-` lines removed; `@@ -10,6 +10,8 @@` says where in the file.
 
+<a id="43-git-add--stage-changes"></a>
 ### 4.3 `git add` — stage changes
 
 ```sh
@@ -178,6 +185,7 @@ git add -p                      # go through each change and choose y/n (interac
 
 `add` copies the file's *current* content into the index. If you edit it again, the new edit isn't staged until you `add` again. That's the `MM` state.
 
+<a id="44-git-commit--record-a-snapshot"></a>
 ### 4.4 `git commit` — record a snapshot
 
 ```sh
@@ -188,6 +196,7 @@ git commit                                # opens the editor for a longer messag
 
 A good message: a short first line (around 50–70 characters) saying what the commit does, a blank line, then the reason if it isn't obvious. Commit small, coherent changes; they're easier to read, revert and test.
 
+<a id="45-git-log--see-commits"></a>
 ### 4.5 `git log` — see commits
 
 ```sh
@@ -201,6 +210,7 @@ git log --author=jagdeep --since="2 days ago"
 git log -S "desktopVersion"               # commits that added or removed that text
 ```
 
+<a id="46-git-show--one-commit-in-detail"></a>
 ### 4.6 `git show` — one commit in detail
 
 ```sh
@@ -211,8 +221,10 @@ git show a8900fe:README.md       # the whole file as it was in that commit
 
 ---
 
+<a id="5-syncing-with-github-fetch-pull-push"></a>
 ## 5. Syncing with GitHub: fetch, pull, push
 
+<a id="51-git-fetch--download-change-nothing"></a>
 ### 5.1 `git fetch` — download, change nothing
 
 ```sh
@@ -221,6 +233,7 @@ git fetch origin
 
 Downloads new commits from GitHub and moves `origin/main`. Your files and your `main` don't change, so it's always safe. Afterwards, `git status -sb` shows whether you're behind.
 
+<a id="52-git-pull--fetch-then-combine"></a>
 ### 5.2 `git pull` — fetch, then combine
 
 ```sh
@@ -239,6 +252,7 @@ Nothing is changed when this happens. See [recipe 14.7](#147-a-build-machine-has
 
 Other pull styles: `git pull --rebase` replays your local commits on top of GitHub's (straight history); plain `git pull` creates a merge commit when histories have diverged.
 
+<a id="53-git-push--upload"></a>
 ### 5.3 `git push` — upload
 
 ```sh
@@ -259,10 +273,12 @@ git remote set-url origin <new-url>       # change the URL (for example after a 
 
 ---
 
+<a id="6-branches-merging-and-rebasing"></a>
 ## 6. Branches, merging and rebasing
 
 This project works on `main` only, but branches are how you try something without disturbing it.
 
+<a id="61-creating-and-switching"></a>
 ### 6.1 Creating and switching
 
 ```sh
@@ -275,6 +291,7 @@ git branch -d try-idea        # delete a merged branch (-D forces, losing unmerg
 
 `git checkout <branch>` is the older command for `git switch <branch>`. It also restores files (`git checkout -- file`), which is why `switch` and `restore` were split out of it.
 
+<a id="62-merging"></a>
 ### 6.2 Merging
 
 ```sh
@@ -297,6 +314,7 @@ Rebase takes the branch's commits and **replays them on top of** the latest `mai
 
 ---
 
+<a id="7-undoing-things"></a>
 ## 7. Undoing things
 
 Pick by *what* you want to undo. Commands marked ⚠️ discard work; see [15](#15-what-can-lose-work).
@@ -314,10 +332,12 @@ Pick by *what* you want to undo. Commands marked ⚠️ discard work; see [15](#
 | Delete untracked files | ⚠️ `git clean -n` to preview, then `git clean -fd` |
 | Find a commit I "lost" | `git reflog` |
 
+<a id="71-git-restore--files"></a>
 ### 7.1 `git restore` — files
 
 `git restore file` copies the version from the index (or the last commit) over your working file. `--staged` does the same for the index only, which is how you unstage. `git restore --source=a8900fe file` brings back a file as it was in any commit.
 
+<a id="72-git-reset--move-the-branch"></a>
 ### 7.2 `git reset` — move the branch
 
 `reset <commit>` moves the current branch label to `<commit>`. The mode decides what happens to the index and your files:
@@ -330,6 +350,7 @@ Pick by *what* you want to undo. Commands marked ⚠️ discard work; see [15](#
 
 Use `reset` only on commits you haven't pushed.
 
+<a id="73-git-revert--undo-by-adding"></a>
 ### 7.3 `git revert` — undo by adding
 
 `git revert <hash>` creates a **new** commit that applies the opposite of `<hash>`. History is kept and nothing is rewritten, so it's the right way to undo something already on GitHub. This project did exactly that: `b55d480` reverted `a8900fe` (the SSH helper move). A revert removes a file from the current code, but the file still exists in the old commit's history.
@@ -338,6 +359,7 @@ Use `reset` only on commits you haven't pushed.
 
 Replaces the last commit with a new one that includes whatever is staged now, with a new message if you like. It gets a new hash, so amend only before pushing.
 
+<a id="75-git-reflog--the-safety-net"></a>
 ### 7.5 `git reflog` — the safety net
 
 ```sh
@@ -348,6 +370,7 @@ Lists everywhere `HEAD` has been on this machine (commits, resets, checkouts, re
 
 ---
 
+<a id="8-stash-put-changes-aside"></a>
 ## 8. Stash: put changes aside
 
 ```sh
@@ -364,6 +387,7 @@ A stash is a hidden commit holding your working-tree and index changes. `-u` inc
 
 ---
 
+<a id="9-reading-history"></a>
 ## 9. Reading history
 
 ```sh
@@ -378,6 +402,7 @@ git describe --tags                     # nearest tag plus commits since (if tag
 git shortlog -sn                        # commits per author
 ```
 
+<a id="91-git-bisect--find-the-commit-that-broke-something"></a>
 ### 9.1 `git bisect` — find the commit that broke something
 
 ```sh
@@ -394,8 +419,10 @@ It halves the range each time, so even 1,000 commits need only about 10 tests.
 
 ---
 
+<a id="10-moving-deleting-and-ignoring-files"></a>
 ## 10. Moving, deleting and ignoring files
 
+<a id="101-moves-and-deletes"></a>
 ### 10.1 Moves and deletes
 
 ```sh
@@ -406,6 +433,7 @@ git rm --cached file          # stop tracking, but keep the file on disk
 
 Git doesn't store renames; it notices them by matching content (that's the `R` in status). `git mv` is the same as moving the file and running `git add -A` on both paths. This project used `git mv` to move `tools/` to `private/scripts/` and to renumber the guides, so each file's history follows it (`git log --follow`).
 
+<a id="102-gitignore"></a>
 ### 10.2 `.gitignore`
 
 Patterns in `.gitignore` tell Git to leave matching untracked files alone:
@@ -426,6 +454,7 @@ git status --ignored                          # list ignored files too
 
 ---
 
+<a id="11-tags"></a>
 ## 11. Tags
 
 ```sh
@@ -441,6 +470,7 @@ A tag is a permanent name for one commit, useful for marking a release you shipp
 
 ---
 
+<a id="12-merge-conflicts"></a>
 ## 12. Merge conflicts
 
 A conflict happens when two changes touch the same lines (during `pull`, `merge`, `rebase`, `stash apply` or `revert`). Git stops and marks the file:
@@ -464,6 +494,7 @@ To back out instead: `git merge --abort`, `git rebase --abort`, or `git revert -
 
 ---
 
+<a id="13-less-common-but-useful"></a>
 ## 13. Less common but useful
 
 | Command | What it does | Used here |
@@ -482,6 +513,7 @@ To back out instead: `git merge --abort`, `git rebase --abort`, or `git revert -
 
 ---
 
+<a id="14-recipes-for-common-situations"></a>
 ## 14. Recipes for common situations
 
 ### 14.1 Commit and push everything on the Mac
@@ -532,6 +564,7 @@ git pull --rebase      # replay your commits on top of GitHub's
 git push origin main
 ```
 
+<a id="147-a-build-machine-has-local-changes"></a>
 ### 14.7 A build machine has local changes
 
 `git pull --ff-only` stops with *"Your local changes … would be overwritten"*, or `desktop.sh` stops with *"has uncommitted changes"*. Don't reset. Compare first, then keep a backup:
@@ -550,6 +583,7 @@ To check whether an untracked file is identical to GitHub's, compare `git hash-o
 
 You checked out a commit, not a branch. Go back with `git switch main`. To keep commits made there: `git switch -c keep-this` first.
 
+<a id="149-i-committed-a-secret"></a>
 ### 14.9 I committed a secret
 
 - **Not pushed yet:** remove it and amend (`git rm --cached secret.txt`, add it to `.gitignore`, `git commit --amend`), or reset the commit.
@@ -572,6 +606,7 @@ git blame -L 40,60 path/to/file
 
 ---
 
+<a id="15-what-can-lose-work"></a>
 ## 15. What can lose work
 
 These commands can discard changes that were never committed, or remove commits. Run `git status`, and if in doubt `git stash push -u -m backup`, before using them:
@@ -590,6 +625,7 @@ Committed work is hard to lose: until garbage collection removes unreachable com
 
 ---
 
+<a id="16-cheat-sheet"></a>
 ## 16. Cheat sheet
 
 | Task | Command | More |
