@@ -102,6 +102,9 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                     Detail("User",summary.displayName)
                     Detail("Last website verification",progressCheckedLabel(summary.checkedAt))
                 }
+                if(page is PageActivity.Automation && page.modules.isNotEmpty()) {
+                    CourseModuleProgress(page.modules, page.moduleAction, viewModel::runCourseModule, viewModel::stopCourseModule)
+                }
                 RunSection("Run details")
                 routine?.let { Detail("Routine type",it.kind.label) }
                 if(page is PageActivity.Automation) {
@@ -139,6 +142,38 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                     Text("${state.toggleHotKey.name} also stops the routine",style=MaterialTheme.typography.bodyMedium)
                     Text("Back keeps it running.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CourseModuleProgress(
+    modules: List<CourseModuleStatus>,
+    activeAction: CourseModuleAction?,
+    run: (String, CourseModuleAction) -> Unit,
+    stop: () -> Unit,
+) {
+    RunSection("Module progress")
+    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Saved video, assessment and certificate status for this profile.", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        modules.forEach { module ->
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(module.module, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Videos: ${if (module.videosComplete) "complete" else "not complete"} · " +
+                        "Assessment: ${if (module.assessmentPassed) "passed" else "not passed"} · " +
+                        "Certificate: ${if (module.certificateSaved) "saved" else "not saved"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { run(module.module, CourseModuleAction.Videos) }) { Text("Run videos") }
+                    TextButton(onClick = { run(module.module, CourseModuleAction.Assessment) }) { Text("Run assessment") }
+                    if (activeAction != null) TextButton(onClick = stop) { Text("Stop selected") }
+                }
+                HorizontalDivider()
             }
         }
     }

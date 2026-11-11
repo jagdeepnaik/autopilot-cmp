@@ -124,7 +124,10 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
         val isProgress = snapshot.path.trimEnd('/') == "/dashboard/progress"
         // A selected local profile is sufficient on test pages, which omit the account header.
         // Defer the initial website import instead of navigating away from an active attempt.
-        if (phase != "ready" && snapshot.assessment?.let { it.result == null } == true) {
+        // Keep any assessment page in place during the initial profile handoff. Besides an
+        // active attempt, a completed result page can require its certificate to be downloaded
+        // before it is safe to navigate away to website progress.
+        if (phase != "ready" && snapshot.assessment != null) {
             phase = "ready"
             deferredVerification = true
         }

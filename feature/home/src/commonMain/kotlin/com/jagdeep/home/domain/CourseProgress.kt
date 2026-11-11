@@ -28,6 +28,15 @@ data class ProgressProfileRequest(val token: String, val displayName: String = "
     val profiles: List<LearningAccount> = emptyList(), val loading: Boolean = false)
 data class CourseProgressSummary(val account: String, val displayName: String, val checkedAt: Long, val records: List<LearningRecord>)
 
+/** The fixed catalogue shown by Sagar Mein Yog. Keep the running view useful before a module is opened. */
+val SAGAR_MEIN_YOG_MODULES = listOf(
+    "Emotional Wellness", "Economic Wellness", "Physical Wellness", "Occupational Wellness", "Social Wellness",
+    "Environmental Wellness", "Climatic Wellness", "Intellectual Wellness", "Cultural Wellness", "Spiritual Wellness",
+)
+
+enum class CourseModuleAction { Videos, Assessment }
+data class CourseModuleStatus(val module: String, val videosComplete: Boolean, val assessmentPassed: Boolean, val certificateSaved: Boolean)
+
 internal fun assessmentRecords(account: String, rows: List<Map<String,String>>, now: Long): List<LearningRecord>? = runCatching {
     rows.map { row ->
         fun cell(name: String) = row[name]?.trim().orEmpty()

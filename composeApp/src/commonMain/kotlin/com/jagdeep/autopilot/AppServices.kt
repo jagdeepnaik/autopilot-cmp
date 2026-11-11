@@ -46,6 +46,7 @@ internal class AppServices private constructor() {
     val liveLog = MemoryLiveLog(AppClock::nowMillis)
     private val bridge: LocalBridge = createLocalBridge(BROWSER_LINK_PORT, BROWSER_EXTENSION_ORIGIN)
     private val courseProgress = createCourseProgressRepository()
+    private val courseCertificates = createCourseCertificateStore()
     val answerBanks = createCourseAnswerBankStore()
     private val dgsTimeOrigin=kotlin.time.TimeSource.Monotonic.markNow()
     val page = PageController(
@@ -60,6 +61,7 @@ internal class AppServices private constructor() {
         answerBankStore = answerBanks,
         assessmentAlerts = createAssessmentAlerts(automation),
         progressRepository = courseProgress,
+        certificateStore = courseCertificates,
         dgsStudyRepository = com.jagdeep.home.data.StoredDgsStudyRepository(courseProgress),
         dgsElapsedMillis = {dgsTimeOrigin.elapsedNow().inWholeMilliseconds},
         extensionStatus = browserExtensionStatus,

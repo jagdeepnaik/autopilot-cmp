@@ -6069,6 +6069,16 @@
       "answer": "Extend blessings and well-being to all beings everywhere"
     },
     {
+      "question": "What is the meaning of the Shanti Path mantra?",
+      "options": [
+        "Let all wars end now.",
+        "Peace lies within only the self.",
+        "Truth alone triumphs",
+        "May the whole world live in happiness."
+      ],
+      "answer": "May the whole world live in happiness."
+    },
+    {
       "question": "What do mudras primarily aim to regulate in the body?",
       "options": [
         "Blood sugar levels",
@@ -6235,6 +6245,16 @@
         "Lokah Samastah Sukhinoh Bhavantu",
         "So Hum",
         "Hare Krishna Hare Rama"
+      ],
+      "answer": "Lokah Samastah Sukhinoh Bhavantu"
+    },
+    {
+      "question": "Which mantra expresses a universal wish for peace and happiness?",
+      "options": [
+        "Lokah Samastah Sukhinoh Bhavantu",
+        "Shree Ganeshaya Namah",
+        "So Ham",
+        "Hare Rama Hare Krishna"
       ],
       "answer": "Lokah Samastah Sukhinoh Bhavantu"
     },

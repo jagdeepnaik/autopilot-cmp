@@ -106,11 +106,13 @@ internal data class CourseAssessment(
     val submit: String? = null,
     val start: String? = null,
     val totalQuestions: Int? = null,
+    val certificate: String? = null,
+    val certificateClose: String? = null,
     val confirmSubmit: String? = null,
     val retry: String? = null,
 )
 
-enum class CourseApprovalKind { StartAssessment, SubmitAssessment, StartAssessmentPass }
+enum class CourseApprovalKind { StartAssessment, SubmitAssessment, StartAssessmentPass, CertificateDownloaded }
 data class CourseApprovalRequest(val token: String, val kind: CourseApprovalKind, val module: String)
 data class ManualAnswerRequest(val token: String, val module: String, val question: String, val options: List<String>, val answer: String, val previousAnswer: String? = null)
 data class AssessmentReviewQuestion(val id: String, val question: String, val options: List<String>, val selectedAnswer: String?, val bankAnswer: String?)

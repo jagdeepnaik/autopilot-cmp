@@ -81,6 +81,30 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var savedVideoTitles = emptySet<String>()
     private var savedPassedTitles = emptySet<String>()
     private var savedFailedTitles = emptySet<String>()
+    private var certificateProfileName: String? = null
+    private var certificateStore: CourseCertificateStore = NoCourseCertificateStore
+    private var pendingCertificate: CourseCertificateTarget? = null
+    private var pendingCertificateAt: Long? = null
+    private val recordedResultUrls = mutableSetOf<String>()
+    internal val certificateDownload: CourseCertificateTarget? get() = pendingCertificate
+
+    /** A historical pass only counts when its locally saved certificate is still available. */
+    fun configureCertificates(profileName: String?, store: CourseCertificateStore) {
+        certificateProfileName = profileName?.trim()?.takeIf { it.isNotEmpty() }
+        certificateStore = store
+    }
+
+    fun certificateDownloaded(target: CourseCertificateTarget) {
+        if (pendingCertificate == target && certificateStore.hasCertificate(target)) {
+            pendingCertificate = null
+            pendingCertificateAt = null
+        }
+    }
+
+    private val certificateTrackingActive get() = certificateStore !== NoCourseCertificateStore
+    private fun hasCertificate(module: String): Boolean = !certificateTrackingActive || certificateProfileName
+        ?.let { certificateStore.hasCertificate(CourseCertificateTarget(it, module)) } == true
+
     fun configureProgress(summary: CourseProgressSummary?) {
         val records = summary?.records.orEmpty()
         val modules = records.filter { it.kind == "module-videos" && it.status == "completed" }
@@ -88,7 +112,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         modules.map { it.details }.filter { it.startsWith("/dashboard/courses/") }.forEach(videoFinishedCourses::add)
         records.filter { it.kind == "lesson" && it.status == "completed" && it.details.startsWith("/dashboard/courses/") }
             .forEach { completedLessonPages.add(it.details) }
-        savedPassedTitles = summary?.records.orEmpty().filter { it.kind == "assessment" && it.status == "passed" }
+        savedPassedTitles = summary?.records.orEmpty().filter { it.kind == "assessment" && it.status == "passed" && hasCertificate(it.course) }
             .map { CourseAnswerBank.normalize(it.course) }.toSet()
         savedFailedTitles = summary?.records.orEmpty().filter { it.kind == "assessment" && it.status == "failed" }
             .map { CourseAnswerBank.normalize(it.course) }.toSet() - savedPassedTitles
@@ -153,7 +177,12 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             currentModule = null
             detail = "Assessment pass approved. Finding unfinished assessments."
         } else if (request.kind == CourseApprovalKind.StartAssessment) approvedStarts.add(coursePath ?: return)
-        else approvedSubmission = token
+        else if (request.kind == CourseApprovalKind.CertificateDownloaded) {
+            val target = pendingCertificate ?: return
+            certificateStore.confirmDownloaded(target)
+            certificateDownloaded(target)
+            detail = "Certificate download confirmed for ${target.module}. Returning to the dashboard."
+        } else approvedSubmission = token
         approval = null
     }
     val playbackSpeed = playbackSpeed.takeIf { it in setOf(1.0, 1.5, 2.0) } ?: 1.0
@@ -194,6 +223,26 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var completionSince = 0L
     private var coursePath: String? = null
     private var currentView: CourseView? = null
+    private var focusedModule: String? = null
+    private var focusedAction: CourseModuleAction? = null
+
+    fun runModule(module: String, moduleAction: CourseModuleAction) {
+        focusedModule = CourseAnswerBank.normalize(module)
+        focusedAction = moduleAction
+        completed = false
+        detail = "Finding $module to run its ${if (moduleAction == CourseModuleAction.Videos) "videos" else "assessment"}."
+        action = null
+        blockedPath = null
+        blockedDocument = null
+    }
+
+    fun stopFocusedModule() {
+        if (focusedModule == null) return
+        completed = true
+        detail = "Selected module stopped."
+    }
+
+    internal val moduleAction: CourseModuleAction? get() = focusedAction
 
     private enum class CourseView { Dashboard, Course, Lesson, Assessment }
 
@@ -223,7 +272,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         val pending = action?.takeIf { it.request == request } ?: return
         if (success && pending.kind != "play") clicks++
         if (success) nextActionAt = maxOf(nextActionAt, now + waitAfterClickMillis.coerceIn(0, 86_400_000))
-        if (!success && pending.kind != "play") {
+        if (!success && pending.kind == "certificateDownload") {
+            requestManualCertificate(now)
+        } else if (!success && pending.kind != "play") {
             detail = if (pending.kind == "assessmentAnswer") {
                 attention = "${pending.document}:answer:${pending.element}"
                 "Chrome could not select the saved answer. Select it manually in Chrome, then continue."
@@ -231,6 +282,13 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             blockedDocument = pending.document
         }
         action = null
+    }
+
+    private fun requestManualCertificate(now: Long) {
+        val target = pendingCertificate ?: return
+        val token = "$session:certificate:${CourseAnswerBank.normalize(target.module)}:${pendingCertificateAt ?: now}"
+        approval = CourseApprovalRequest(token, CourseApprovalKind.CertificateDownloaded, target.module)
+        detail = "AutoPilot could not download the ${target.module} certificate. Download it manually in Chrome, then confirm here to record it and continue."
     }
 
     fun read(snapshot: CourseSnapshot, now: Long) {
@@ -287,8 +345,11 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         currentView = view
         if (action != null) {
             if (now - pendingAt > 15_000) {
-                detail = "Chrome did not confirm the action. Stop and start again to retry."
-                blockedDocument = action?.document
+                if (action?.kind == "certificateDownload") requestManualCertificate(now)
+                else {
+                    detail = "Chrome did not confirm the action. Stop and start again to retry."
+                    blockedDocument = action?.document
+                }
                 action = null
             }
             return
@@ -303,10 +364,13 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             return
         }
         val elements = snapshot.elements.filter { it.visible && it.enabled }
+        val focusedHere = focusedModule != null && CourseAnswerBank.normalize(currentModule.orEmpty()) == focusedModule
         fun issue(element: CourseElement, kind: String = "click", message: String, repeat: Boolean = false) {
             val key = "$pageId:${snapshot.document}:${element.id}:$kind"
             if (!repeat && !attempted.add(key)) { detail = "Waiting for the page to change. Stop and start again if it stays here."; return }
-            action = CourseAction(++sequence, snapshot.document, element.id, kind, element.label.takeIf { kind.startsWith("assessment") })
+            action = CourseAction(++sequence, snapshot.document, element.id, kind, element.label.takeIf {
+                kind.startsWith("assessment") || kind in setOf("certificateDownload", "certificateClose")
+            })
             pendingAt = now
             detail = message
         }
@@ -329,7 +393,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             if (!snapshot.top) return
             // An already active attempt must not be stranded by the video's-first run setting.
             if (learningOrder == LearningOrder.VideosFirst && snapshot.assessment?.questions?.isNotEmpty() == true) assessmentPass = true
-            if (learningOrder == LearningOrder.VideosFirst && !assessmentPass) {
+            // A finished result page is a safe post-assessment handoff, not a new assessment.
+            // It must remain reachable in a videos-first run so a passed certificate can be
+            // collected (and a failed result can be reported) before returning to the course.
+            if (learningOrder == LearningOrder.VideosFirst && !assessmentPass && snapshot.assessment?.result == null) {
                 detail = "This run watches videos only. Assessments are left for a later run. Return to the course in Chrome to continue videos."
                 return
             }
@@ -428,6 +495,42 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 return
             }
             if (assessment.result == "passed") {
+                val module = assessment.module.takeIf { it.isNotBlank() } ?: currentModule.orEmpty()
+                val target = certificateProfileName?.let { CourseCertificateTarget(it, module) }
+                if (certificateTrackingActive && target == null) {
+                    detail = "Assessment passed. Choose a progress profile so its certificate can be saved."
+                    return
+                }
+                if (certificateTrackingActive && recordedResultUrls.add(snapshot.path)) {
+                    certificateStore.recordResultUrl(requireNotNull(target), "https://sagarmeinyog.com${snapshot.path}")
+                }
+                if (certificateTrackingActive && !certificateStore.hasCertificate(requireNotNull(target))) {
+                    val certificate = elements.firstOrNull { element ->
+                        element.id == assessment.certificate && element.label.trim() in setOf("View certificate", "Download PDF")
+                    }
+                    if (pendingCertificate == null && certificate != null) {
+                        pendingCertificate = requireNotNull(target)
+                        pendingCertificateAt = now
+                        issue(certificate, "certificateDownload", "Downloading the $module certificate before returning to the dashboard.")
+                    } else if (pendingCertificate != null && certificate?.label?.trim().equals("Download PDF", true)) {
+                        issue(requireNotNull(certificate), "certificateDownload", "Downloading the $module certificate PDF.")
+                    } else if (pendingCertificate != null) {
+                        if (now - (pendingCertificateAt ?: now) > 20_000) requestManualCertificate(now)
+                        else detail = "Waiting for the $module certificate download to finish."
+                    } else detail = "Assessment passed. Waiting for the View certificate button."
+                    return
+                }
+                val certificateClose = elements.firstOrNull { it.id == assessment.certificateClose && it.label.trim().equals("Close", true) }
+                if (certificateClose != null) {
+                    issue(certificateClose, "certificateClose", "Closing the downloaded certificate preview.")
+                    return
+                }
+                pendingCertificate = null
+                if (focusedAction == CourseModuleAction.Assessment && focusedHere) {
+                    completed = true
+                    detail = "$module assessment and certificate are complete."
+                    return
+                }
                 passedAssessments.add(path)
                 if (completedCourses.add(path)) progressCheckpoint++
                 openedCard?.let(completedCards::add)
@@ -483,12 +586,18 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val next = elements.firstOrNull { it.id == assessment.next && it.label.trim().lowercase() in setOf("next", "next question") }
             val expectedCount = assessment.totalQuestions ?: saved?.size ?: 0
             if (next != null && confirmed.size < expectedCount) { issue(next, "assessmentNext", "Opening the next assessment question."); return }
+            val submit = elements.firstOrNull { it.id == assessment.submit && it.label.trim().lowercase() in setOf("submit", "submit assessment", "submit answers", "end test") }
             // A full known bank must be covered, with every displayed answer observed selected.
-            // Never submit based on click acknowledgements or a guessed last-page button.
-            if (confirmed.size != expectedCount || (assessment.totalQuestions == null && !saved.orEmpty().all { CourseAnswerBank.normalize(it.question) in confirmed.values })) {
+            // Never submit based on click acknowledgements or a guessed last-page button. Review
+            // mode deliberately hands a resumed, already-selected final page back to the user:
+            // choices made before the app connected cannot be verified automatically, but the
+            // user can inspect them before explicitly approving any submission.
+            val allQuestionsConfirmed = confirmed.size == expectedCount &&
+                (assessment.totalQuestions != null || saved.orEmpty().all { CourseAnswerBank.normalize(it.question) in confirmed.values })
+            val readyForReview = assessmentMode == AssessmentMode.Review && submit != null && answers.all { it.second!!.selected }
+            if (!allQuestionsConfirmed && !readyForReview) {
                 detail = "Assessment paused: not all assessment questions have been confirmed."; return
             }
-            val submit = elements.firstOrNull { it.id == assessment.submit && it.label.trim().lowercase() in setOf("submit", "submit assessment", "submit answers", "end test") }
             if (submit != null) {
                 if (!requireApproval(CourseApprovalKind.SubmitAssessment, assessment.module, confirmed.entries.sortedBy { it.key }.joinToString() + assessment.questions.toString())) return
                 submittedAssessments.add(path)
@@ -579,6 +688,18 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         }
         if (!snapshot.top) return
         if (view == CourseView.Course) {
+            if (focusedAction == CourseModuleAction.Assessment && focusedHere) {
+                val assessment = elements.firstOrNull { it.label.trim().equals("Assessment", true) }
+                if (assessment == null) {
+                    detail = "Waiting for the $currentModule Assessment button."
+                    return
+                }
+                val module = currentModule ?: "this module"
+                if (!requireApproval(CourseApprovalKind.StartAssessment, module, path)) return
+                assessmentCourse = path
+                issue(assessment, "assessmentOpen", "Opening the selected $module assessment.")
+                return
+            }
             // Completed rows change their button to Rewatch video on the live site. Keep them in
             // the row order so completing Part 3 cannot make Part 4 inherit Part 3's fallback key.
             if (path !in videoFinishedCourses) {
@@ -629,6 +750,11 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             pendingCompletions["module-videos:$path"] = CourseCompletion("module-videos:$path", title, "module-videos", "All module videos", path)
             }
             val moduleTitle = moduleTitles[path] ?: currentModule
+            if (focusedAction == CourseModuleAction.Videos && focusedHere) {
+                completed = true
+                detail = "$moduleTitle videos are complete."
+                return
+            }
             if (moduleTitle != null && CourseAnswerBank.normalize(moduleTitle) in savedPassedTitles) passedAssessments.add(path)
             if (answerAssessments && (learningOrder == LearningOrder.AssessmentAfterModule || assessmentPass) && path !in passedAssessments) {
                 if (assessmentMode != AssessmentMode.Manual && answerBank == null) { detail = "Videos finished. Validate $answerBankFile in the routine options before starting the assessment."; return }
@@ -677,7 +803,8 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         }
         val cards = allCards.filter { !cachedFinished(it) && (!done(it.context) || assessmentPass) && it.context !in completedCards &&
             (it.courseTitle == null || CourseAnswerBank.normalize(it.courseTitle) !in finishedTitles) &&
-            (!assessmentPass || it.courseTitle?.let { title -> CourseAnswerBank.normalize(title) !in savedPassedTitles } != false) }
+            (!assessmentPass || it.courseTitle?.let { title -> CourseAnswerBank.normalize(title) !in savedPassedTitles } != false) &&
+            (focusedModule == null || it.courseTitle?.let(CourseAnswerBank::normalize) == focusedModule) }
         val next = cards.groupBy { it.context }.values.firstNotNullOfOrNull { controls ->
             controls.firstOrNull { it.href?.let { href -> href !in completedCourses && Regex("/dashboard/courses/[A-Za-z0-9_-]+").matches(href) } == true }
                 ?: controls.lastOrNull { it.svg && it.label.isBlank() }

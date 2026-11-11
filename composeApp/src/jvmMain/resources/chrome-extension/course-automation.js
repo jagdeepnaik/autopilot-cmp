@@ -61,14 +61,24 @@
     });
     const moduleTitle = liveTest ? [...document.querySelectorAll('div,h1,h2,h3')].find((node) =>
       node.childElementCount === 0 && visible(node) && /^.+\s+Assessment$/i.test(safeText(node, 240))) : null;
-    const module = moduleLink ? safeText(moduleLink, 240) : moduleTitle ? safeText(moduleTitle, 240).replace(/\s+Assessment$/i, '') : '';
     const resultRoute = /^\/dashboard\/courses\/[A-Za-z0-9_-]+\/assessment\/result\/[A-Za-z0-9_-]+$/.test(location.pathname);
+    const resultText = safeText(root, 10000);
+    // During result-page loading the breadcrumb temporarily renders the internal course id.
+    // The cleared-result copy contains the stable course title, which is what file records use.
+    const resultModule = resultRoute ? resultText.match(/You've scored\s+[\d.]+\s*%\s+(.+?)\s+CLEARED\b/i)?.[1]?.trim() : null;
+    const module = resultModule || (moduleLink ? safeText(moduleLink, 240) : moduleTitle ? safeText(moduleTitle, 240).replace(/\s+Assessment$/i, '') : '');
     const statuses = [...root.querySelectorAll('h1,h2,h3,h4,[role="status"]')].filter(visible).map((node) => safeText(node));
-    const clearedResult = resultRoute && [...root.querySelectorAll('div,span,p')].some((node) => visible(node) && /^CLEARED$/.test(safeText(node))) && /Well done — you've successfully passed with a score above 75%!/.test(safeText(root, 10000));
+    // The certificate preview replaces the result content visually, but stays on the same
+    // passed-result route. Its download button is therefore an unambiguous continuation of the
+    // certificate handoff.
+    const modalDownload = [...document.querySelectorAll('button,input[type="submit"]')]
+      .filter(visible).find((node) => /^download pdf$/i.test(label(node)));
+    const clearedResult = resultRoute && [...root.querySelectorAll('div,span,p')].some((node) => visible(node) && /^CLEARED$/.test(safeText(node))) && /Well done — you've successfully passed with a score above 75%!/.test(resultText);
     const failedResult = resultRoute && [...root.querySelectorAll('div,span,p')].some((node) => visible(node) && /^NOT CLEARED$/.test(safeText(node))) &&
       safeText(root, 10000).includes('You need to score higher than 75% to pass this course.');
     const result = clearedResult || statuses.some((text) => /^(?:assessment passed[.!]?|you (?:have )?(?:successfully )?passed(?: the assessment)?[.!]?|congratulations[!,]? you passed(?: the assessment)?!?)$/i.test(text)) ? 'passed' :
-      failedResult || statuses.some((text) => /^(?:assessment failed|you (?:did not|didn't) pass(?: the assessment)?[.!]?)$/i.test(text)) ? 'failed' : null;
+      failedResult || statuses.some((text) => /^(?:assessment failed|you (?:did not|didn't) pass(?: the assessment)?[.!]?)$/i.test(text)) ? 'failed' :
+      modalDownload ? 'passed' : null;
     const groups = new Map();
     for (const radio of radios.filter((node) => root.contains(node))) {
       const group = radio.closest('[role="radiogroup"],fieldset') || (radio.name ? root.querySelector(`input[type="radio"][name="${CSS.escape(radio.name)}"]`)?.parentElement?.parentElement : null);
@@ -92,16 +102,25 @@
         enabled: !node.matches(':disabled') && !node.closest('[inert],[aria-disabled="true"]'), visible: true })) });
     }
     const buttons = [...root.querySelectorAll('button,input[type="submit"]')].filter(visible);
+    // The certificate preview is rendered in a portal outside <main>. Its Download PDF button
+    // therefore must be found from the document rather than from the assessment result root.
+    const documentButtons = [...document.querySelectorAll('button,input[type="submit"]')].filter(visible);
     const next = buttons.find((node) => /^(?:next|next question)$/i.test(label(node)));
     const submit = buttons.find((node) => /^(?:submit|submit assessment|submit answers|end test)$/i.test(label(node)));
     const start = buttons.find((node) => /^start assessment$/i.test(label(node)));
     const retry = result === 'failed' ? buttons.find((node) => /^re-attempt$/i.test(label(node))) : null;
+    const certificate = result === 'passed' ?
+      documentButtons.find((node) => /^download pdf$/i.test(label(node))) ||
+      buttons.find((node) => /^view certificate$/i.test(label(node))) : null;
+    const certificateClose = result === 'passed' && modalDownload ?
+      documentButtons.find((node) => /^close$/i.test(label(node))) : null;
     const confirmSubmit = liveTest && [...root.querySelectorAll('div,p')].some((node) => visible(node) && safeText(node) === 'Your answers will be submitted. Are you sure you want to end the test?')
       ? buttons.filter((node) => /^end test$/i.test(label(node))).at(-1) : null;
     const countText = liveTest ? [...root.querySelectorAll('div')].find((node) => node.childElementCount === 0 && visible(node) && /^\d+\s+out of\s+\d+$/i.test(node.textContent.trim()))?.textContent : null;
     const totalQuestions = countText ? Number(countText.trim().match(/out of\s+(\d+)$/i)[1]) : null;
     return { module, questions, result, next: next ? identify(next) : null, submit: submit ? identify(submit) : null,
-      start: start ? identify(start) : null, totalQuestions, confirmSubmit: confirmSubmit ? identify(confirmSubmit) : null, retry: retry ? identify(retry) : null };
+      start: start ? identify(start) : null, totalQuestions, certificate: certificate ? identify(certificate) : null,
+      certificateClose: certificateClose ? identify(certificateClose) : null, confirmSubmit: confirmSubmit ? identify(confirmSubmit) : null, retry: retry ? identify(retry) : null };
   }
   function visible(element) {
     const box = element.getBoundingClientRect(), style = getComputedStyle(element);
@@ -245,6 +264,19 @@
     if (window !== window.top || location.origin !== 'https://sagarmeinyog.com') return false;
     const actual = action.kind === 'assessmentAnswer' ? optionLabel(node) : label(node);
     if (!action.expectedLabel || actual !== action.expectedLabel) return false;
+    // The preview portal can hide the assessment result DOM. This is still safe to authorize:
+    // only the exact Download PDF control on a concrete assessment-result route may continue a
+    // certificate action that the app already initiated from a passed result.
+    if (action.kind === 'certificateDownload' && /^download pdf$/i.test(actual)) {
+      return node.matches('button,input[type="submit"]') &&
+        /^\/dashboard\/courses\/[A-Za-z0-9_-]+\/assessment\/result\/[A-Za-z0-9_-]+$/.test(location.pathname);
+    }
+    if (action.kind === 'certificateClose' && /^close$/i.test(actual)) {
+      const download = [...document.querySelectorAll('button,input[type="submit"]')].filter(visible)
+        .some((button) => /^download pdf$/i.test(label(button)));
+      return node.matches('button') && download &&
+        /^\/dashboard\/courses\/[A-Za-z0-9_-]+\/assessment\/result\/[A-Za-z0-9_-]+$/.test(location.pathname);
+    }
     if (action.kind === 'assessmentOpen') return node.matches('button,a') && /^assessment$/i.test(actual);
     const assessment = assessmentInventory();
     if (!assessment) return false;
@@ -253,6 +285,8 @@
     if (action.kind === 'assessmentStart') return assessment.start === action.element && /^start assessment$/i.test(actual);
     if (action.kind === 'assessmentSubmit') return assessment.submit === action.element;
     if (action.kind === 'assessmentConfirmSubmit') return assessment.confirmSubmit === action.element && /^end test$/i.test(actual);
+    if (action.kind === 'certificateDownload') return assessment.result === 'passed' && assessment.certificate === action.element && /^(?:view certificate|download pdf)$/i.test(actual);
+    if (action.kind === 'certificateClose') return assessment.result === 'passed' && assessment.certificateClose === action.element && /^close$/i.test(actual);
     if (action.kind === 'assessmentRetry') return assessment.result === 'failed' && assessment.retry === action.element && /^re-attempt$/i.test(actual);
     if (action.kind === 'assessmentReturn') return node.matches('a,button') && !/submit|retry|retake|quiz|exam/i.test(actual);
     return false;

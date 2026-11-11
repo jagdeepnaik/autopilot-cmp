@@ -495,11 +495,94 @@ class CourseAssessmentTest {
     }
 
     @Test
+    fun `given review mode resumes a partly completed assessment then it asks the user to review before submission`() {
+        val runner = CourseAutomationSession("s", answerAssessments = true, assessmentMode = AssessmentMode.Review)
+        runner.configureAnswers(bank)
+        val selected = q.copy(options = q.options.map { it.copy(selected = it.id == "b") })
+
+        runner.read(page(submit, assessment = CourseAssessment("Wellness", listOf(selected), submit = "submit", totalQuestions = 2)), 0)
+
+        assertNull(runner.action)
+        assertEquals(CourseApprovalKind.SubmitAssessment, runner.approval?.kind)
+        assertTrue(runner.detail.contains("Review Wellness"))
+    }
+
+    @Test
     fun `given real Start Assessment confirmation then approved attempt can proceed without touching course navigation`() {
         val runner = ready()
         val start = CourseElement("start", label = "Start Assessment")
         runner.read(page(start, assessment = CourseAssessment("Wellness", start = "start")), 3000)
         assertEquals("assessmentStart", runner.action?.kind)
         assertEquals("start", runner.action?.element)
+    }
+
+    @Test
+    fun `given a passed assessment without a certificate then download it before returning`() {
+        val stored = mutableSetOf<CourseCertificateTarget>()
+        val certificates = object : CourseCertificateStore {
+            override fun hasCertificate(target: CourseCertificateTarget) = target in stored
+            override fun prepareDownload(target: CourseCertificateTarget) = Unit
+            override fun collectDownloaded(target: CourseCertificateTarget) = target in stored
+            override fun confirmDownloaded(target: CourseCertificateTarget) { stored += target }
+            override fun recordResultUrl(target: CourseCertificateTarget, url: String) = Unit
+        }
+        val runner = CourseAutomationSession("s", answerAssessments = true)
+        runner.configureCertificates("Jagdeep", certificates)
+        val certificate = CourseElement("certificate", label = "View certificate")
+        val passed = CourseAssessment("Wellness", result = "passed", certificate = certificate.id)
+
+        runner.read(page(certificate, assessment = passed), 0)
+
+        assertEquals("certificateDownload", runner.action?.kind)
+        val target = requireNotNull(runner.certificateDownload)
+        stored += target
+        runner.certificateDownloaded(target)
+        runner.acknowledge(runner.action!!.request, true)
+        runner.read(page(home, assessment = passed), 1)
+        assertEquals("assessmentReturn", runner.action?.kind)
+    }
+
+    @Test
+    fun `given a saved certificate preview then close it before returning`() {
+        val stored = mutableSetOf<CourseCertificateTarget>()
+        val certificates = object : CourseCertificateStore {
+            override fun hasCertificate(target: CourseCertificateTarget) = target in stored
+            override fun prepareDownload(target: CourseCertificateTarget) = Unit
+            override fun collectDownloaded(target: CourseCertificateTarget) = target in stored
+            override fun confirmDownloaded(target: CourseCertificateTarget) { stored += target }
+            override fun recordResultUrl(target: CourseCertificateTarget, url: String) = Unit
+        }
+        val runner = CourseAutomationSession("s", answerAssessments = true)
+        runner.configureCertificates("Jagdeep", certificates)
+        val target = CourseCertificateTarget("Jagdeep", "Wellness")
+        stored += target
+        val close = CourseElement("close", label = "Close")
+        runner.read(page(close, assessment = CourseAssessment("Wellness", result = "passed", certificateClose = close.id)), 0)
+
+        assertEquals("certificateClose", runner.action?.kind)
+    }
+
+    @Test
+    fun `given certificate download is refused then user confirmation records completion`() {
+        val stored = mutableSetOf<CourseCertificateTarget>()
+        val certificates = object : CourseCertificateStore {
+            override fun hasCertificate(target: CourseCertificateTarget) = target in stored
+            override fun prepareDownload(target: CourseCertificateTarget) = Unit
+            override fun collectDownloaded(target: CourseCertificateTarget) = false
+            override fun confirmDownloaded(target: CourseCertificateTarget) { stored += target }
+            override fun recordResultUrl(target: CourseCertificateTarget, url: String) = Unit
+        }
+        val runner = CourseAutomationSession("s", answerAssessments = true)
+        runner.configureCertificates("Jagdeep", certificates)
+        val certificate = CourseElement("certificate", label = "View certificate")
+        val passed = CourseAssessment("Wellness", result = "passed", certificate = certificate.id)
+
+        runner.read(page(certificate, assessment = passed), 0)
+        runner.acknowledge(requireNotNull(runner.action).request, false, 1)
+
+        assertEquals(CourseApprovalKind.CertificateDownloaded, runner.approval?.kind)
+        runner.approveAssessment(requireNotNull(runner.approval).token)
+        runner.read(page(home, assessment = passed), 2)
+        assertEquals("assessmentReturn", runner.action?.kind)
     }
 }

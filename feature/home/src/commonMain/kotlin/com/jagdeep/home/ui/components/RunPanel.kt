@@ -159,12 +159,22 @@ internal fun RunPanel(
                     confirmButton = { TextButton(onClick = { onApproveAssessment(activity.approval.token) }) { Text("Approve submission") } },
                     dismissButton = { TextButton(onClick = onStop) { Text("Stop without submitting") } })
             }
-            if (activity is PageActivity.Automation && activity.approval != null && activity.approval.kind != com.jagdeep.home.domain.CourseApprovalKind.SubmitAssessment) {
+            if (activity is PageActivity.Automation && activity.approval?.kind == com.jagdeep.home.domain.CourseApprovalKind.CertificateDownloaded) {
+                AlertDialog(onDismissRequest = {}, title = { Text("Download certificate manually") },
+                    text = { Text("AutoPilot could not finish downloading the ${activity.approval.module} certificate. In Chrome, download the certificate now. When it is complete, confirm below so AutoPilot records the assessment and certificate as complete, then continues.") },
+                    confirmButton = { TextButton(onClick = { onApproveAssessment(activity.approval.token) }) { Text("I downloaded the certificate") } },
+                    dismissButton = { TextButton(onClick = onStop) { Text("Stop for now") } })
+            }
+            if (activity is PageActivity.Automation && activity.approval != null && activity.approval.kind !in setOf(
+                    com.jagdeep.home.domain.CourseApprovalKind.SubmitAssessment,
+                    com.jagdeep.home.domain.CourseApprovalKind.CertificateDownloaded,
+                )) {
                 Button(onClick = { onApproveAssessment(activity.approval.token) }) {
                     Text(when(activity.approval.kind) {
                         com.jagdeep.home.domain.CourseApprovalKind.StartAssessment -> "Allow assessment attempt"
                         com.jagdeep.home.domain.CourseApprovalKind.StartAssessmentPass -> "Begin assessment pass"
                         com.jagdeep.home.domain.CourseApprovalKind.SubmitAssessment -> "Approve submission"
+                        com.jagdeep.home.domain.CourseApprovalKind.CertificateDownloaded -> "I downloaded the certificate"
                     })
                 }
             }

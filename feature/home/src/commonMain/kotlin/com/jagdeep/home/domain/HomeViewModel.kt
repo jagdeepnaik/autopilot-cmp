@@ -91,6 +91,8 @@ class HomeViewModel(
     fun confirmManualAnswer(token: String, save: Boolean) = controller.page.confirmManualAnswer(token, save)
     fun saveReviewedAnswers(token: String, answers: Map<String, String>) = controller.page.saveReviewedAnswers(token, answers)
     fun retryAssessment(token: String, automatic: Boolean) = controller.page.retryAssessment(token, automatic)
+    fun runCourseModule(module: String, action: CourseModuleAction) = controller.page.runCourseModule(module, action)
+    fun stopCourseModule() = controller.page.stopCourseModule()
 
     fun select(routine: Routine) {
         viewModelScope.launch { repository.select(routine.id) }

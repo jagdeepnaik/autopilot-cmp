@@ -52,6 +52,8 @@ sealed interface PageActivity {
         val context: CourseRunContext = CourseRunContext(),
         val progressProfile: ProgressProfileRequest? = null,
         val progressSummary: CourseProgressSummary? = null,
+        val modules: List<CourseModuleStatus> = emptyList(),
+        val moduleAction: CourseModuleAction? = null,
         val savingAnswer: Boolean = false,
         val answerSaveError: String? = null,
     ) : PageActivity
@@ -97,6 +99,8 @@ interface PageRunner {
     fun confirmProgressProfile(token: String, localName: String) = Unit
     fun saveReviewedAnswers(token: String, answers: Map<String, String>) = Unit
     fun retryAssessment(token: String, automatic: Boolean) = Unit
+    fun runCourseModule(module: String, action: CourseModuleAction) = Unit
+    fun stopCourseModule() = Unit
     fun selectDgsCourse(id: String) = Unit
 }
 
@@ -107,6 +111,8 @@ object NoPageRunner : PageRunner {
     override fun start(routine: Routine): String = "This kind of routine works with Chrome on a computer."
     override fun stop() = false
     override fun toggleScrolling() = Unit
+    override fun runCourseModule(module: String, action: CourseModuleAction) = Unit
+    override fun stopCourseModule() = Unit
 }
 
 /** Shared extension command. Retired helper fields stay inert for older installed extensions. */
@@ -161,11 +167,13 @@ class PageController(
     private val answerBankStore: CourseAnswerBankStore = NoCourseAnswerBankStore,
     private val assessmentAlerts: AssessmentAlerts = AssessmentAlerts { automation.playAlert() },
     private val progressRepository: CourseProgressRepository = NoCourseProgressRepository,
+    private val certificateStore: CourseCertificateStore = NoCourseCertificateStore,
     private val dgsStudyRepository:DgsStudyRepository = NoDgsStudyRepository,
     private val dgsElapsedMillis:()->Long = now,
     extensionStatus: StateFlow<com.jagdeep.shared.browser.BrowserExtensionStatus> = MutableStateFlow(com.jagdeep.shared.browser.BrowserExtensionStatus()),
 ) : PageRunner {
     private var historySelection = ""
+    private var lastCourseSnapshot: CourseSnapshot? = null
     private val progressMarkers = mutableMapOf<String, String>()
     private fun observeProgress(channel: String, marker: String) {
         if (progressMarkers[channel] == marker) return
@@ -203,7 +211,9 @@ class PageController(
             courseProgressMutex.withLock {
                 if (courseProgress !== tracking) return@withLock
                 val accepted = tracking.confirm(token, localName, now())
-                if (accepted) tracking.requireSync()
+                // A passed result page is already the certificate handoff. Do not navigate away
+                // to the progress table before the result URL and PDF have been saved.
+                if (accepted && lastCourseSnapshot?.assessment?.result != "passed") tracking.requireSync()
                 mutableState.update { state ->
                     val activity = state.activity as? PageActivity.Automation ?: return@update state
                     state.copy(activity = activity.copy(progressProfile = tracking.request,
@@ -291,6 +301,27 @@ class PageController(
             state.copy(activity = activity.copy(approval = runner.approval))
         }
         automation.apps.bringToFront(BROWSER_APP_NAME)
+    }
+
+    override fun runCourseModule(module: String, action: CourseModuleAction) {
+        val runner = courseAutomation ?: return
+        runner.runModule(module, action)
+        mutableState.update { state ->
+            val activity = state.activity as? PageActivity.Automation ?: return@update state
+            state.copy(activity = activity.copy(detail = runner.detail, moduleAction = action))
+        }
+        publish()
+        automation.apps.bringToFront(BROWSER_APP_NAME)
+    }
+
+    override fun stopCourseModule() {
+        val runner = courseAutomation ?: return
+        runner.stopFocusedModule()
+        mutableState.update { state ->
+            val activity = state.activity as? PageActivity.Automation ?: return@update state
+            state.copy(activity = activity.copy(detail = runner.detail, moduleAction = null))
+        }
+        publish()
     }
     private var questionAlertKey: String? = null
     private var questionAlertAt: Long? = null
@@ -553,6 +584,12 @@ class PageController(
             if (courseProgress?.request == null) automation.apps.bringToFront(BROWSER_APP_NAME)
             while (true) {
                 if (!state.value.isConnected) { outcome = RunOutcome.BrowserDisconnected; break }
+                runner?.certificateDownload?.let { target ->
+                    if (certificateStore.collectDownloaded(target)) {
+                        runner.certificateDownloaded(target)
+                        live.log(LiveSource.Routine) { "Saved ${target.module} certificate for ${target.profileName}" }
+                    }
+                }
                 if (runner != null) updateAssessmentAlerts(runner)
                 if (runner != null && now() - lastCourseInventoryAt > 5_000 && runner.approval == null && runner.attention == null && runner.failure == null && runner.manualAnswer == null && courseProgress?.request == null) {
                     mutableState.update { state ->
@@ -714,6 +751,7 @@ class PageController(
             live.log(LiveSource.Chrome) { "Course action ${event.request}: ${if (event.success) "accepted" else "refused"}" }
             if (courseProgress?.acknowledge(event.request, event.success, now()) != true) runner.acknowledge(event.request, event.success, now())
         } else courseChunks.accept(event)?.let { snapshot ->
+            lastCourseSnapshot = snapshot
             lastCourseInventoryAt = now()
             observeProgress("course:${snapshot.document}", snapshot.progressMarker())
             val summary = "Course page ${snapshot.path} top=${snapshot.top} · " + snapshot.elements
@@ -743,6 +781,7 @@ class PageController(
             val progressHandled = tracking?.process(snapshot, now(), learningActionPending = runner.action != null) == true
             if (courseAutomation !== runner) return true
             if (!progressHandled) {
+                runner.configureCertificates(courseProgress?.summary?.displayName, certificateStore)
                 runner.configureProgress(tracking?.summary)
                 runner.read(snapshot, now())
                 tracking?.capture(snapshot, runner, now())
@@ -754,6 +793,9 @@ class PageController(
             }
             updateAssessmentAlerts(runner)
             if (runner.action != null && runner.action != previousAction) {
+                if (runner.action?.kind == "certificateDownload") {
+                    runner.certificateDownload?.let(certificateStore::prepareDownload)
+                }
                 val target = snapshot.elements.firstOrNull { it.id == runner.action?.element }
                 live.log(LiveSource.Chrome) {
                     "Course target ${target?.id}: ${target?.tag} '${target?.label}' · ${target?.context?.take(180)}"
@@ -767,10 +809,23 @@ class PageController(
             context = activity.context.copy(module = runner.currentModule ?: activity.context.module),
             manualAnswer = runner.manualAnswer, failure = runner.failure,
             progressProfile = courseProgress?.request, progressSummary = courseProgress?.summary,
+            modules = moduleStatuses(courseProgress?.summary), moduleAction = runner.moduleAction,
             savingAnswer = activity.savingAnswer && activity.manualAnswer?.token == runner.manualAnswer?.token,
             answerSaveError = activity.answerSaveError.takeIf { activity.manualAnswer?.token == runner.manualAnswer?.token })) }
         publish()
         return true
+        }
+    }
+
+    private fun moduleStatuses(summary: CourseProgressSummary?): List<CourseModuleStatus> {
+        val profile = summary?.displayName ?: return SAGAR_MEIN_YOG_MODULES.map { CourseModuleStatus(it, false, false, false) }
+        val records = summary.records
+        return SAGAR_MEIN_YOG_MODULES.map { module ->
+            val normalized = CourseAnswerBank.normalize(module)
+            val videos = records.any { it.kind == "module-videos" && it.status == "completed" && CourseAnswerBank.normalize(it.course) == normalized }
+            val passed = records.any { it.kind == "assessment" && it.status == "passed" && CourseAnswerBank.normalize(it.course) == normalized }
+            val certificate = passed && certificateStore.hasCertificate(CourseCertificateTarget(profile, module))
+            CourseModuleStatus(module, videos, passed, certificate)
         }
     }
 
