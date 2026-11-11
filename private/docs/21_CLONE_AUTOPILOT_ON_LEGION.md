@@ -1,6 +1,6 @@
-# 20 — Clone AutoPilot on Legion for the First Time
+# 21 — Clone AutoPilot on Legion for the First Time
 
-[All guides](00_INDEX.md) · [SSH setup](18_SET_UP_WINDOWS_SSH.md) · [Build after cloning](02_BUILD_WINDOWS_ON_LEGION.md)
+[All guides](00_INDEX.md) · [SSH setup](19_SET_UP_WINDOWS_SSH.md) · [Build after cloning](02_BUILD_WINDOWS_ON_LEGION.md)
 
 ## PART B — NEW PROJECT PREPARATION — once per app
 

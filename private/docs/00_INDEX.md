@@ -1,6 +1,6 @@
 # 00 — AutoPilot Documentation Index
 
-**Open this file first.** The guides are numbered by how often you'll need them: 01–08 are everyday tasks, 09–12 are the home-server route, 13–17 are background reading, and 18–26 are one-time setup and old shortcut pages. Each guide links back here. Opening a guide doesn't start any build, installation or connection.
+**Open this file first.** The guides are numbered by how often you'll need them: 01–08 are everyday tasks, 09–12 are the home-server route, 13–18 are background reading and reference (including the Git guide), and 19–27 are one-time setup and old shortcut pages. Each guide links back here. Opening a guide doesn't start any build, installation or connection.
 
 Updated 11 November 2026.
 
@@ -16,6 +16,8 @@ Updated 11 November 2026.
 | Fix "already installed" | [08 · H5 Updating an installed copy](08_FIX_WINDOWS_INSTALLER.md#h5-updating-an-installed-copy) |
 | See why a one-command run stopped | [01 · When it stops](01_ONE_COMMAND_BUILDS.md#when-it-stops) |
 | Debug the Windows app from the Mac | [04 · Debug from the Mac](04_DEBUG_WINDOWS_FROM_MAC.md) |
+| Look up a Git command, or fix a Git problem | [18 · Cheat sheet](18_GIT_GUIDE.md#16-cheat-sheet) · [Recipes](18_GIT_GUIDE.md#14-recipes-for-common-situations) · [Undoing things](18_GIT_GUIDE.md#7-undoing-things) |
+| A pull refused because of local changes | [18 · Recipe 14.7](18_GIT_GUIDE.md#147-a-build-machine-has-local-changes) |
 
 ## 01–08 · Everyday
 
@@ -43,7 +45,7 @@ Updated 11 November 2026.
 
 `private/scripts/desktop.sh server` and `private/scripts/desktop.sh vm` run these steps in one command. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.
 
-## 13–17 · Background and recorded evidence
+## 13–18 · Background, reference and recorded evidence
 
 | Topic | Guide |
 | --- | --- |
@@ -52,24 +54,25 @@ Updated 11 November 2026.
 | Windows build and debug details, with recorded tests | [15_WINDOWS_BUILD_DEBUG_REFERENCE.md](15_WINDOWS_BUILD_DEBUG_REFERENCE.md) |
 | Server tests and earlier build results | [16_SERVER_BUILD_TESTS_AND_RESULTS.md](16_SERVER_BUILD_TESTS_AND_RESULTS.md) |
 | How SSH and its keys work | [17_UNDERSTAND_SSH_AND_KEYS.md](17_UNDERSTAND_SSH_AND_KEYS.md) |
+| **Git: how it works, every important command, recipes and a cheat sheet** | [18_GIT_GUIDE.md](18_GIT_GUIDE.md) |
 
-## 18–22 · One-time setup — already done
+## 19–23 · One-time setup — already done
 
 Legion, the server and the VM are already set up. Use these only for a new machine, or to repair one.
 
 | Task | Guide |
 | --- | --- |
-| Set up SSH and PowerShell access on Legion | [18_SET_UP_WINDOWS_SSH.md](18_SET_UP_WINDOWS_SSH.md) |
-| Set up protected keys and the macOS Keychain | [19_SET_UP_PASSWORD_FREE_SSH.md](19_SET_UP_PASSWORD_FREE_SSH.md) |
-| Clone AutoPilot on Legion for the first time | [20_CLONE_AUTOPILOT_ON_LEGION.md](20_CLONE_AUTOPILOT_ON_LEGION.md) |
-| Register the `AutoPilot-Debug` launcher on Legion | [21_SET_UP_WINDOWS_DEBUG_LAUNCHER.md](21_SET_UP_WINDOWS_DEBUG_LAUNCHER.md) |
-| Install the home server and its Windows VM | [22_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md](22_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md) |
+| Set up SSH and PowerShell access on Legion | [19_SET_UP_WINDOWS_SSH.md](19_SET_UP_WINDOWS_SSH.md) |
+| Set up protected keys and the macOS Keychain | [20_SET_UP_PASSWORD_FREE_SSH.md](20_SET_UP_PASSWORD_FREE_SSH.md) |
+| Clone AutoPilot on Legion for the first time | [21_CLONE_AUTOPILOT_ON_LEGION.md](21_CLONE_AUTOPILOT_ON_LEGION.md) |
+| Register the `AutoPilot-Debug` launcher on Legion | [22_SET_UP_WINDOWS_DEBUG_LAUNCHER.md](22_SET_UP_WINDOWS_DEBUG_LAUNCHER.md) |
+| Install the home server and its Windows VM | [23_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md](23_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md) |
 
-## 23–26 · Old shortcut pages
+## 24–27 · Old shortcut pages
 
 Short pages left from an earlier layout. They only link to the guides above.
 
-- [23 — Windows tasks](23_WINDOWS_TASKS_QUICK_LINKS.md)
-- [24 — Initial setup tasks](24_INITIAL_SETUP_QUICK_LINKS.md)
-- [25 — Build tasks](25_BUILD_TASKS_QUICK_LINKS.md)
-- [26 — Server setup tasks](26_SERVER_SETUP_QUICK_LINKS.md)
+- [24 — Windows tasks](24_WINDOWS_TASKS_QUICK_LINKS.md)
+- [25 — Initial setup tasks](25_INITIAL_SETUP_QUICK_LINKS.md)
+- [26 — Build tasks](26_BUILD_TASKS_QUICK_LINKS.md)
+- [27 — Server setup tasks](27_SERVER_SETUP_QUICK_LINKS.md)

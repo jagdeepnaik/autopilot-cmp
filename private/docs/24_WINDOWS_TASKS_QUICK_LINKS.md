@@ -1,4 +1,4 @@
-# 23 — AutoPilot Windows Tasks — Quick Links
+# 24 — AutoPilot Windows Tasks — Quick Links
 
 [All guides](00_INDEX.md)
 
@@ -10,4 +10,4 @@ This former combined guide has been split into short task guides. **Start with [
 4. [Debug from the Mac](04_DEBUG_WINDOWS_FROM_MAC.md)
 5. [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
 
-Initial preparation: [SSH setup](18_SET_UP_WINDOWS_SSH.md). Detailed past results: [build/debug reference](15_WINDOWS_BUILD_DEBUG_REFERENCE.md).
+Initial preparation: [SSH setup](19_SET_UP_WINDOWS_SSH.md). Detailed past results: [build/debug reference](15_WINDOWS_BUILD_DEBUG_REFERENCE.md).
