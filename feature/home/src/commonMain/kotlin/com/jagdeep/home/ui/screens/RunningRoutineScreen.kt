@@ -150,14 +150,14 @@ private fun CourseModuleProgress(
 ) {
     RunSection("Module progress")
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Saved video, assessment and certificate status for this profile.", style = MaterialTheme.typography.bodySmall,
+        Text("All ${modules.size} modules are shown. Status is saved locally as videos, assessments and certificates finish.", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         modules.forEach { module ->
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(module.module, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Videos: ${if (module.videosComplete) "complete" else "not complete"} · " +
-                        "Assessment: ${if (module.assessmentPassed) "passed" else "not passed"} · " +
+                    "Video status: ${if (module.videosComplete) "complete" else "not complete"} · " +
+                        "Assessment status: ${if (module.assessmentPassed) "passed" else "not passed"} · " +
                         "Certificate: ${if (module.certificateSaved) "saved" else "not saved"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

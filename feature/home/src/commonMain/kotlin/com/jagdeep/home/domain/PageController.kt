@@ -434,7 +434,17 @@ class PageController(
                 courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode, routine.learningOrder, bankFile)
                 courseProgress = if (progressRepository.available) CourseProgressSession(progressRepository, courseAutomation!!.session, routine.waitAfterClickMillis) else null
                 courseChunks.clear()
-                launchActivity(PageActivity.Automation(routine.copy(answerBankFile = bankFile), courseProgress?.detail ?: courseAutomation!!.detail, progressProfile = courseProgress?.request), scrolling = false) { performCourseAutomation(routine) }
+                launchActivity(
+                    PageActivity.Automation(
+                        routine.copy(answerBankFile = bankFile),
+                        courseProgress?.detail ?: courseAutomation!!.detail,
+                        progressProfile = courseProgress?.request,
+                        // Show the complete course catalogue immediately. The live
+                        // snapshot then replaces these rows with saved statuses.
+                        modules = moduleStatuses(null),
+                    ),
+                    scrolling = false,
+                ) { performCourseAutomation(routine) }
                 if (courseProgress == null) automation.apps.bringToFront(BROWSER_APP_NAME)
                 null
             }
