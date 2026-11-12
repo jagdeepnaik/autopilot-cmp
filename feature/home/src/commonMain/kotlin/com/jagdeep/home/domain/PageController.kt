@@ -185,14 +185,11 @@ class PageController(
         if (state.value.inactivityWarning != message) mutableState.update { it.copy(inactivityWarning = message) }
     }
     override fun refreshCourseProgress() {
-        val tracking = courseProgress ?: return
-        if (tracking.isChecking) return
-        manualProgressCheckRequested = true
+        if (courseProgress == null) return
         mutableState.update { state ->
             val activity = state.activity as? PageActivity.Automation ?: return@update state
-            state.copy(activity = activity.copy(detail = "Website progress verification queued for the next safe course page."))
+            state.copy(activity = activity.copy(detail = "Local progress is saved automatically as videos and assessments finish."))
         }
-        automation.apps.bringToFront(BROWSER_APP_NAME)
     }
     override fun loadProgressHistory(account: String) {
         val profile = state.value.progressAccounts.singleOrNull { it.key == account } ?: return
@@ -211,9 +208,6 @@ class PageController(
             courseProgressMutex.withLock {
                 if (courseProgress !== tracking) return@withLock
                 val accepted = tracking.confirm(token, localName, now())
-                // A passed result page is already the certificate handoff. Do not navigate away
-                // to the progress table before the result URL and PDF have been saved.
-                if (accepted && lastCourseSnapshot?.assessment?.result != "passed") tracking.requireSync()
                 mutableState.update { state ->
                     val activity = state.activity as? PageActivity.Automation ?: return@update state
                     state.copy(activity = activity.copy(progressProfile = tracking.request,
@@ -344,8 +338,6 @@ class PageController(
     private var courseAutomation: CourseAutomationSession? = null
     private var activeAnswerBankStore: CourseAnswerBankStore = answerBankStore
     private var courseProgress: CourseProgressSession? = null
-    private var finalProgressCheckRequested = false
-    private var manualProgressCheckRequested = false
     private val courseChunks = CourseSnapshotAssembler()
     private var courseRunSequence = 0L
     private var lastCourseSnapshotSummary: String? = null
@@ -441,8 +433,6 @@ class PageController(
                 lastCourseInventoryAt = now()
                 courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode, routine.learningOrder, bankFile)
                 courseProgress = if (progressRepository.available) CourseProgressSession(progressRepository, courseAutomation!!.session, routine.waitAfterClickMillis) else null
-                finalProgressCheckRequested = false
-                manualProgressCheckRequested = false
                 courseChunks.clear()
                 launchActivity(PageActivity.Automation(routine.copy(answerBankFile = bankFile), courseProgress?.detail ?: courseAutomation!!.detail, progressProfile = courseProgress?.request), scrolling = false) { performCourseAutomation(routine) }
                 if (courseProgress == null) automation.apps.bringToFront(BROWSER_APP_NAME)
@@ -774,10 +764,6 @@ class PageController(
             }
             val previousAction = runner.action
             val tracking = courseProgress
-            if (manualProgressCheckRequested && tracking != null && !tracking.isChecking && runner.canVerifyProgress(snapshot)) {
-                manualProgressCheckRequested = false
-                tracking.requireSync()
-            }
             val progressHandled = tracking?.process(snapshot, now(), learningActionPending = runner.action != null) == true
             if (courseAutomation !== runner) return true
             if (!progressHandled) {
@@ -786,10 +772,6 @@ class PageController(
                 runner.read(snapshot, now())
                 tracking?.capture(snapshot, runner, now())
                 runner.configureProgress(tracking?.summary)
-                if (runner.completed && tracking != null && tracking.hasLocalChanges && !finalProgressCheckRequested) {
-                    finalProgressCheckRequested = true
-                    tracking.requireSync()
-                }
             }
             updateAssessmentAlerts(runner)
             if (runner.action != null && runner.action != previousAction) {

@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import com.jagdeep.home.domain.*
 import com.jagdeep.home.ui.components.DgsCourseDialog
 import com.jagdeep.home.ui.components.RunPanel
-import com.jagdeep.home.ui.util.progressCheckedLabel
 import com.jagdeep.ui.components.*
 import com.jagdeep.ui.components.TopAppBarState
 import com.jagdeep.home.ui.navigation.RouteRunningRoutine
@@ -91,16 +90,11 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                 Detail("Clicks",clicks.toString())
                 if(page!=null) Detail("Chrome",if(state.page.isConnected) "Connected" else "Not connected")
                 if(page is PageActivity.ScrollClick) Detail("Round","${page.progress.round} of ${page.progress.rounds}")
-                if(page is PageActivity.Automation) {
-                    TextButton(onClick = viewModel::refreshCourseProgress, modifier = Modifier.padding(horizontal = 8.dp)) {
-                        Text("Verify website progress")
-                    }
-                }
                 if(page is PageActivity.Automation) page.progressSummary?.let { summary ->
                     Detail("Modules with a passed assessment",summary.records.filter { it.kind=="assessment" && it.status=="passed" }.map { CourseAnswerBank.normalize(it.course) }.distinct().size.toString())
                     RunSection("Saved progress")
                     Detail("User",summary.displayName)
-                    Detail("Last website verification",progressCheckedLabel(summary.checkedAt))
+                    Detail("Progress source","Saved locally as videos and assessments finish")
                 }
                 if(page is PageActivity.Automation && page.modules.isNotEmpty()) {
                     CourseModuleProgress(page.modules, page.moduleAction, viewModel::runCourseModule, viewModel::stopCourseModule)

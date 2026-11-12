@@ -5,9 +5,8 @@ import kotlinx.coroutines.flow.first
 
 /** Serial snapshot consumer. A complete, validated import must be durable before navigation resumes. */
 internal class CourseProgressSession(private val repository: CourseProgressRepository, private val token: String, private val wait: Long) {
-    private var identityMissing = false
-    val blocksActions get() = fatal || request != null || identityMissing
-    val isChecking get() = phase != "ready" || fatal
+    val blocksActions get() = fatal || request != null
+    val isChecking get() = request != null || fatal
     var request: ProgressProfileRequest? = ProgressProfileRequest("$token:profile", loading = true); private set
     var summary: CourseProgressSummary? = null; private set
     var hasLocalChanges = false; private set
@@ -57,15 +56,22 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
                 "Last selected profile", "selected", observedAt = now)))
             profile = selected
             summary = CourseProgressSummary(selected.key, selected.displayName, selected.checkedAt, learningRecords(rows))
-            phase = if (selected.checkedAt > 0) "ready" else "check"
+            // Local progress is the source of truth. Never send the browser to the
+            // website progress table just because this profile has not been checked.
+            phase = "ready"
             request = null
-            identityMissing = false
             detail = "Using progress profile ${selected.displayName}."
             return true
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: Exception) { fatal = true; detail = "Could not save the selected profile. Check local storage and restart."; return false }
     }
-    fun requireSync() { if (!fatal) { phase = "check"; expectedPage = 1; totalPages = 0; totalRows = 0; collected.clear(); sizeChecked = false; sizeOpenAttempts = 0; sizeTarget = null; scanSize = null } }
+    fun requireSync() {
+        if (!fatal) {
+            phase = "ready"
+            detail = profile?.displayName?.let { "Saving local progress for $it automatically." }
+                ?: "Local progress is saved automatically as videos and assessments finish."
+        }
+    }
     fun acknowledge(id: Long, success: Boolean, now: Long): Boolean {
         if (action?.request != id) return false
         action = null
@@ -81,7 +87,7 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
     }
     suspend fun capture(snapshot: CourseSnapshot, runner: CourseAutomationSession, now: Long) {
         val account = profile ?: return
-        if (fatal || identityMissing || request != null || !snapshot.top) return
+        if (fatal || request != null || !snapshot.top) return
         val updates = runner.pendingCompletions.values.toList()
         val records = updates.map { value -> LearningRecord(account.key, value.key, value.course, value.kind,
             value.title, "completed", details = value.details, observedAt = now) }.toMutableList()
@@ -104,6 +110,16 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
     }
 
     suspend fun process(snapshot: CourseSnapshot, now: Long, learningActionPending: Boolean = false): Boolean {
+        // Progress is recorded from the live course snapshots in capture(). The
+        // website's /dashboard/progress table is not authoritative and can contain
+        // rows the extension cannot safely classify, so it must never block course
+        // playback or certificate handling.
+        if (fatal) return true
+        if (request != null) prepareProfiles()
+        if (fatal) return true
+        if (request != null) return true
+        return false
+        /*
         if (!snapshot.top) return phase != "ready"
         if (fatal) return true
         if (snapshot.session != token || !snapshot.ready || snapshot.truncated) { identityMissing = true; detail = "Waiting for a complete page to check progress."; return true }
@@ -241,5 +257,6 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: Exception) { fatal = true; detail = "Could not save progress. Check local storage and restart. Courses remain paused." }
         return true
+        */
     }
 }
