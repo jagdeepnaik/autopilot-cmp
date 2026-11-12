@@ -34,7 +34,7 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | Copy all existing Legion and server build files to the Mac | [07 · Fetch all build artifacts](07_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact) |
 | Fix installer errors: Error 1723, "Smart App Control blocked an app", "already installed" | [08_FIX_WINDOWS_INSTALLER.md](08_FIX_WINDOWS_INSTALLER.md) |
 
-**Usual order:** run `private/scripts/desktop.sh run legion` (or `run mac`, `run server`, `run all`) from the Mac, then open the app on that machine and check it. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
+**Usual order:** run `private/scripts/desktop.sh run legion` (or `run mac`, `run server`, `run all`) from the Mac, then open the app on that machine and check it. `run all` includes the server Windows VM and both Mac-local VMs. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
 
 ## 09–12 · Home server — Linux DEB and the Windows VM
 

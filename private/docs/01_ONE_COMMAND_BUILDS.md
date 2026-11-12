@@ -2,11 +2,21 @@
 
 [All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](09_BUILD_LINUX_ON_SERVER.md)
 
-**On this page:** [Go to the scripts folder](#go-to-the-scripts-folder) · [Quick reference](#quick-reference) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
+**On this page:** [Commit and push everything](#commit-and-push-everything) · [Go to the scripts folder](#go-to-the-scripts-folder) · [Quick reference](#quick-reference) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
 
 **Related:** [Git guide](18_GIT_GUIDE.md) · [Fetch all remote artifacts](07_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact) · [Start/stop/test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
 
 `private/scripts/desktop.sh` runs the build chain for one machine, or all of them, from a Mac Terminal. The only supported form puts one action first and the target last. Every step stops with a plain reason when something isn't right.
+
+## Commit and push everything
+
+From any Mac Terminal folder, this one-line command opens the project, stages all non-ignored changes, creates a commit, and pushes it to `main`:
+
+```sh
+cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot && git add -A && git commit -m "Update AutoPilot" && git push origin main
+```
+
+Only run this when all current changes belong in the same commit. Files ignored by Git, including `private/plans/`, `private/signing/`, `private/secrets/` and `private/misc/`, are not included. Remote builds require this step before `sync`, `build` or `run` on another machine.
 
 ## Go to the scripts folder
 
@@ -39,13 +49,13 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 <tbody>
 <tr><td><strong>Standard syntax</strong></td><td>Write the action first and the machine target last:<br><code>private/scripts/desktop.sh &lt;action&gt; &lt;target&gt;</code></td></tr>
 <tr><td colspan="2"><strong>Sync — push and pull only</strong></td></tr>
-<tr><td><code>private/scripts/desktop.sh sync all</code></td><td><strong>Sync only:</strong> pushes committed Mac changes to GitHub, then pulls them onto Legion and the server.</td></tr>
+<tr><td><code>private/scripts/desktop.sh sync all</code></td><td><strong>Sync only:</strong> pushes committed Mac changes to GitHub, then pulls the same commit onto Legion, the home server, the server Windows VM, and both Mac-local VMs.</td></tr>
 <tr><td><code>private/scripts/desktop.sh sync legion</code></td><td>Push and pull Legion only.</td></tr>
 <tr><td><code>private/scripts/desktop.sh sync server</code></td><td>Push and pull the home server only.</td></tr>
 <tr><td><code>private/scripts/desktop.sh sync mac-vm-win</code></td><td>Push and pull the Windows VM running on this Mac.</td></tr>
 <tr><td><code>private/scripts/desktop.sh sync mac-vm-linux</code></td><td>Push and pull the Linux VM running on this Mac.</td></tr>
 <tr><td colspan="2"><strong>Build — sync, test and create an installer</strong></td></tr>
-<tr><td><code>private/scripts/desktop.sh build all</code></td><td><strong>Build only:</strong> syncs first, then builds the Mac app, Legion MSI and server DEB. It does not install or copy.</td></tr>
+<tr><td><code>private/scripts/desktop.sh build all</code></td><td><strong>Build only:</strong> syncs first, then builds every configured desktop artifact: macOS app, Legion MSI, server DEB, server Windows VM MSI, Mac-local Windows MSI and Mac-local Linux DEB. It does not install or copy.</td></tr>
 <tr><td><code>private/scripts/desktop.sh build legion</code></td><td>Sync Legion, then build its MSI without installing.</td></tr>
 <tr><td><code>private/scripts/desktop.sh build server</code></td><td>Sync and build the home-server Linux DEB. The server is headless, so it is not installed there.</td></tr>
 <tr><td><code>private/scripts/desktop.sh build server-vm-win</code></td><td>Sync and build the server Windows VM MSI. Use <code>fetch server-vm-win</code> to copy it to the Mac.</td></tr>
@@ -53,7 +63,7 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 <tr><td><code>private/scripts/desktop.sh build mac-vm-linux</code></td><td>Sync and build the Linux VM running on this Mac. Use <code>run mac-vm-linux</code> to build/install it, or <code>debug mac-vm-linux</code> to debug.</td></tr>
 <tr><td><code>private/scripts/desktop.sh build local-all</code></td><td>Build macOS, then sync and build the Mac-local Windows and Linux VMs. Use <code>run local-all</code> to build/install/check all supported local builds.</td></tr>
 <tr><td colspan="2"><strong>Run — build, install and check</strong></td></tr>
-<tr><td><code>private/scripts/desktop.sh run all</code></td><td>Build all supported desktop artifacts, then install/check the Mac and Legion builds.</td></tr>
+<tr><td><code>private/scripts/desktop.sh run all</code></td><td>Build all configured desktop artifacts, install/check the Mac, Legion and Mac-local VM builds, and copy the server Windows VM MSI. The headless server DEB stays on the server.</td></tr>
 <tr><td><code>private/scripts/desktop.sh run legion</code></td><td>Build, install and check the Legion MSI.</td></tr>
 <tr><td><code>private/scripts/desktop.sh run mac</code></td><td>Build, install and check the macOS app.</td></tr>
 <tr><td><code>private/scripts/desktop.sh run mac-vm-win</code></td><td>Build, install and check the Mac-local Windows VM MSI.</td></tr>
@@ -106,7 +116,7 @@ Install a copied DEB on a Linux desktop with `sudo apt install ./autopilot_<vers
 
 ### 1. Git is the only way code reaches a build machine
 
-The rule for every remote machine is **push, pull, then build**. Nothing is copied over directly, and the script never builds from a side folder.
+The rule for every build machine, including the VMs on this Mac, is **push, pull, then build**. Nothing is copied over directly, and the script never builds from a side folder.
 
 1. **Mac check.** The Mac must have no uncommitted changes, be on `main`, and not be behind GitHub. If any of these fails, the script stops and tells you what to do: commit, or pull on the Mac.
 2. **Push.** Any unpushed Mac commits are pushed to GitHub.

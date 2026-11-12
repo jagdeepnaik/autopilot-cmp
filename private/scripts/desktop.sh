@@ -16,7 +16,7 @@
 #            mac-vm-win  Windows VM on this Mac (SSH host/path supplied by environment variables)
 #            mac-vm-linux  Linux VM on this Mac (SSH host/path supplied by environment variables)
 #            local-all      this Mac plus its local Windows and Linux VMs
-#            all      mac, legion and server: build and install; the server DEB stays on the server
+#            all      every configured desktop target: mac, Legion, server and both VM pairs
 #
 #   action   sync     push the Mac's commits and pull them on the target
 #            build    sync, focused tests, then build the installer
@@ -436,7 +436,7 @@ run_action() {
         sync:mac-vm-win) windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR" ;;
         sync:mac-vm-linux) linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR" ;;
         sync:local-all) local_all_sync ;;
-        sync:all) mac_check_pushed; windows_sync Legion "$LEGION_HOST" "$LEGION_DIR"; server_sync ;;
+        sync:all) mac_check_pushed; windows_sync Legion "$LEGION_HOST" "$LEGION_DIR"; server_sync; windows_sync "Server VM" "$VM_HOST" "$VM_DIR"; windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR"; linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR" ;;
 
         build:mac) mac_build ;;
         build:legion) legion_build ;;
@@ -445,7 +445,7 @@ run_action() {
         build:mac-vm-win) local_windows_build ;;
         build:mac-vm-linux) local_linux_build ;;
         build:local-all) local_all_build ;;
-        build:all) mac_check_pushed; mac_build; legion_build; server_build ;;
+        build:all) mac_check_pushed; mac_build; legion_build; server_build; vm_build; local_windows_build; local_linux_build ;;
 
         run:mac) mac_build; mac_install ;;
         run:legion) legion_build; legion_install ;;
@@ -454,7 +454,7 @@ run_action() {
         run:mac-vm-win) local_windows_build; local_windows_install ;;
         run:mac-vm-linux) local_linux_build; local_linux_install ;;
         run:local-all) local_all_install ;;
-        run:all) mac_check_pushed; mac_build; mac_install; legion_build; legion_install; server_build ;;
+        run:all) mac_check_pushed; mac_build; mac_install; legion_build; legion_install; server_build; vm_build; vm_fetch; local_windows_build; local_windows_install; local_linux_build; local_linux_install ;;
 
         fetch:all) fetch_all_builds ;;
         fetch:server) server_build; server_fetch ;;

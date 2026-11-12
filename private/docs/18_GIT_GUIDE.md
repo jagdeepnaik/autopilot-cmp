@@ -4,6 +4,16 @@
 
 A complete guide to Git as this project uses it: the ideas behind it, every command you're likely to need, what each one actually does, and recipes for the situations that come up. Commands are for the Mac Terminal unless a section says otherwise. They work the same in Windows PowerShell and on Linux.
 
+## One-line commit and push
+
+From any Mac Terminal folder, open the project, stage all non-ignored changes, commit them, and push the commit to `main`:
+
+```sh
+cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot && git add -A && git commit -m "Update AutoPilot" && git push origin main
+```
+
+The next command runs only if the previous command succeeds. Review `git status` first when the worktree contains unrelated changes.
+
 > **Following links in Android Studio:** in the editor, Cmd+Click a link to jump to its section. In the Markdown **preview**, Android Studio's default runtime can't follow `#section` links and opens them in the browser instead. To fix that, open **Help → Find Action**, run **Choose Boot Java Runtime for the IDE**, pick a JetBrains Runtime "with JCEF", then restart. JetBrains notes that the preview doesn't work on Android Studio's default runtime ([known issue](https://issuetracker.google.com/issues/159933628)). On GitHub, the links work as they are.
 
 **On this page:**
