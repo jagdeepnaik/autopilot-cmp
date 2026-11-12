@@ -4,7 +4,7 @@
 
 ## ONE COMMAND — sync, build, install, debug
 
-From the Mac: `private/scripts/desktop.sh legion` (or `private/scripts/windows/legion.sh`). It pushes, pulls on Legion, builds with tests, installs and checks, then starts the debug run and tunnel. Add `install`, `build`, `debug` or `sync` to run only part of it. How it works, and the commands for the Mac and the home server: [01_ONE_COMMAND_BUILDS.md](01_ONE_COMMAND_BUILDS.md).
+From the Mac: `private/scripts/desktop.sh run legion`. It pushes, pulls on Legion, builds with tests, installs and checks. Use `sync legion`, `build legion` or `debug legion` for one part of the workflow. How it works, and the commands for the Mac and the home server: [01_ONE_COMMAND_BUILDS.md](01_ONE_COMMAND_BUILDS.md).
 
 The manual steps below do the same thing one command at a time.
 

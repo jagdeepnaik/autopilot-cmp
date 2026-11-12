@@ -63,7 +63,14 @@ internal data class CourseAction(val request: Long, val document: String, val el
 @Serializable
 internal data class CourseCommand(val session: String, val action: CourseAction? = null, val playbackSpeed: Double = 1.0)
 
-internal data class CourseCompletion(val key: String, val course: String, val kind: String, val title: String, val details: String)
+internal data class CourseCompletion(
+    val key: String,
+    val course: String,
+    val kind: String,
+    val title: String,
+    val details: String,
+    val durationMillis: Long = 0,
+)
 internal data class AssessmentAnswerStats(val automatic: Int, val manual: Int)
 
 /** App-owned decisions; the extension only describes elements and executes a specific command. */
@@ -163,6 +170,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         )
     }
 
+    internal fun videoDuration(module: String): Long = completedVideoMillis[CourseAnswerBank.normalize(module)] ?: 0
+    internal fun assessmentDuration(module: String): Long = assessmentDurations[CourseAnswerBank.normalize(module)] ?: 0
+
     fun retryAssessment(token: String): Boolean {
         if (failure?.token != token || failure?.canRetry != true) return false
         authorizedRetryToken = token
@@ -210,6 +220,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var pendingAt = 0L
     private var nextActionAt = 0L
     private val lastVideoPlayAt = mutableMapOf<String, Long>()
+    private val videoStartedAt = mutableMapOf<String, Long>()
+    private val completedVideoMillis = mutableMapOf<String, Long>()
+    private val assessmentStartedAt = mutableMapOf<String, Long>()
+    private val assessmentDurations = mutableMapOf<String, Long>()
     private var blockedDocument: String? = null
     private var blockedPath: String? = null
     private var lastPath: String? = null
@@ -349,6 +363,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             lastPath = pageId
             videos.clear()
             lastVideoPlayAt.clear()
+            videoStartedAt.clear()
             blockedDocument = null
             blockedPath = null
             action = null
@@ -420,8 +435,13 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 ?: currentModule
                 ?: moduleTitles[path]
                 ?: "")
+            // Count the actual question attempt, not time spent waiting on the module's
+            // "Start Assessment" page or an approval dialog.
+            if (assessment.result == null && assessment.questions.isNotEmpty()) assessmentStartedAt.putIfAbsent(path, now)
             assessment.questions.forEach { observedQuestions.getOrPut(path) { mutableMapOf() }[CourseAnswerBank.normalize(it.text) + it.options.map { option -> CourseAnswerBank.optionText(option.text) }.sorted().joinToString("|")] = it }
             if (assessment.result == "failed") {
+                val failedDuration = assessmentStartedAt.remove(path)?.let { (now - it).coerceAtLeast(0) } ?: 0
+                assessmentDurations[CourseAnswerBank.normalize(assessment.module)] = failedDuration
                 val failureToken = "$reportedPath:${snapshot.document}:${assessmentEpochs[path] ?: 0}:failed"
                 if (authorizedRetryToken == failureToken) {
                     authorizedRetryToken = null
@@ -509,6 +529,8 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             }
             if (assessment.result == "passed") {
                 val module = assessment.module.takeIf { it.isNotBlank() } ?: currentModule.orEmpty()
+                val assessmentDuration = assessmentStartedAt.remove(path)?.let { (now - it).coerceAtLeast(0) } ?: 0
+                assessmentDurations[CourseAnswerBank.normalize(module)] = assessmentDuration
                 val target = certificateProfileName?.let { CourseCertificateTarget(it, module) }
                 if (certificateTrackingActive && target == null) {
                     detail = "Assessment passed. Choose a progress profile so its certificate can be saved."
@@ -648,7 +670,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             snapshot.elements.filter { it.tag == "video" && !it.decorative }.forEach { videos["${snapshot.document}:${it.id}"] = it }
             val video = elements.firstOrNull { it.tag == "video" && !it.decorative && !it.ended }
             if (video != null) {
-                if (!video.paused) { detail = "Watching the video. It continues when the video ends."; return }
+                if (!video.paused) {
+                    videoStartedAt.putIfAbsent("${snapshot.document}:${video.id}", now)
+                    detail = "Watching the video. It continues when the video ends."; return
+                }
                 // Use the player's own start control first: it may initialize its media source.
                 // Calling HTMLVideoElement.play() alone can fail before that initialization.
                 val playButton = elements.firstOrNull {
@@ -683,7 +708,11 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             completedPage?.let {
                 completedLessonPages.add(it)
                 val module = coursePath?.let(moduleTitles::get) ?: currentModule ?: coursePath.orEmpty()
-                pendingCompletions["watched:$it"] = CourseCompletion("watched:$it", module, "lesson", "Video completed", it)
+                val videoKey = videos.keys.firstOrNull { key -> key.startsWith("${snapshot.document}:") }
+                val duration = videoKey?.let { key -> videoStartedAt.remove(key)?.let { started -> (now - started).coerceAtLeast(0) } } ?: 0
+                completedVideoMillis[CourseAnswerBank.normalize(module)] =
+                    (completedVideoMillis[CourseAnswerBank.normalize(module)] ?: 0) + duration
+                pendingCompletions["watched:$it"] = CourseCompletion("watched:$it", module, "lesson", "Video completed", it, duration)
             }
             coursePath?.let(newlyWatchedCourses::add)
             val courseReturn = elements.firstOrNull { it.label.equals("Back to Course", true) }
@@ -770,7 +799,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             if (!settled(snapshot, now)) return
             videoFinishedCourses.add(path)
             val title = moduleTitles[path] ?: currentModule ?: path
-            pendingCompletions["module-videos:$path"] = CourseCompletion("module-videos:$path", title, "module-videos", "All module videos", path)
+            pendingCompletions["module-videos:$path"] = CourseCompletion(
+                "module-videos:$path", title, "module-videos", "All module videos", path, videoDuration(title),
+            )
             }
             val moduleTitle = moduleTitles[path] ?: currentModule
             if (focusedAction == CourseModuleAction.Videos && focusedHere) {

@@ -41,13 +41,33 @@ internal fun CourseProgressPanel(request: ProgressProfileRequest?, summary: Cour
 }
 
 @Composable
-internal fun CourseProgressHistory(accounts: List<LearningAccount>, summary: CourseProgressSummary?, error: String?, load: (String)->Unit) {
+internal fun CourseProgressHistory(accounts: List<LearningAccount>, summary: CourseProgressSummary?, allSummaries: List<CourseProgressSummary>, error: String?, load: (String)->Unit, loadAll: () -> Unit = {}) {
     var open by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<String?>(null) }
     TextButton(onClick = { open = true }) { Text("Saved progress by user") }
     if(open) AlertDialog(onDismissRequest = { open = false }, title = { Text("Saved learning progress") }, text = {
         Column(Modifier.heightIn(max = 500.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if(accounts.isEmpty()) Text("No saved profiles yet. Start a course routine to check progress.")
+            if(accounts.isEmpty()) Text("No saved profiles yet. Start a course routine to create one.")
+            if (accounts.isNotEmpty()) TextButton(onClick = loadAll) { Text("Load all profiles") }
+            allSummaries.forEach { history ->
+                HorizontalDivider()
+                Text(history.displayName, style = MaterialTheme.typography.titleMedium)
+                val modules = SAGAR_MEIN_YOG_MODULES.map { module ->
+                    val normalized = CourseAnswerBank.normalize(module)
+                    val video = history.records.filter { it.kind == "module-videos" && CourseAnswerBank.normalize(it.course) == normalized }.maxByOrNull { it.observedAt }
+                    val assessment = history.records.filter { it.kind == "assessment" && CourseAnswerBank.normalize(it.course) == normalized }.maxByOrNull { it.observedAt }
+                    val videoDone = video?.status == "completed"
+                    val passed = assessment?.status == "passed"
+                    val videoMillis = detailMetric(video?.details.orEmpty(), "durationMillis")
+                    val assessmentMillis = detailMetric(assessment?.details.orEmpty(), "durationMillis")
+                    Triple(module, videoDone, passed to (videoMillis + assessmentMillis))
+                }
+                Text("${modules.count { it.second && it.third.first }} / ${modules.size} modules complete · " +
+                    formatDuration(modules.sumOf { it.third.second }), style = MaterialTheme.typography.bodySmall)
+                modules.filter { it.second || it.third.first }.forEach { (module, videoDone, result) ->
+                    Text("$module · video ${if (videoDone) "complete" else "incomplete"} · assessment ${if (result.first) "passed" else "not passed"}", style = MaterialTheme.typography.bodySmall)
+                }
+            }
             accounts.forEach { profile -> TextButton(onClick = { selected = profile.key; load(profile.key) }) { Text(if(profile.key.startsWith("dgs:")) profile.displayName else profile.displayName + " · " + profile.key.removePrefix("sagarmeinyog:")) } }
             error?.let { Text(it) }
             summary?.takeIf { it.account == selected }?.let { history ->
@@ -70,4 +90,12 @@ internal fun CourseProgressHistory(accounts: List<LearningAccount>, summary: Cou
             }
         }
     }, confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } })
+}
+
+private fun formatDuration(millis: Long): String {
+    val totalSeconds = millis / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m ${seconds}s"
 }

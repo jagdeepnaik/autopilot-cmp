@@ -86,6 +86,7 @@ class HomeViewModel(
     fun selectDgsCourse(id: String) = controller.page.selectDgsCourse(id)
 
     fun refreshCourseProgress() = controller.page.refreshCourseProgress()
+    fun loadAllProgressHistory() = controller.page.loadAllProgressHistory()
     fun approveAssessment(token: String) = controller.page.approveAssessment(token)
     fun confirmProgressProfile(token: String, localName: String) = controller.page.confirmProgressProfile(token, localName)
     fun confirmManualAnswer(token: String, save: Boolean) = controller.page.confirmManualAnswer(token, save)

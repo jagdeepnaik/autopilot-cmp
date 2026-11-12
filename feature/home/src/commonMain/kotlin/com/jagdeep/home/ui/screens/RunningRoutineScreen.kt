@@ -97,6 +97,7 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                     Detail("Modules complete","${page.modules.count { it.videosComplete && it.assessmentPassed }} / ${page.modules.size}")
                     Detail("Assessments passed","${assessments.size}")
                     Detail("Answers","${assessments.sumOf { it.automaticAnswers }} automatic · ${assessments.sumOf { it.manualAnswers }} manual")
+                    Detail("Recorded course time",formatDuration(page.modules.sumOf { it.videoDurationMillis + it.assessmentDurationMillis }))
                 }
                 if(page is PageActivity.Automation && page.modules.isNotEmpty()) {
                     CourseModuleProgress(page.modules, page.moduleAction, viewModel::runCourseModule, viewModel::stopCourseModule)
@@ -171,6 +172,11 @@ private fun CourseModuleProgress(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(
+                        "Time: videos ${formatDuration(module.videoDurationMillis)} · assessment ${formatDuration(module.assessmentDurationMillis)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { run(module.module, CourseModuleAction.Videos) }) { Text("Run videos") }
                         TextButton(onClick = { run(module.module, CourseModuleAction.Assessment) }) { Text("Run assessment") }
@@ -180,6 +186,14 @@ private fun CourseModuleProgress(
             }
         }
     }
+}
+
+private fun formatDuration(millis: Long): String {
+    val totalSeconds = millis / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m ${seconds}s"
 }
 
 @Composable

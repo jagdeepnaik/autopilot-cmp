@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -72,6 +73,7 @@ data class PageState(
     val activity: PageActivity? = null,
     val progressAccounts: List<com.jagdeep.persistence.room.learning.LearningAccount> = emptyList(),
     val savedProgress: CourseProgressSummary? = null,
+    val savedProgressProfiles: List<CourseProgressSummary> = emptyList(),
     val progressHistoryError: String? = null,
 )
 
@@ -95,6 +97,7 @@ interface PageRunner {
     fun approveAssessment(token: String) = Unit
     fun confirmManualAnswer(token: String, save: Boolean) = Unit
     fun loadProgressHistory(account: String) = Unit
+    fun loadAllProgressHistory() = Unit
     fun refreshCourseProgress() = Unit
     fun confirmProgressProfile(token: String, localName: String) = Unit
     fun saveReviewedAnswers(token: String, answers: Map<String, String>) = Unit
@@ -197,9 +200,23 @@ class PageController(
         scope.launch {
             try {
                 val rows = progressRepository.records(account).filter { it.kind != "profile-use" }
-                if (historySelection == account) mutableState.update { it.copy(savedProgress = CourseProgressSummary(account,profile.displayName,profile.checkedAt,rows), progressHistoryError = null) }
+                if (historySelection == account) mutableState.update { it.copy(savedProgress = CourseProgressSummary(account,profile.displayName,profile.checkedAt,rows), savedProgressProfiles = emptyList(), progressHistoryError = null) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { mutableState.update { it.copy(progressHistoryError = "Could not load saved progress.") } }
+        }
+    }
+    override fun loadAllProgressHistory() {
+        scope.launch {
+            try {
+                val accounts = progressRepository.accounts().first()
+                    .filter { it.key.startsWith("sagarmeinyog:") }
+                val summaries = accounts.map { profile ->
+                    CourseProgressSummary(profile.key, profile.displayName, profile.checkedAt,
+                        progressRepository.records(profile.key).filter { it.kind != "profile-use" })
+                }
+                mutableState.update { it.copy(savedProgressProfiles = summaries, progressHistoryError = null) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { mutableState.update { it.copy(progressHistoryError = "Could not load saved profiles.") } }
         }
     }
     override fun confirmProgressProfile(token: String, localName: String) {
@@ -821,7 +838,10 @@ class PageController(
                 .maxByOrNull { it.observedAt }
             val details = assessment?.details.orEmpty()
             fun metric(name: String) = Regex("(?:^|\\n)$name=([0-9]+)").find(details)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-            CourseModuleStatus(module, videos, passed, certificate, assessment?.score, metric("automaticAnswers"), metric("manualAnswers"))
+            val video = records.filter { it.kind == "module-videos" && CourseAnswerBank.normalize(it.course) == normalized }
+                .maxByOrNull { it.observedAt }
+            CourseModuleStatus(module, videos, passed, certificate, assessment?.score, metric("automaticAnswers"), metric("manualAnswers"),
+                detailMetric(video?.details.orEmpty(), "durationMillis"), detailMetric(details, "durationMillis"))
         }
     }
 

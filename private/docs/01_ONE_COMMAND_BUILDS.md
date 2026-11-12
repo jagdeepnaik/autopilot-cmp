@@ -6,7 +6,7 @@
 
 **Related:** [Git guide](18_GIT_GUIDE.md) · [Fetch all remote artifacts](07_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact) · [Start/stop/test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
 
-`private/scripts/desktop.sh` runs the whole build chain for one machine, or all of them, from a Mac Terminal. Every step stops with a plain reason when something isn't right. The manual guides still work; this script runs the same commands in order.
+`private/scripts/desktop.sh` runs the build chain for one machine, or all of them, from a Mac Terminal. The only supported form puts one action first and the target last. Every step stops with a plain reason when something isn't right.
 
 ## Go to the scripts folder
 
@@ -19,7 +19,7 @@ cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts
 From there, run the commands as `./desktop.sh …`, for example:
 
 ```sh
-./desktop.sh legion
+./desktop.sh build legion
 ```
 
 The script finds the project itself, so it works from any folder. From the project root, `/Users/jagdeep/Projects/AndroidStudio/AutoPilot`, use `private/scripts/desktop.sh …`, as in the table below.
@@ -27,7 +27,7 @@ The script finds the project itself, so it works from any folder. From the proje
 
 ## Server Windows VM — start and stop
 
-`desktop.sh vm` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [11 — Start, stop and test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script).
+`desktop.sh build server-vm-win` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [11 — Start, stop and test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script).
 
 ## Quick reference
 
@@ -37,32 +37,45 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 <colgroup><col style="width:32%"><col style="width:68%"></colgroup>
 <thead><tr><th>Command or topic</th><th>How it works</th></tr></thead>
 <tbody>
-<tr><td><strong>Sync/build syntax</strong></td><td>Write the machine name first, then the action:<br><code>private/scripts/desktop.sh &lt;target&gt; &lt;action&gt;</code></td></tr>
-<tr><td><code>private/scripts/desktop.sh &lt;target&gt; sync</code></td><td><strong>Sync only:</strong> pushes committed Mac changes to GitHub, then pulls them onto the selected remote machine.</td></tr>
-<tr><td><code>private/scripts/desktop.sh &lt;target&gt; build</code></td><td><strong>Build:</strong> performs the same sync first, then creates the installer. It does not install or copy it.</td></tr>
-<tr><td>Push and pull Legion only</td><td><code>private/scripts/desktop.sh legion sync</code></td></tr>
-<tr><td>Sync Legion, then build its MSI without installing</td><td><code>private/scripts/desktop.sh legion build</code></td></tr>
-<tr><td>Sync the server, then build its Linux DEB without copying</td><td><code>private/scripts/desktop.sh server build</code></td></tr>
-<tr><td>Push and pull Legion and the server</td><td><code>private/scripts/desktop.sh all sync</code></td></tr>
-<tr><td>Build on the Mac, Legion and server without installing or copying</td><td><code>private/scripts/desktop.sh all build</code></td></tr>
-<tr><td><code>private/scripts/desktop.sh mac</code></td><td>Build the macOS app with tests, install it in <code>/Applications</code>, then start a debug run.</td></tr>
-<tr><td><code>private/scripts/desktop.sh legion</code></td><td>Sync Legion, build the MSI with tests, install and check it, then start a debug run and tunnel.</td></tr>
-<tr><td><code>private/scripts/desktop.sh server</code></td><td>Sync the home server, build the Linux DEB with tests, and copy it to the Mac.</td></tr>
-<tr><td><code>private/scripts/desktop.sh vm</code></td><td>Sync the server Windows VM, build its MSI with tests, and copy it to the Mac.</td></tr>
-<tr><td><code>private/scripts/desktop.sh windows-local</code></td><td>Sync and build the Windows VM running on this Mac. Set <code>MAC_WINDOWS_HOST</code> and <code>MAC_WINDOWS_DIR</code> first.</td></tr>
-<tr><td><code>private/scripts/desktop.sh linux-local</code></td><td>Sync and build the Linux VM running on this Mac. Set <code>MAC_LINUX_HOST</code> and <code>MAC_LINUX_DIR</code> first.</td></tr>
-<tr><td><code>private/scripts/desktop.sh local-all</code></td><td>Build macOS locally, then sync and build the Mac-local Windows and Linux VMs.</td></tr>
-<tr><td><code>private/scripts/desktop.sh all</code></td><td>Build and install on the Mac and Legion, then build the server DEB. The DEB stays on the server.</td></tr>
-<tr><td><code>private/scripts/desktop.sh all fetch</code></td><td>Fetches every existing MSI from Legion and every DEB from the server to <code>~/Downloads/Builds/AutoPilot</code>. Each file is checked against its source SHA256 hash. It does not sync, build, install or delete.</td></tr>
-<tr><td><strong>Targets</strong></td><td><code>mac</code>, <code>legion</code>, <code>server</code>, <code>vm</code>, <code>windows-local</code>, <code>linux-local</code>, <code>local-all</code> and <code>all</code>.</td></tr>
-<tr><td><strong>Mac-local VM setup</strong></td><td>Use your SSH aliases and checkout paths, for example:<br><code>MAC_WINDOWS_HOST=win11-vm MAC_WINDOWS_DIR='C:\Users\jagde\Projects\autopilot-cmp'</code><br><code>MAC_LINUX_HOST=linux-vm MAC_LINUX_DIR='/home/jagdeep/Projects/AutoPilot'</code></td></tr>
+<tr><td><strong>Standard syntax</strong></td><td>Write the action first and the machine target last:<br><code>private/scripts/desktop.sh &lt;action&gt; &lt;target&gt;</code></td></tr>
+<tr><td colspan="2"><strong>Sync — push and pull only</strong></td></tr>
+<tr><td><code>private/scripts/desktop.sh sync all</code></td><td><strong>Sync only:</strong> pushes committed Mac changes to GitHub, then pulls them onto Legion and the server.</td></tr>
+<tr><td><code>private/scripts/desktop.sh sync legion</code></td><td>Push and pull Legion only.</td></tr>
+<tr><td><code>private/scripts/desktop.sh sync server</code></td><td>Push and pull the home server only.</td></tr>
+<tr><td><code>private/scripts/desktop.sh sync mac-vm-win</code></td><td>Push and pull the Windows VM running on this Mac.</td></tr>
+<tr><td><code>private/scripts/desktop.sh sync mac-vm-linux</code></td><td>Push and pull the Linux VM running on this Mac.</td></tr>
+<tr><td colspan="2"><strong>Build — sync, test and create an installer</strong></td></tr>
+<tr><td><code>private/scripts/desktop.sh build all</code></td><td><strong>Build only:</strong> syncs first, then builds the Mac app, Legion MSI and server DEB. It does not install or copy.</td></tr>
+<tr><td><code>private/scripts/desktop.sh build legion</code></td><td>Sync Legion, then build its MSI without installing.</td></tr>
+<tr><td><code>private/scripts/desktop.sh build server</code></td><td>Sync and build the home-server Linux DEB. The server is headless, so it is not installed there.</td></tr>
+<tr><td><code>private/scripts/desktop.sh build server-vm-win</code></td><td>Sync and build the server Windows VM MSI. Use <code>fetch server-vm-win</code> to copy it to the Mac.</td></tr>
+<tr><td><code>private/scripts/desktop.sh build mac-vm-win</code></td><td>Sync and build the Windows VM running on this Mac. Use <code>run mac-vm-win</code> to build/install/check it, or <code>debug mac-vm-win</code> to debug.</td></tr>
+<tr><td><code>private/scripts/desktop.sh build mac-vm-linux</code></td><td>Sync and build the Linux VM running on this Mac. Use <code>run mac-vm-linux</code> to build/install it, or <code>debug mac-vm-linux</code> to debug.</td></tr>
+<tr><td><code>private/scripts/desktop.sh build local-all</code></td><td>Build macOS, then sync and build the Mac-local Windows and Linux VMs. Use <code>run local-all</code> to build/install/check all supported local builds.</td></tr>
+<tr><td colspan="2"><strong>Run — build, install and check</strong></td></tr>
+<tr><td><code>private/scripts/desktop.sh run all</code></td><td>Build all supported desktop artifacts, then install/check the Mac and Legion builds.</td></tr>
+<tr><td><code>private/scripts/desktop.sh run legion</code></td><td>Build, install and check the Legion MSI.</td></tr>
+<tr><td><code>private/scripts/desktop.sh run mac</code></td><td>Build, install and check the macOS app.</td></tr>
+<tr><td><code>private/scripts/desktop.sh run mac-vm-win</code></td><td>Build, install and check the Mac-local Windows VM MSI.</td></tr>
+<tr><td><code>private/scripts/desktop.sh run mac-vm-linux</code></td><td>Build, install and check the Mac-local Linux DEB.</td></tr>
+<tr><td><code>private/scripts/desktop.sh run local-all</code></td><td>Build and install/check macOS, the local Windows VM and the local Linux VM.</td></tr>
+<tr><td colspan="2"><strong>Fetch — copy already-built remote artifacts</strong></td></tr>
+<tr><td><code>private/scripts/desktop.sh fetch all</code></td><td>Copies existing Legion MSIs and server DEBs to <code>~/Downloads/Builds/AutoPilot</code>, checking each SHA256. It does not sync, build or install.</td></tr>
+<tr><td><code>private/scripts/desktop.sh fetch server-vm-win</code></td><td>Builds the server Windows VM MSI, then copies it to <code>~/Downloads/Builds/AutoPilot</code>.</td></tr>
+<tr><td colspan="2"><strong>Debug — sync and start one debug session</strong></td></tr>
+<tr><td><code>private/scripts/desktop.sh debug mac</code></td><td>Sync, then start the Mac debug run on port 5005.</td></tr>
+<tr><td><code>private/scripts/desktop.sh debug legion</code></td><td>Sync, start the Legion debug run, and tunnel port 5005.</td></tr>
+<tr><td><code>private/scripts/desktop.sh debug mac-vm-win</code></td><td>Sync, start the Mac-local Windows VM debug run, and tunnel port 5005.</td></tr>
+<tr><td><code>private/scripts/desktop.sh debug mac-vm-linux</code></td><td>Sync, start the Mac-local Linux VM debug run, and tunnel port 5005.</td></tr>
+<tr><td><strong>Targets</strong></td><td><code>mac</code>, <code>legion</code>, <code>server</code>, <code>server-vm-win</code>, <code>mac-vm-win</code>, <code>mac-vm-linux</code>, <code>local-all</code> and <code>all</code>.</td></tr>
+<tr><td><strong>Mac-local VM setup</strong></td><td>Use your SSH aliases and checkout paths, for example:<br><code>MAC_WINDOWS_HOST=mac-windows-vm MAC_WINDOWS_DIR='C:\Users\Jagdeep\Projects\autopilot-cmp'</code><br><code>MAC_LINUX_HOST=mac-linux-vm MAC_LINUX_DIR='/home/jagdeep/Projects/AutoPilot'</code></td></tr>
 <tr><td><strong>Remote build rule</strong></td><td>Your Mac work must be committed. The script pushes unpushed commits automatically, then makes the remote checkout match that commit.</td></tr>
 <tr><td><code>--no-tests</code></td><td>Skip the focused tests.</td></tr>
-<tr><td><code>--remote</code></td><td>Reach the home server through Cloudflare instead of the local network. For artifact fetching: <code>private/scripts/desktop.sh all fetch --remote</code>.</td></tr>
+<tr><td><code>--remote</code></td><td>Reach the home server through Cloudflare instead of the local network. For artifact fetching: <code>private/scripts/desktop.sh --remote fetch all</code>.</td></tr>
 </tbody>
 </table>
 
-`private/scripts/windows/legion.sh` is a shortcut for `private/scripts/desktop.sh legion`.
+Use `private/scripts/desktop.sh build legion` for Legion builds.
 
 ## What each machine does
 
@@ -80,10 +93,10 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 <tbody>
 <tr><td>This Mac</td><td><code>mac</code></td><td>macOS app<br><code>createReleaseDistributable</code></td><td>Copies it to <code>/Applications/AutoPilot.app</code></td><td><code>gradlew :composeApp:run --debug-jvm</code><br>Attach <strong>AutoPilot Mac (local)</strong></td></tr>
 <tr><td>Legion laptop<br><code>home-legion</code></td><td><code>legion</code></td><td>Windows MSI<br><code>Build-Distribution.ps1</code></td><td>Silent update with <code>Install-Msi.ps1</code>, then checks it</td><td><code>AutoPilot-Debug</code> task and SSH tunnel<br>Attach <strong>AutoPilot Windows (SSH tunnel)</strong></td></tr>
-<tr><td>Home server, Debian<br><code>home-server</code></td><td><code>server</code></td><td>Linux DEB<br><code>packageReleaseDeb</code><br>Low priority</td><td>No: headless website host.<br><code>desktop.sh server</code> can copy its DEB; <code>desktop.sh all</code> leaves it remote.</td><td>No</td></tr>
-<tr><td>Home server Windows VM<br><code>home-server-build</code></td><td><code>vm</code></td><td>Windows MSI<br><code>Build-Distribution.ps1</code></td><td>No. Its MSI is copied to <code>~/Downloads/Builds/AutoPilot</code>; install it on Legion.</td><td>No</td></tr>
-<tr><td>Windows VM on this Mac</td><td><code>windows-local</code></td><td>Windows MSI<br><code>Build-Distribution.ps1</code></td><td>Can install and check inside the VM with <code>install</code>.</td><td>Not wired yet</td></tr>
-<tr><td>Linux VM on this Mac</td><td><code>linux-local</code></td><td>Linux DEB<br><code>packageReleaseDeb</code></td><td>Build inside the VM; install it there separately.</td><td>Not wired yet</td></tr>
+<tr><td>Home server, Debian<br><code>home-server</code></td><td><code>server</code></td><td>Linux DEB<br><code>packageReleaseDeb</code><br>Low priority</td><td>No: headless website host.<br><code>desktop.sh fetch server</code> can copy its DEB; <code>desktop.sh run all</code> leaves it remote.</td><td>No</td></tr>
+<tr><td>Home server Windows VM<br><code>home-server-build</code></td><td><code>server-vm-win</code></td><td>Windows MSI<br><code>Build-Distribution.ps1</code></td><td>No. Its MSI is copied to <code>~/Downloads/Builds/AutoPilot</code>; install it on Legion.</td><td>No</td></tr>
+<tr><td>Windows VM on this Mac</td><td><code>mac-vm-win</code></td><td>Windows MSI<br><code>Build-Distribution.ps1</code></td><td><code>run mac-vm-win</code> runs <code>Install-Msi.ps1 -LaunchCheck -SkipIfInstalled</code> inside the VM.</td><td><code>debug mac-vm-win</code> starts <code>AutoPilot-Debug</code> and tunnels port 5005.</td></tr>
+<tr><td>Linux VM on this Mac</td><td><code>mac-vm-linux</code></td><td>Linux DEB<br><code>packageReleaseDeb</code></td><td><code>run mac-vm-linux</code> installs the newest DEB with <code>sudo apt-get</code> inside the VM.</td><td><code>debug mac-vm-linux</code> runs <code>:composeApp:run --debug-jvm</code> and tunnels port 5005; the VM needs a desktop session.</td></tr>
 </tbody>
 </table>
 
@@ -127,7 +140,9 @@ The focused tests are `core:automation`, the DGS study tests, the desktop data-p
 
 - **Mac:** stops if AutoPilot is running, since quitting it could lose a routine's progress. Otherwise it replaces `/Applications/AutoPilot.app` with the new build and checks its signature. `~/.autopilot` isn't touched.
 - **Legion:** `private/scripts/windows/Install-Msi.ps1 -LaunchCheck -SkipIfInstalled`. It refuses an older MSI and closes a running copy. Then it installs silently and checks four things: the installed version, the signed `javaw.exe`, that both shortcuts point to it, and a 15-second launch from the desktop shortcut. It finishes by counting Smart App Control blocks. `%USERPROFILE%\.autopilot` isn't touched.
-- **Server and VM:** their explicit `fetch` action copies the newest installer to `~/Downloads/Builds/AutoPilot`, and the SHA256 of the copy must match the source. `desktop.sh all` builds the server DEB but does not copy it. `desktop.sh all fetch` separately copies and checks every existing Legion MSI and server DEB.
+- **Mac Windows VM:** uses the same `Install-Msi.ps1 -LaunchCheck -SkipIfInstalled` path over SSH, with the VM's own `%USERPROFILE%\.autopilot` preserved.
+- **Mac Linux VM:** installs the newest DEB found in the VM's release folder with `sudo apt-get install -y`; the VM's package database and user data stay in the VM.
+- **Server and VM:** their explicit `fetch` action copies the newest installer to `~/Downloads/Builds/AutoPilot`, and the SHA256 of the copy must match the source. `desktop.sh run all` builds the server DEB but does not copy it. `desktop.sh fetch all` separately copies and checks every existing Legion MSI and server DEB.
 
 ### 6. Debug
 
@@ -135,10 +150,12 @@ Both debug runs build from source at the synced commit, so breakpoints match the
 
 - **Mac:** stops if AutoPilot is already running or port 5005 is taken. It then runs `./gradlew :composeApp:run --debug-jvm`, which waits for the debugger. In Android Studio choose **AutoPilot Mac (local)** → Debug. Closing the app window ends the run.
 - **Legion:** checks that the `AutoPilot-Debug` task exists and that the installed app isn't open, since both would share `.autopilot`. It starts the task on the signed-in desktop and waits up to 15 minutes until the debug run listens on Legion's port 5005. It then opens `ssh -N -L 127.0.0.1:5005:127.0.0.1:5005 home-legion` on the Mac. In Android Studio choose **AutoPilot Windows (SSH tunnel)** → Debug; the window appears on Legion. Control-C in the Terminal closes the tunnel. Port 5005 is never opened to the network.
+- **Mac Windows VM:** uses the same `AutoPilot-Debug` scheduled task and opens an SSH tunnel to the VM's port 5005. Register the task once inside the VM with `private\scripts\windows\Register-DebugLauncher.ps1`, then use `private/scripts/desktop.sh debug mac-vm-win`.
+- **Mac Linux VM:** runs `:composeApp:run --debug-jvm` over SSH and forwards port 5005 to the Mac. The Linux VM must have an active desktop session available to the SSH user.
 
 ## Where the scripts live
 
-All build, install and debug scripts are in `private/scripts/` (moved from `tools/` on 11 November 2026): `private/scripts/desktop.sh` for the Mac, and `private/scripts/windows/` for Windows. They're tracked in Git, because Gradle runs the two MSI patch scripts during packaging and the build machines need them. The `AutoPilot-Debug` task on Legion stores its launcher's path. `desktop.sh legion debug` re-registers it automatically when that path is out of date.
+All build, install and debug scripts are in `private/scripts/` (moved from `tools/` on 11 November 2026): `private/scripts/desktop.sh` for the Mac, and `private/scripts/windows/` for Windows. They're tracked in Git, because Gradle runs the two MSI patch scripts during packaging and the build machines need them. The `AutoPilot-Debug` task on Legion stores its launcher's path. `desktop.sh debug legion` re-registers it automatically when that path is out of date.
 
 ## When it stops
 
@@ -160,8 +177,7 @@ All build, install and debug scripts are in `private/scripts/` (moved from `tool
 | File | Runs on | Role |
 | --- | --- | --- |
 | `private/scripts/desktop.sh` | Mac | The single command: sync, build, install and debug; `all` leaves the server DEB remote |
-| `private/scripts/desktop.sh all fetch` | Mac | Copy and SHA256-check every existing Legion MSI and server DEB |
-| `private/scripts/windows/legion.sh` | Mac | Shortcut for `desktop.sh legion` |
+| `private/scripts/desktop.sh fetch all` | Mac | Copy and SHA256-check every existing Legion MSI and server DEB |
 | `private/scripts/server-vm.sh` | Mac | Start, stop, check and test the server's Windows VM |
 | `private/scripts/windows/Build-Distribution.ps1` | Legion, VM | Focused tests and MSI build |
 | `private/scripts/windows/Install-Msi.ps1` | Legion | Silent install or update, plus checks |
@@ -171,7 +187,7 @@ All build, install and debug scripts are in `private/scripts/` (moved from `tool
 
 ## Recorded run — 11 November 2026
 
-`private/scripts/desktop.sh all` at commit `1a13630` (version 1.0.30):
+The earlier full-run invocation at commit `1a13630` (version 1.0.30), now expressed as `private/scripts/desktop.sh run all`:
 
 | Step | Result |
 | --- | --- |
@@ -189,8 +205,8 @@ Also tested on 11 November 2026, at commit `ac90a44` (version 1.0.31):
 
 | Command | Result |
 | --- | --- |
-| `private/scripts/desktop.sh vm` | VM running check passed. Synced the VM to `ac90a44`. Focused tests and MSI: BUILD SUCCESSFUL in 6 min 2 s, with both Smart App Control fixes applied. Copied `~/Downloads/Builds/AutoPilot/AutoPilot-1.0.31.msi`; its SHA256 `e3ee33bd…817c22fd52` matches the VM. |
-| `private/scripts/desktop.sh legion debug` | Synced Legion. Started `AutoPilot-Debug`; the debug run listened on port 5005. `jdb -attach 127.0.0.1:5005` through the tunnel attached to Legion's JVM 21.0.13, resumed the app and detached. |
+| `private/scripts/desktop.sh build server-vm-win` | VM running check passed. Synced the VM to `ac90a44`. Focused tests and MSI: BUILD SUCCESSFUL in 6 min 2 s, with both Smart App Control fixes applied. Copied `~/Downloads/Builds/AutoPilot/AutoPilot-1.0.31.msi`; its SHA256 `e3ee33bd…817c22fd52` matches the VM. |
+| `private/scripts/desktop.sh debug legion` | Synced Legion. Started `AutoPilot-Debug`; the debug run listened on port 5005. `jdb -attach 127.0.0.1:5005` through the tunnel attached to Legion's JVM 21.0.13, resumed the app and detached. |
 
 The first debug test found a problem: the Mac's SSH config shares connections (`ControlMaster auto`, kept for 30 minutes). Through a shared connection, `ssh -N` opened a Windows prompt, and the 5005 forward stayed attached to the shared connection after the script ended. The tunnel now uses its own connection (`ssh -S none -N …`), so Control-C really closes it. If 5005 is ever stuck on the Mac, `ssh -O cancel -L 127.0.0.1:5005:127.0.0.1:5005 home-legion` releases it.
 

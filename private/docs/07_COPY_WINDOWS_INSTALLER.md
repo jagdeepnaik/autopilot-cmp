@@ -7,7 +7,7 @@
 From the project root on the Mac, run:
 
 ```sh
-private/scripts/desktop.sh all fetch
+private/scripts/desktop.sh fetch all
 ```
 
 That is the only command needed to collect the existing remote release files. It copies:
@@ -17,12 +17,12 @@ That is the only command needed to collect the existing remote release files. It
 
 The files go to `~/Downloads/Builds/AutoPilot`. The script checks the SHA256 hash of every copied file against the machine it came from, then reports each verified file.
 
-It does **not** push or pull Git, build a new installer, install an app, or remove old files. Build first when needed with `private/scripts/desktop.sh legion build` and `private/scripts/desktop.sh server build`; use this command afterwards whenever you want copies on the Mac.
+It does **not** push or pull Git, build a new installer, install an app, or remove old files. Build first when needed with `private/scripts/desktop.sh build legion` and `private/scripts/desktop.sh build server`; use this command afterwards whenever you want copies on the Mac.
 
 For the Cloudflare connection to the home server, use:
 
 ```sh
-private/scripts/desktop.sh all fetch --remote
+private/scripts/desktop.sh --remote fetch all
 ```
 
 Legion remains on its normal local SSH connection. If its MSI folder or the server's DEB folder is empty, the command stops and tells you which machine must build first.

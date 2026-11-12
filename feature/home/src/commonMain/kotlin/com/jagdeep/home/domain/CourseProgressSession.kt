@@ -90,7 +90,10 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
         if (fatal || request != null || !snapshot.top) return
         val updates = runner.pendingCompletions.values.toList()
         val records = updates.map { value -> LearningRecord(account.key, value.key, value.course, value.kind,
-            value.title, "completed", details = value.details, observedAt = now) }.toMutableList()
+            value.title, "completed", details = buildString {
+                append(value.details)
+                if (value.durationMillis > 0) append("\ndurationMillis=").append(value.durationMillis)
+            }, observedAt = now) }.toMutableList()
         val result = snapshot.assessment
         if (result?.result in setOf("passed", "failed") && !result?.module.isNullOrBlank()) {
             val path = snapshot.path.split('/').take(4).joinToString("/")
@@ -100,6 +103,7 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
                 append("\nscore=").append(result.score ?: "")
                 append("\nautomaticAnswers=").append(stats.automatic)
                 append("\nmanualAnswers=").append(stats.manual)
+                append("\ndurationMillis=").append(runner.assessmentDuration(result.module))
             }
             records.add(LearningRecord(account.key, "assessment-result:$path:${snapshot.document}:${result!!.result}",
                 result.module, "assessment", "Course Assessment", result.result!!, score = result.score, details = details, observedAt = now))

@@ -131,20 +131,12 @@ Create one Windows 11 ARM64 VM and one Debian or Ubuntu ARM64 VM. Give each a st
 
 ## 3. Prepare the Windows VM
 
-Open **PowerShell as Administrator** inside Windows:
-
-```powershell
-Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-Start-Service sshd
-Set-Service -Name sshd -StartupType Automatic
-New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
-```
-
-Install Git for Windows and a full JDK 21. Verify:
+The complete Windows installation is in [Windows VM components](#02-windows-vm-components). After completing that section, verify the SSH account that `desktop.sh` will use:
 
 ```powershell
 git --version
 java -version
+Get-Service sshd
 Get-Command powershell
 ```
 
@@ -152,18 +144,13 @@ The JDK must be available in the SSH session, not only in an interactive desktop
 
 ## 4. Prepare the Linux VM
 
-On Debian or Ubuntu, install Git, JDK 21, and Debian packaging tools:
-
-```sh
-sudo apt update
-sudo apt install -y git openjdk-21-jdk unzip fakeroot dpkg-dev
-```
-
-Verify:
+The complete Linux installation is in [Linux VM components](#03-linux-vm-components). After completing that section, verify the SSH account that `desktop.sh` will use:
 
 ```sh
 git --version
 java -version
+ssh -V
+unzip -v | head -1
 dpkg-deb --version
 ```
 
@@ -176,10 +163,10 @@ Use a dedicated clean checkout in each VM. The paths below are examples.
 **Windows PowerShell:**
 
 ```powershell
-New-Item -ItemType Directory -Force C:\Users\jagde\Projects | Out-Null
-Set-Location C:\Users\jagde\Projects
+New-Item -ItemType Directory -Force C:\Users\Jagdeep\Projects | Out-Null
+Set-Location C:\Users\Jagdeep\Projects
 git clone https://github.com/jagdeepnaik/autopilot-cmp.git autopilot-cmp
-Set-Location C:\Users\jagde\Projects\autopilot-cmp
+Set-Location C:\Users\Jagdeep\Projects\autopilot-cmp
 git status --short
 ```
 
@@ -224,13 +211,138 @@ ssh mac-linux-vm 'hostname && uname -m'
 
 Use the existing [password-free SSH guide](20_SET_UP_PASSWORD_FREE_SSH.md). Never put passwords or private keys in `desktop.sh`.
 
+### 6.1 If the VM addresses in the aliases do not work
+
+VM addresses can change when the virtualization product recreates its private network. On the
+Mac, first check the active VM bridge addresses:
+
+```sh
+ifconfig | grep -E '^(bridge|vmenet)' -A5
+```
+
+Then check the SSH port on the candidate guest address:
+
+```sh
+nc -vz -G 3 172.16.201.129 22
+nc -vz -G 3 172.16.201.130 22
+```
+
+On this Mac, the guests were found on 2026-11-13 as follows:
+
+| Guest | Address | SSH banner | Result |
+| --- | --- | --- | --- |
+| Windows VM | `172.16.201.129` | `OpenSSH_for_Windows_9.5` | Port open; key authentication still needs to be installed |
+| Debian VM | `172.16.201.130` | `OpenSSH_10.0p2 Debian-7+deb13u4` | Port open; key authentication still needs to be installed |
+
+Update only the `HostName` values in `~/.ssh/config` when the addresses change. A reachable
+port is not enough: the VM user must also have the Mac public key in its authorized-keys file.
+Complete the key installation from [password-free SSH](20_SET_UP_PASSWORD_FREE_SSH.md), then
+repeat:
+
+```sh
+ssh mac-windows-vm powershell -NoProfile -Command "hostname"
+ssh mac-linux-vm 'hostname && uname -m'
+```
+
+Do not continue to build until both commands authenticate without asking for a password. If the
+SSH user is not `jagdeep`, change the `User` line in the matching alias to the actual VM account.
+
+### 6.2 Current connection test
+
+On 2026-11-13 the Mac reached both active VM addresses and verified their host keys, but both
+logins returned `Permission denied (publickey,password,keyboard-interactive)`. This means the
+network and SSH servers are working; the Mac public key has not yet been authorized for the
+`jagdeep` account in one or both guests. Follow [password-free SSH section 9.3](20_SET_UP_PASSWORD_FREE_SSH.md#93-append-without-losing-existing-keys)
+on each guest, then run the two alias tests above again. Do not use `-o StrictHostKeyChecking=no`
+as a permanent fix.
+
+### 6.3 Complete password-free SSH setup
+
+The VM account password is needed only once to authorize the Mac public key. The private key stays
+on the Mac; only `~/.ssh/id_ed25519.pub` is copied to the VM.
+
+On the Mac, copy the public key:
+
+```sh
+pbcopy < ~/.ssh/id_ed25519.pub
+```
+
+#### Windows administrator account
+
+The `jagdeep` account on the Windows VM is an administrator, so Windows OpenSSH uses
+`C:\ProgramData\ssh\administrators_authorized_keys`. Open **PowerShell as Administrator** in the
+Windows VM console. These commands deliberately create the file before opening it in Notepad:
+
+```powershell
+$keyFile = "$env:ProgramData\ssh\administrators_authorized_keys"
+$keyDir = Split-Path $keyFile
+New-Item -ItemType Directory -Force -Path $keyDir | Out-Null
+New-Item -ItemType File -Force -Path $keyFile | Out-Null
+notepad $keyFile
+```
+
+Paste the one-line `ssh-ed25519 ...` public key copied from the Mac, save the file, and close
+Notepad. Verify that the file was saved:
+
+```powershell
+Test-Path $keyFile
+Get-Content $keyFile
+```
+
+Then apply the OpenSSH administrator-file permissions and restart the server:
+
+```powershell
+icacls.exe $keyFile /inheritance:r /grant:r '*S-1-5-32-544:F' '*S-1-5-18:F'
+Restart-Service sshd
+```
+
+If `icacls` says the file does not exist, return to the `New-Item` commands and save the key in
+Notepad before applying permissions. In PowerShell, use the commands as shown; a trailing `\` is
+not a continuation character.
+
+#### Debian user account
+
+Open the Debian VM console as `jagdeep`, then paste the same public-key line into the user's
+authorized-keys file:
+
+```sh
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+nano ~/.ssh/authorized_keys
+```
+
+Save in Nano with `Ctrl+O`, `Enter`, then exit with `Ctrl+X`. Finish with:
+
+```sh
+chmod 600 ~/.ssh/authorized_keys
+chown -R "$USER:$USER" ~/.ssh
+sudo systemctl restart ssh
+```
+
+#### Verify without allowing password fallback
+
+From the Mac, both commands must work without displaying a password prompt:
+
+```sh
+ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no mac-windows-vm powershell -NoProfile -Command "hostname; whoami"
+ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no mac-linux-vm 'hostname && whoami && uname -m'
+```
+
+The command may still ask for the Mac key's passphrase if the key is protected. That is local key
+protection, not the Windows or Debian account password. To keep the protected key in Apple's
+Keychain for the current Mac user, run:
+
+```sh
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+```
+
 ## 7. Configure `desktop.sh`
 
 In the Mac Terminal, set the aliases and exact checkout paths:
 
 ```sh
 export MAC_WINDOWS_HOST='mac-windows-vm'
-export MAC_WINDOWS_DIR='C:\Users\jagde\Projects\autopilot-cmp'
+export MAC_WINDOWS_DIR='C:\Users\Jagdeep\Projects\autopilot-cmp'
 
 export MAC_LINUX_HOST='mac-linux-vm'
 export MAC_LINUX_DIR='/home/jagdeep/Projects/AutoPilot'
@@ -253,34 +365,68 @@ Both `git status --short` outputs should be empty.
 
 ## 9. Build on the Mac-local VMs
 
+The standard command format is `private/scripts/desktop.sh <action> <target>`: action first,
+target last. `build` syncs and creates the artifact; `run` builds, then installs/checks it; `debug`
+starts one debug session and its port-5005 tunnel.
+
 Test one VM at a time first:
 
 ```sh
-private/scripts/desktop.sh windows-local sync
-private/scripts/desktop.sh windows-local build
-private/scripts/desktop.sh windows-local install
+private/scripts/desktop.sh sync mac-vm-win
+private/scripts/desktop.sh build mac-vm-win
+private/scripts/desktop.sh run mac-vm-win
 ```
+
+For Windows VM debugging, register the scheduled launcher once from an interactive PowerShell
+window inside the VM:
+
+```powershell
+Set-Location C:\Users\Jagdeep\Projects\autopilot-cmp
+& .\private\scripts\windows\Register-DebugLauncher.ps1
+```
+
+Then start the debug run from the Mac. The command waits for port 5005 and keeps the SSH tunnel
+open until you press `Control-C`:
+
+```sh
+private/scripts/desktop.sh debug mac-vm-win
+```
+
+Attach Android Studio to `127.0.0.1:5005` using the Windows debug configuration. Close the
+Windows app normally when finished so its local progress is saved.
 
 Build the Linux DEB in the Linux VM:
 
 ```sh
-private/scripts/desktop.sh linux-local sync
-private/scripts/desktop.sh linux-local build
+private/scripts/desktop.sh sync mac-vm-linux
+private/scripts/desktop.sh build mac-vm-linux
+private/scripts/desktop.sh run mac-vm-linux
 ```
+
+Linux VM debugging requires a graphical desktop session for the SSH user:
+
+```sh
+private/scripts/desktop.sh debug mac-vm-linux
+```
+
+The command runs `:composeApp:run --debug-jvm`, forwards port 5005 to the Mac, and keeps the SSH
+session open until `Control-C`. Install uses `sudo apt-get` inside the VM and may request the
+Linux user's sudo password unless sudo is configured for unattended package installation.
 
 Build macOS, Windows, and Linux from one Mac command:
 
 ```sh
-private/scripts/desktop.sh local-all build
+private/scripts/desktop.sh build local-all
+private/scripts/desktop.sh run local-all
 ```
 
-The script requires committed Mac work, pushes it, and pulls the same commit into both VM checkouts before building.
+The script requires committed Mac work, pushes it, and pulls the same commit into both VM checkouts before building. `run local-all` also installs the macOS app, Windows MSI and Linux DEB. Debug one VM at a time with its target above.
 
 ## 10. Recommended release workflow
 
 1. Commit the Mac changes.
-2. Run `private/scripts/desktop.sh local-all sync`.
-3. Run `private/scripts/desktop.sh local-all build`.
+2. Run `private/scripts/desktop.sh sync local-all`.
+3. Run `private/scripts/desktop.sh build local-all`.
 4. Test the macOS app, MSI, and DEB in their respective environments.
 5. Use Legion for the final x64 Windows MSI unless the local VM’s JDK and MSI architecture have been verified.
 

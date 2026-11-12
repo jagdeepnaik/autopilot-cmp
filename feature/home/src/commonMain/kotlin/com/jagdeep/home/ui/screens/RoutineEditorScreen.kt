@@ -128,7 +128,7 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                     Group("Study time")
                     NumberField("Required course hours",draft.requiredHours,errors.studyHours,{ value -> update { it.copy(requiredHours=value) } },Modifier.fillMaxWidth().padding(horizontal=16.dp))
                     NumberField("Hours already credited by DGS",draft.creditedHours,errors.studyHours,{ value -> update { it.copy(creditedHours=value) } },Modifier.fillMaxWidth().padding(horizontal=16.dp))
-                    com.jagdeep.home.ui.components.CourseProgressHistory(state.progressAccounts.filter {it.key.startsWith("dgs:")},state.savedProgress,state.progressHistoryError,viewModel::loadProgressHistory)
+                    com.jagdeep.home.ui.components.CourseProgressHistory(state.progressAccounts.filter {it.key.startsWith("dgs:")},state.savedProgress,emptyList(),state.progressHistoryError,viewModel::loadProgressHistory)
                     Text("Use the credited hours for the account and course you will select. The first run saves this baseline per user and course. Later runs resume the saved total and baseline. DGS decides official credit.",Modifier.padding(16.dp),style=MaterialTheme.typography.bodySmall)
                     Group("Reading and videos")
                     ChoiceSetting("Scroll speed",draft.pixelsPerSecond,listOf(Triple(30,"Slow",null),Triple(60,"Normal",null),Triple(100,"Faster",null))) { speed -> update { it.copy(pixelsPerSecond=speed) } }
@@ -175,7 +175,7 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                     Text("Sign in to Sagar Mein Yog in Chrome and leave the course tab in front while running. Choose Save to apply changes.", modifier = Modifier.padding(horizontal = 16.dp),style=MaterialTheme.typography.bodySmall)
                     com.jagdeep.home.ui.components.CourseAutomationGuide()
                     com.jagdeep.home.ui.components.CourseProgressHistory(
-                        state.progressAccounts, state.savedProgress, state.progressHistoryError, viewModel::loadProgressHistory,
+                        state.progressAccounts, state.savedProgress, state.savedProgressProfiles, state.progressHistoryError, viewModel::loadProgressHistory, viewModel::loadAllProgressHistory,
                     )
                 }
             }

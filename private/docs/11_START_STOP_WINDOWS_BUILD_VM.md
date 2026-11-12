@@ -4,7 +4,7 @@
 
 **On this page:** [One line with the script](#one-line-with-the-script) · [Separately, by hand](#separately-by-hand) · [Recorded test](#recorded-test--11-november-2026) · [Detailed steps: monitor, Screen Sharing, troubleshooting](#11-windows-vm-connect-check-start-monitor-and-stop) · [Cancel, disconnect or shut down](#5-cancel-disconnect-or-shut-down--choose-the-right-action)
 
-The VM is a Windows guest on the home server. It uses 8 GB of the server's 16 GB, so start it only for a build and stop it afterwards. Starting or stopping it never touches Debian or the websites. `desktop.sh vm` needs the VM running and stops with a hint if it isn't.
+The VM is a Windows guest on the home server. It uses 8 GB of the server's 16 GB, so start it only for a build and stop it afterwards. Starting or stopping it never touches Debian or the websites. `desktop.sh build server-vm-win` needs the VM running and stops with a hint if it isn't.
 
 ## One line with the script
 
@@ -23,7 +23,7 @@ A typical VM build:
 
 ```sh
 cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts
-./server-vm.sh start --headless && ./desktop.sh vm && ./server-vm.sh stop
+./server-vm.sh start --headless && ./desktop.sh build server-vm-win && ./server-vm.sh stop
 ```
 
 The script never force-kills the VM. If Windows doesn't answer, or takes longer than 5 minutes to shut down (often because it's installing updates), the script stops and says to check it with Screen Sharing.

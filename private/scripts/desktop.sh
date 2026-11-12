@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
 # One command from the Mac to sync, build, install and debug AutoPilot on every desktop machine.
 #
-#   private/scripts/desktop.sh <target> [action] [--no-tests] [--remote]
+#   private/scripts/desktop.sh [--no-tests] [--remote] <action> <target>
+#
+#   Standard action-first examples:
+#     private/scripts/desktop.sh sync all
+#     private/scripts/desktop.sh build all
+#     private/scripts/desktop.sh run all
+#     private/scripts/desktop.sh fetch all
 #
 #   target   mac      this Mac: macOS app in /Applications
 #            legion   Windows laptop (ssh home-legion): MSI, installed on Legion
 #            server   Debian home server (ssh home-server): Linux DEB, copied to the Mac
-#            vm       Windows VM on the home server (ssh home-server-build): MSI, copied to the Mac
-#            windows-local  Windows VM on this Mac (SSH host/path supplied by environment variables)
-#            linux-local    Linux VM on this Mac (SSH host/path supplied by environment variables)
-#            local-all      this Mac plus its local Windows and Linux VMs; build only the VMs
+#            server-vm-win Windows VM on the home server (ssh home-server-build): MSI, copied to the Mac
+#            mac-vm-win  Windows VM on this Mac (SSH host/path supplied by environment variables)
+#            mac-vm-linux  Linux VM on this Mac (SSH host/path supplied by environment variables)
+#            local-all      this Mac plus its local Windows and Linux VMs
 #            all      mac, legion and server: build and install; the server DEB stays on the server
 #
-#   action   all      (default) every step the target supports, in order
-#            sync     push the Mac's commits and pull them on the target
-#            build    sync, focused tests, then the installer
-#            install  build, then install and check   (mac, legion)
-#            fetch    copy existing installers to ~/Downloads/Builds/AutoPilot   (all); build then copy one installer (server, vm)
-#            debug    sync, start a debug run waiting on port 5005   (mac, legion)
+#   action   sync     push the Mac's commits and pull them on the target
+#            build    sync, focused tests, then build the installer
+#            run      build, then install/check the target
+#            fetch    copy existing installers to ~/Downloads/Builds/AutoPilot   (all); build then copy one installer (server, server-vm-win)
+#            debug    sync, start a debug run waiting on port 5005   (mac, legion, mac-vm-win, mac-vm-linux)
 #
 #   --no-tests  skip the focused tests
 #   --remote    reach the home server through Cloudflare (home-server-remote, home-server-build-remote)
@@ -40,10 +45,10 @@ SERVER_HOST="${SERVER_HOST:-home-server}"
 SERVER_DIR='/srv/build/autopilot-cmp'
 VM_HOST="${VM_HOST:-home-server-build}"
 VM_DIR='C:\Build\autopilot-cmp'
-MAC_WINDOWS_HOST="${MAC_WINDOWS_HOST:-mac-windows}"
-MAC_WINDOWS_DIR="${MAC_WINDOWS_DIR:-C:\Users\jagde\Projects\autopilot-cmp}"
-MAC_LINUX_HOST="${MAC_LINUX_HOST:-mac-linux}"
-MAC_LINUX_DIR="${MAC_LINUX_DIR:-/home/jagdeep/Projects/AndroidStudio/AutoPilot}"
+MAC_WINDOWS_HOST="${MAC_WINDOWS_HOST:-mac-windows-vm}"
+MAC_WINDOWS_DIR="${MAC_WINDOWS_DIR:-C:\Users\Jagdeep\Projects\autopilot-cmp}"
+MAC_LINUX_HOST="${MAC_LINUX_HOST:-mac-linux-vm}"
+MAC_LINUX_DIR="${MAC_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
 DOWNLOADS="$HOME/Downloads/Builds/AutoPilot"
 DEBUG_PORT=5005
 LOW_MEMORY=(--no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process')
@@ -52,21 +57,30 @@ FOCUSED_TESTS=(:core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy
 # The help text is the comment block at the top of this file, up to the first line of code.
 usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$SCRIPT"; }
 
-TARGET="${1:-}"
-case "$TARGET" in -h|--help|help) usage; exit 0 ;; esac
-[ -n "$TARGET" ] || { usage; exit 2; }
-shift
-ACTION=all
+POSITIONAL=()
 TESTS=1
 for arg in "$@"; do
     case "$arg" in
-        all|sync|build|install|fetch|debug) ACTION="$arg" ;;
         --no-tests) TESTS=0 ;;
         --remote) SERVER_HOST=home-server-remote; VM_HOST=home-server-build-remote ;;
         -h|--help) usage; exit 0 ;;
-        *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
+        *) POSITIONAL+=("$arg") ;;
     esac
 done
+
+TARGET=''
+ACTIONS=()
+is_target() { case "$1" in mac|legion|server|server-vm-win|mac-vm-win|mac-vm-linux|local-all|all) return 0 ;; *) return 1 ;; esac; }
+is_action() { case "$1" in sync|build|run|fetch|debug) return 0 ;; *) return 1 ;; esac; }
+
+if [ "${#POSITIONAL[@]}" -eq 2 ] && is_action "${POSITIONAL[0]}" && is_target "${POSITIONAL[1]}"; then
+    ACTIONS=("${POSITIONAL[0]}")
+    TARGET="${POSITIONAL[1]}"
+else
+    echo "Use exactly: private/scripts/desktop.sh <action> <target> (see --help)." >&2
+    usage
+    exit 2
+fi
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 fail() { printf '\n\033[31mStopped: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -248,6 +262,50 @@ local_linux_build() {
         || fail "the Mac Linux VM build failed (see above)."
 }
 
+local_linux_install() {
+    step "Mac Linux VM: install the newest DEB and check"
+    local deb
+    deb=$(ssh "$MAC_LINUX_HOST" "find '$MAC_LINUX_DIR/composeApp/build/compose/binaries/main-release/deb' -maxdepth 1 -type f -name '*.deb' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-" | tr -d '\r') \
+        || fail "couldn't find the Mac Linux VM DEB. Build it first."
+    [ -n "$deb" ] || fail "no DEB found on the Mac Linux VM. Build it first."
+    ssh "$MAC_LINUX_HOST" "sudo apt-get install -y '$deb'" \
+        || fail "the Mac Linux VM DEB install failed (see above)."
+    echo "Installed $deb on the Mac Linux VM."
+}
+
+local_windows_debug() {
+    windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR"
+    step "Mac Windows VM: start the debug run"
+    lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 && fail "port $DEBUG_PORT is already in use on the Mac. Close it and run again."
+    windows_ps "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR" "
+\$task = Get-ScheduledTask -TaskName 'AutoPilot-Debug' -ErrorAction SilentlyContinue
+if (-not \$task) { throw 'The AutoPilot-Debug task is not registered. Run private\\scripts\\windows\\Register-DebugLauncher.ps1 once inside the Windows VM desktop.' }
+if (-not ((\$task.Actions | ForEach-Object Arguments) -like '*private\\scripts\\windows\\Start-Debug.ps1*')) { & .\\private\\scripts\\windows\\Register-DebugLauncher.ps1 }
+if (Get-NetTCPConnection -LocalPort $DEBUG_PORT -State Listen -ErrorAction SilentlyContinue) { 'A debug run is already waiting on port $DEBUG_PORT.'; return }
+Start-ScheduledTask -TaskName 'AutoPilot-Debug'
+'Started AutoPilot-Debug in the Mac Windows VM. Waiting for port $DEBUG_PORT...'
+\$deadline = (Get-Date).AddMinutes(15)
+while (-not (Get-NetTCPConnection -LocalPort $DEBUG_PORT -State Listen -ErrorAction SilentlyContinue)) {
+    if ((Get-Date) -gt \$deadline) { throw 'The debug run did not listen within 15 minutes. Check the newest debug-*.log in %USERPROFILE%\\.autopilot\\logs.' }
+    if ((Get-ScheduledTask -TaskName 'AutoPilot-Debug').State -ne 'Running') { throw 'The debug run stopped early. Check the newest debug-*.log in %USERPROFILE%\\.autopilot\\logs.' }
+    Start-Sleep -Seconds 5
+}
+'The Mac Windows VM debug run is waiting for the debugger.'
+" || fail "the Mac Windows VM debug run didn't start (see above)."
+    step "Mac: debugger tunnel on 127.0.0.1:$DEBUG_PORT"
+    echo "In Android Studio, attach the Windows debug configuration to the Mac Windows VM. Press Control-C here to close the tunnel."
+    ssh -S none -N -o ExitOnForwardFailure=yes -L "127.0.0.1:$DEBUG_PORT:127.0.0.1:$DEBUG_PORT" "$MAC_WINDOWS_HOST"
+}
+
+local_linux_debug() {
+    linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR"
+    lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 && fail "port $DEBUG_PORT is already in use on the Mac. Close it and run again."
+    step "Mac Linux VM: start the debug run and tunnel port $DEBUG_PORT"
+    echo "The Linux VM must have a desktop session available to the SSH user. Press Control-C to stop the run and close the tunnel."
+    ssh -t -S none -o ExitOnForwardFailure=yes -L "127.0.0.1:$DEBUG_PORT:127.0.0.1:$DEBUG_PORT" "$MAC_LINUX_HOST" \
+        "cd '$MAC_LINUX_DIR' && ./gradlew --console=plain :composeApp:run --debug-jvm"
+}
+
 local_all_sync() {
     mac_check_pushed
     windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR"
@@ -259,6 +317,13 @@ local_all_build() {
     mac_build
     local_windows_build
     local_linux_build
+}
+
+local_all_install() {
+    local_all_build
+    mac_install
+    local_windows_install
+    local_linux_install
 }
 
 # --- Home server (Debian DEB) -------------------------------------------------------------------
@@ -359,60 +424,56 @@ vm_fetch() {
 }
 
 # --- Dispatch -----------------------------------------------------------------------------------
-unsupported() { fail "'$ACTION' isn't available for $TARGET. $1"; }
+unsupported() { fail "'$1' isn't available for $TARGET. $2"; }
 
-case "$TARGET" in
-    mac)
-        case "$ACTION" in
-            sync) mac_sync ;; build) mac_build ;; install) mac_build; mac_install ;; debug) mac_sync; mac_debug ;;
-            all) mac_build; mac_install; mac_debug ;;
-            fetch) unsupported "The Mac build stays on this Mac." ;;
-        esac ;;
-    legion)
-        case "$ACTION" in
-            sync) windows_sync Legion "$LEGION_HOST" "$LEGION_DIR" ;; build) legion_build ;;
-            install) legion_build; legion_install ;; debug) legion_debug ;;
-            all) legion_build; legion_install; legion_debug ;;
-            fetch) unsupported "Legion installs its own MSI; to copy it, see private/docs/07_COPY_WINDOWS_INSTALLER.md." ;;
-        esac ;;
-    server)
-        case "$ACTION" in
-            sync) server_sync ;; build) server_build ;; fetch|all) server_build; server_fetch ;;
-            install|debug) unsupported "The server is a headless website host; install and test the DEB on a Linux desktop." ;;
-        esac ;;
-    vm)
-        case "$ACTION" in
-            sync) windows_sync "Server VM" "$VM_HOST" "$VM_DIR" ;; build) vm_build ;; fetch|all) vm_build; vm_fetch ;;
-            install|debug) unsupported "Install and test MSIs on Legion." ;;
-        esac ;;
-    windows-local)
-        case "$ACTION" in
-            sync) windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR" ;;
-            build) local_windows_build ;;
-            install|all) local_windows_build; local_windows_install ;;
-            fetch|debug) unsupported "The Mac Windows VM builds locally; install or inspect its MSI there." ;;
-        esac ;;
-    linux-local)
-        case "$ACTION" in
-            sync) linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR" ;;
-            build|all) local_linux_build ;;
-            install|fetch|debug) unsupported "Build the DEB in the Mac Linux VM, then install it inside that VM." ;;
-        esac ;;
-    local-all)
-        case "$ACTION" in
-            sync) local_all_sync ;;
-            build|all) local_all_build ;;
-            install) local_all_build; mac_install; local_windows_install ;;
-            fetch|debug) unsupported "Use windows-local or linux-local for platform-specific local VM work." ;;
-        esac ;;
-    all)
-        case "$ACTION" in
-            sync) mac_check_pushed; windows_sync Legion "$LEGION_HOST" "$LEGION_DIR"; server_sync ;;
-            build) mac_check_pushed; mac_build; legion_build; server_build ;;
-            all|install) mac_check_pushed; mac_build; mac_install; legion_build; legion_install; server_build ;;
-            fetch) fetch_all_builds ;;
-            debug) unsupported "Debug one machine at a time: private/scripts/desktop.sh mac debug, or private/scripts/desktop.sh legion debug." ;;
-        esac ;;
-    *) fail "unknown target '$TARGET'. Use mac, legion, server, vm, windows-local, linux-local, local-all or all (see --help)." ;;
-esac
+run_action() {
+    local action="$1"
+    case "$action:$TARGET" in
+        sync:mac) mac_sync ;;
+        sync:legion) windows_sync Legion "$LEGION_HOST" "$LEGION_DIR" ;;
+        sync:server) server_sync ;;
+        sync:server-vm-win) windows_sync "Server VM" "$VM_HOST" "$VM_DIR" ;;
+        sync:mac-vm-win) windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR" ;;
+        sync:mac-vm-linux) linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR" ;;
+        sync:local-all) local_all_sync ;;
+        sync:all) mac_check_pushed; windows_sync Legion "$LEGION_HOST" "$LEGION_DIR"; server_sync ;;
+
+        build:mac) mac_build ;;
+        build:legion) legion_build ;;
+        build:server) server_build ;;
+        build:server-vm-win) vm_build ;;
+        build:mac-vm-win) local_windows_build ;;
+        build:mac-vm-linux) local_linux_build ;;
+        build:local-all) local_all_build ;;
+        build:all) mac_check_pushed; mac_build; legion_build; server_build ;;
+
+        run:mac) mac_build; mac_install ;;
+        run:legion) legion_build; legion_install ;;
+        run:server) server_build ;;
+        run:server-vm-win) vm_build; vm_fetch ;;
+        run:mac-vm-win) local_windows_build; local_windows_install ;;
+        run:mac-vm-linux) local_linux_build; local_linux_install ;;
+        run:local-all) local_all_install ;;
+        run:all) mac_check_pushed; mac_build; mac_install; legion_build; legion_install; server_build ;;
+
+        fetch:all) fetch_all_builds ;;
+        fetch:server) server_build; server_fetch ;;
+        fetch:server-vm-win) vm_build; vm_fetch ;;
+        fetch:mac|fetch:legion|fetch:mac-vm-win|fetch:mac-vm-linux|fetch:local-all)
+            unsupported fetch "This target does not copy an installer to the Mac." ;;
+
+        debug:mac) mac_sync; mac_debug ;;
+        debug:legion) legion_debug ;;
+        debug:mac-vm-win) local_windows_debug ;;
+        debug:mac-vm-linux) local_linux_debug ;;
+        debug:server|debug:server-vm-win|debug:local-all|debug:all)
+            unsupported debug "Debug one desktop at a time: use mac, legion, mac-vm-win or mac-vm-linux." ;;
+
+        *) fail "'$action' isn't available for $TARGET. See --help." ;;
+    esac
+}
+
+for action in "${ACTIONS[@]}"; do
+    run_action "$action"
+done
 step "Done"

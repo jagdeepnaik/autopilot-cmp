@@ -32,6 +32,7 @@ data class RoutineEditorUiState(
     val isSaved: Boolean = false,
     val progressAccounts: List<com.jagdeep.persistence.room.learning.LearningAccount> = emptyList(),
     val savedProgress: CourseProgressSummary? = null,
+    val savedProgressProfiles: List<CourseProgressSummary> = emptyList(),
     val progressHistoryError: String? = null,
     val answerBankNames: List<String> = emptyList(),
     val answerBankFolder: String? = null,
@@ -64,13 +65,14 @@ class RoutineEditorViewModel(
         viewModelScope.launch { controller.preferences.collect { prefs -> mutableState.update { it.copy(captureHotKey = prefs.captureHotKey) } } }
         viewModelScope.launch {
             controller.page.state.collect { page ->
-                mutableState.update { it.copy(progressAccounts = page.progressAccounts, savedProgress = page.savedProgress, progressHistoryError = page.progressHistoryError) }
+                mutableState.update { it.copy(progressAccounts = page.progressAccounts, savedProgress = page.savedProgress, savedProgressProfiles = page.savedProgressProfiles, progressHistoryError = page.progressHistoryError) }
             }
         }
         refreshApps()
     }
 
     fun loadProgressHistory(account: String) = controller.page.loadProgressHistory(account)
+    fun loadAllProgressHistory() = controller.page.loadAllProgressHistory()
     fun refreshAnswerBanks() = bankAction { null }
     fun validateAnswerBank() = bankAction { answerBanks.validate(state.value.draft.answerBankFile) }
     fun importAnswerBank() = bankAction { answerBanks.importFile(state.value.draft.answerBankFile) }

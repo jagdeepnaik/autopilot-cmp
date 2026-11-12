@@ -43,7 +43,12 @@ data class CourseModuleStatus(
     val assessmentScore: Double? = null,
     val automaticAnswers: Int = 0,
     val manualAnswers: Int = 0,
+    val videoDurationMillis: Long = 0,
+    val assessmentDurationMillis: Long = 0,
 )
+
+internal fun detailMetric(details: String, name: String): Long =
+    Regex("(?:^|\\n)$name=([0-9]+)").find(details)?.groupValues?.get(1)?.toLongOrNull() ?: 0
 
 internal fun assessmentRecords(account: String, rows: List<Map<String,String>>, now: Long): List<LearningRecord>? = runCatching {
     rows.map { row ->

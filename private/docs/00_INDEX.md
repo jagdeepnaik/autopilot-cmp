@@ -34,7 +34,7 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | Copy all existing Legion and server build files to the Mac | [07 · Fetch all build artifacts](07_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact) |
 | Fix installer errors: Error 1723, "Smart App Control blocked an app", "already installed" | [08_FIX_WINDOWS_INSTALLER.md](08_FIX_WINDOWS_INSTALLER.md) |
 
-**Usual order:** run `private/scripts/desktop.sh legion` (or `mac`, `server`, `all`) from the Mac, then open the app on that machine and check it. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
+**Usual order:** run `private/scripts/desktop.sh run legion` (or `run mac`, `run server`, `run all`) from the Mac, then open the app on that machine and check it. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
 
 ## 09–12 · Home server — Linux DEB and the Windows VM
 
@@ -45,7 +45,7 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | Start, stop, test or monitor the server's Windows VM (one line: `private/scripts/server-vm.sh`) | [11_START_STOP_WINDOWS_BUILD_VM.md](11_START_STOP_WINDOWS_BUILD_VM.md) |
 | Build the MSI inside that VM (alternative to Legion) | [12_BUILD_WINDOWS_IN_SERVER_VM.md](12_BUILD_WINDOWS_IN_SERVER_VM.md) |
 
-`private/scripts/desktop.sh server` and `private/scripts/desktop.sh vm` can build and fetch one machine's installer. `private/scripts/desktop.sh all` deliberately leaves the server DEB on the server; use `private/scripts/desktop.sh all fetch` when you want to collect the remote artifacts. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.
+Use `private/scripts/desktop.sh build server-vm-win` to build the server Windows VM MSI and `private/scripts/desktop.sh fetch all` to collect existing remote artifacts. `private/scripts/desktop.sh run all` deliberately leaves the server DEB on the server. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.
 
 ## 13–18 · Background, reference and recorded evidence
 
