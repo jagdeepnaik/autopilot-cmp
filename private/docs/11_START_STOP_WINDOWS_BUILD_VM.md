@@ -8,7 +8,7 @@ The VM is a Windows guest on the home server. It uses 8 GB of the server's 16 GB
 
 ## One line with the script
 
-From `private/scripts` (or as `private/scripts/server-vm.sh …` from the project root):
+Run from the project root with `private/scripts/server-vm.sh …`. Changing into `private/scripts` and using `./server-vm.sh …` is optional:
 
 | Command | What happens |
 | --- | --- |

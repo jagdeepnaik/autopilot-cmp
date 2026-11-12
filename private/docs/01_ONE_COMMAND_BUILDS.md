@@ -2,7 +2,7 @@
 
 [All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](09_BUILD_LINUX_ON_SERVER.md)
 
-**On this page:** [Commit and push everything](#commit-and-push-everything) · [Go to the scripts folder](#go-to-the-scripts-folder) · [Quick reference](#quick-reference) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
+**On this page:** [Commit and push everything](#commit-and-push-everything) · [Quick reference](#quick-reference) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
 
 **Related:** [Git guide](18_GIT_GUIDE.md) · [Fetch all remote artifacts](07_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact) · [Start/stop/test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
 
@@ -10,11 +10,39 @@
 
 ## Commit and push everything
 
-From any Mac Terminal folder, this one-line command opens the project, stages all non-ignored changes, creates a commit, and pushes it to `main`:
+From any Mac Terminal folder, run the project Git command:
+
+```sh
+/Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts/git.sh push-all
+```
+
+It stages all non-ignored changes, creates a commit, and pushes `main`. To provide a commit message, add it after the script path:
+
+```sh
+/Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts/git.sh push-all "Describe the change"
+```
+
+The equivalent one-line Git command is:
 
 ```sh
 cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot && git add -A && git commit -m "Update AutoPilot" && git push origin main
 ```
+
+### Project Git script commands
+
+| Command | What it does |
+| --- | --- |
+| `private/scripts/git.sh status` | Show the current branch and changed files. |
+| `private/scripts/git.sh check` | Fetch GitHub and show whether this checkout is ahead or behind. |
+| `private/scripts/git.sh fetch` | Download GitHub history without changing project files. |
+| `private/scripts/git.sh pull` | Fast-forward clean `main` to the latest GitHub commit. Refuses local changes. |
+| `private/scripts/git.sh diff` | Show unstaged and staged changes. |
+| `private/scripts/git.sh history` | Show the latest 20 commits. |
+| `private/scripts/git.sh branches` | Show local branches and tracking state. |
+| `private/scripts/git.sh push-all` | Commit all non-ignored changes and push `main`. |
+| `private/scripts/git.sh push-all "Message"` | Same as `push-all`, with a custom commit message. |
+
+The script intentionally has no destructive `reset --hard`, `clean -fd` or force-push command.
 
 Only run this when all current changes belong in the same commit. Files ignored by Git, including `private/plans/`, `private/signing/`, `private/secrets/` and `private/misc/`, are not included. Remote builds require this step before `sync`, `build` or `run` on another machine.
 

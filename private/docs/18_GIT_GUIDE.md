@@ -6,7 +6,19 @@ A complete guide to Git as this project uses it: the ideas behind it, every comm
 
 ## One-line commit and push
 
-From any Mac Terminal folder, open the project, stage all non-ignored changes, commit them, and push the commit to `main`:
+The preferred shortcut from any Mac Terminal folder is:
+
+```sh
+/Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts/git.sh push-all
+```
+
+Pass a commit message when useful:
+
+```sh
+/Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts/git.sh push-all "Describe the change"
+```
+
+The equivalent one-line Git command is:
 
 ```sh
 cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot && git add -A && git commit -m "Update AutoPilot" && git push origin main
@@ -33,6 +45,24 @@ The next command runs only if the previous command succeeds. Review `git status`
 [14 Recipes](#14-recipes-for-common-situations) ·
 [15 Safety](#15-what-can-lose-work) ·
 [16 Cheat sheet](#16-cheat-sheet)
+
+## Project Git script
+
+The project includes a safe daily Git wrapper. Run it from any folder with the absolute path, or use `./git.sh` after changing to `private/scripts`:
+
+| Command | What it does | Changes files? |
+| --- | --- | --- |
+| `private/scripts/git.sh status` | Shows the current branch and changed files. | No |
+| `private/scripts/git.sh check` | Fetches GitHub, then shows whether `main` is ahead, behind or synchronized. | No project files; updates remote-tracking information |
+| `private/scripts/git.sh fetch` | Downloads the latest GitHub history without changing the working files. | No project files |
+| `private/scripts/git.sh pull` | Pulls `origin/main` with fast-forward-only safety. It refuses to run with local changes. | Yes, only by fast-forwarding `main` |
+| `private/scripts/git.sh diff` | Shows both unstaged and staged changes. | No |
+| `private/scripts/git.sh history` | Shows the latest 20 commits. | No |
+| `private/scripts/git.sh branches` | Shows local branches and their tracking state. | No |
+| `private/scripts/git.sh push-all` | Stages all non-ignored changes, commits them, and pushes `main`. | Yes; commits and pushes |
+| `private/scripts/git.sh push-all "Message"` | Same as `push-all`, with a custom commit message. | Yes; commits and pushes |
+
+The wrapper intentionally does not include destructive commands such as `reset --hard`, `clean -fd` or force-push. Use those only after reviewing the Git guide and confirming the exact files affected.
 
 ---
 
