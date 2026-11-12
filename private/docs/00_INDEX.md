@@ -58,9 +58,9 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | How SSH and its keys work | [17_UNDERSTAND_SSH_AND_KEYS.md](17_UNDERSTAND_SSH_AND_KEYS.md) |
 | **Git: how it works, every important command, recipes and a cheat sheet** | [18_GIT_GUIDE.md](18_GIT_GUIDE.md) |
 
-## 19–23 · One-time setup — already done
+## 19–23, 28 · One-time machine setup
 
-Legion, the server and the VM are already set up. Use these only for a new machine, or to repair one.
+Legion, the server, the server VM, and the Mac-local build VMs are already set up or documented. Use these only for a new machine, or to repair one.
 
 | Task | Guide |
 | --- | --- |
@@ -69,6 +69,7 @@ Legion, the server and the VM are already set up. Use these only for a new machi
 | Clone AutoPilot on Legion for the first time | [21_CLONE_AUTOPILOT_ON_LEGION.md](21_CLONE_AUTOPILOT_ON_LEGION.md) |
 | Register the `AutoPilot-Debug` launcher on Legion | [22_SET_UP_WINDOWS_DEBUG_LAUNCHER.md](22_SET_UP_WINDOWS_DEBUG_LAUNCHER.md) |
 | Install the home server and its Windows VM | [23_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md](23_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md) |
+| Set up Windows and Linux build VMs on this Mac | [28_SET_UP_MAC_LOCAL_BUILD_VMS.md](28_SET_UP_MAC_LOCAL_BUILD_VMS.md) |
 
 ## 24–27 · Old shortcut pages
 
