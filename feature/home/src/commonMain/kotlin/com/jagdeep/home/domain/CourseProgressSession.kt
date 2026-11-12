@@ -94,8 +94,15 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
         val result = snapshot.assessment
         if (result?.result in setOf("passed", "failed") && !result?.module.isNullOrBlank()) {
             val path = snapshot.path.split('/').take(4).joinToString("/")
+            val stats = runner.answerStats(result!!.module)
+            val details = buildString {
+                append(path)
+                append("\nscore=").append(result.score ?: "")
+                append("\nautomaticAnswers=").append(stats.automatic)
+                append("\nmanualAnswers=").append(stats.manual)
+            }
             records.add(LearningRecord(account.key, "assessment-result:$path:${snapshot.document}:${result!!.result}",
-                result.module, "assessment", "Course Assessment", result.result!!, details = path, observedAt = now))
+                result.module, "assessment", "Course Assessment", result.result!!, score = result.score, details = details, observedAt = now))
         }
         val previous = summary?.records.orEmpty().associateBy { it.key }
         val changed = records.filter { row -> previous[row.key]?.let { it.status == row.status && it.details == row.details && it.course == row.course } != true }

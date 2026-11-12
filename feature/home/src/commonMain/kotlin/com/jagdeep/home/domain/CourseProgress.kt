@@ -35,7 +35,15 @@ val SAGAR_MEIN_YOG_MODULES = listOf(
 )
 
 enum class CourseModuleAction { Videos, Assessment }
-data class CourseModuleStatus(val module: String, val videosComplete: Boolean, val assessmentPassed: Boolean, val certificateSaved: Boolean)
+data class CourseModuleStatus(
+    val module: String,
+    val videosComplete: Boolean,
+    val assessmentPassed: Boolean,
+    val certificateSaved: Boolean,
+    val assessmentScore: Double? = null,
+    val automaticAnswers: Int = 0,
+    val manualAnswers: Int = 0,
+)
 
 internal fun assessmentRecords(account: String, rows: List<Map<String,String>>, now: Long): List<LearningRecord>? = runCatching {
     rows.map { row ->

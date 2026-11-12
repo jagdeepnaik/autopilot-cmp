@@ -63,6 +63,8 @@
       node.childElementCount === 0 && visible(node) && /^.+\s+Assessment$/i.test(safeText(node, 240))) : null;
     const resultRoute = /^\/dashboard\/courses\/[A-Za-z0-9_-]+\/assessment\/result\/[A-Za-z0-9_-]+$/.test(location.pathname);
     const resultText = safeText(root, 10000);
+    const scoreMatch = resultText.match(/You've scored\s+([\d.]+)\s*%/i);
+    const score = scoreMatch ? Number(scoreMatch[1]) : null;
     // During result-page loading the breadcrumb temporarily renders the internal course id.
     // The cleared-result copy contains the stable course title, which is what file records use.
     const resultModule = resultRoute ? resultText.match(/You've scored\s+[\d.]+\s*%\s+(.+?)\s+CLEARED\b/i)?.[1]?.trim() : null;
@@ -118,7 +120,7 @@
       ? buttons.filter((node) => /^end test$/i.test(label(node))).at(-1) : null;
     const countText = liveTest ? [...root.querySelectorAll('div')].find((node) => node.childElementCount === 0 && visible(node) && /^\d+\s+out of\s+\d+$/i.test(node.textContent.trim()))?.textContent : null;
     const totalQuestions = countText ? Number(countText.trim().match(/out of\s+(\d+)$/i)[1]) : null;
-    return { module, questions, result, next: next ? identify(next) : null, submit: submit ? identify(submit) : null,
+    return { module, questions, result, score, next: next ? identify(next) : null, submit: submit ? identify(submit) : null,
       start: start ? identify(start) : null, totalQuestions, certificate: certificate ? identify(certificate) : null,
       certificateClose: certificateClose ? identify(certificateClose) : null, confirmSubmit: confirmSubmit ? identify(confirmSubmit) : null, retry: retry ? identify(retry) : null };
   }

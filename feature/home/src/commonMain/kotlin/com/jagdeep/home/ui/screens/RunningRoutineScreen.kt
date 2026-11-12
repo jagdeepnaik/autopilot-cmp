@@ -80,37 +80,35 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                     Detail("Assessments","Manual · not automated")
                     Detail("Reserved answer bank",page.routine.answerBankFile)
                 }
-                RunSection("Run progress")
-                val clicks=when(page) {
-                    is PageActivity.Dgs -> page.progress.clicks
-                    is PageActivity.Automation -> page.clicks
-                    is PageActivity.ScrollClick -> page.progress.clicks
-                    else -> (state.run as? RunState.Running)?.clicks ?: 0
+                if(page !is PageActivity.Automation) {
+                    RunSection("Run progress")
+                    val clicks=when(page) {
+                        is PageActivity.Dgs -> page.progress.clicks
+                        is PageActivity.ScrollClick -> page.progress.clicks
+                        else -> (state.run as? RunState.Running)?.clicks ?: 0
+                    }
+                    Detail("Clicks",clicks.toString())
+                    if(page!=null) Detail("Chrome",if(state.page.isConnected) "Connected" else "Not connected")
                 }
-                Detail("Clicks",clicks.toString())
-                if(page!=null) Detail("Chrome",if(state.page.isConnected) "Connected" else "Not connected")
                 if(page is PageActivity.ScrollClick) Detail("Round","${page.progress.round} of ${page.progress.rounds}")
                 if(page is PageActivity.Automation) page.progressSummary?.let { summary ->
-                    Detail("Modules with a passed assessment",summary.records.filter { it.kind=="assessment" && it.status=="passed" }.map { CourseAnswerBank.normalize(it.course) }.distinct().size.toString())
-                    RunSection("Saved progress")
-                    Detail("User",summary.displayName)
-                    Detail("Progress source","Saved locally as videos and assessments finish")
+                    val assessments = page.modules.filter { it.assessmentPassed }
+                    Detail("Profile",summary.displayName)
+                    Detail("Modules complete","${page.modules.count { it.videosComplete && it.assessmentPassed }} / ${page.modules.size}")
+                    Detail("Assessments passed","${assessments.size}")
+                    Detail("Answers","${assessments.sumOf { it.automaticAnswers }} automatic · ${assessments.sumOf { it.manualAnswers }} manual")
                 }
                 if(page is PageActivity.Automation && page.modules.isNotEmpty()) {
                     CourseModuleProgress(page.modules, page.moduleAction, viewModel::runCourseModule, viewModel::stopCourseModule)
                 }
-                RunSection("Run details")
                 routine?.let { Detail("Routine type",it.kind.label) }
                 if(page is PageActivity.Automation) {
-                    Detail("Playback speed","${page.routine.playbackSpeed}×")
-                    Detail("Wait after each click","${page.routine.waitAfterClickMillis/1000} seconds")
                     Detail("Learning order",if(page.routine.learningOrder==LearningOrder.VideosFirst) "All videos first; confirm before assessments" else "Assessment after each module")
                     Detail("Assessment mode",if(!page.routine.answerAssessments) "Manual outside the routine" else when(page.routine.assessmentMode) {
                         AssessmentMode.Manual -> "Fully manual in Chrome"
                         AssessmentMode.Review -> "Automatic answers; confirm final submission"
                         AssessmentMode.Automatic -> "Automatic; unknown answers pause for help"
                     })
-                    Detail("Answer bank",page.routine.answerBankFile)
                     Text("Keep the course tab active and Chrome in front. Return here when an answer or approval is needed.",
                         Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -153,21 +151,32 @@ private fun CourseModuleProgress(
         Text("All ${modules.size} modules are shown. Status is saved locally as videos, assessments and certificates finish.", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         modules.forEach { module ->
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(module.module, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "Video status: ${if (module.videosComplete) "complete" else "not complete"} · " +
-                        "Assessment status: ${if (module.assessmentPassed) "passed" else "not passed"} · " +
-                        "Certificate: ${if (module.certificateSaved) "saved" else "not saved"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { run(module.module, CourseModuleAction.Videos) }) { Text("Run videos") }
-                    TextButton(onClick = { run(module.module, CourseModuleAction.Assessment) }) { Text("Run assessment") }
-                    if (activeAction != null) TextButton(onClick = stop) { Text("Stop selected") }
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                tonalElevation = 1.dp,
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(module.module, style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Video: ${if (module.videosComplete) "complete" else "not complete"} · " +
+                            "Assessment: ${if (module.assessmentPassed) "passed" else "not passed"} · " +
+                            "Score: ${module.assessmentScore?.let { "${it.toInt()}%" } ?: "—"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "Answers: ${module.automaticAnswers} automatic, ${module.manualAnswers} manual · " +
+                            "Certificate: ${if (module.certificateSaved) "saved" else "not saved"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { run(module.module, CourseModuleAction.Videos) }) { Text("Run videos") }
+                        TextButton(onClick = { run(module.module, CourseModuleAction.Assessment) }) { Text("Run assessment") }
+                        if (activeAction != null) TextButton(onClick = stop) { Text("Stop selected") }
+                    }
                 }
-                HorizontalDivider()
             }
         }
     }

@@ -233,7 +233,7 @@ class HomeScreensUiTest {
         onNodeWithText("Setup and how it works").assertDoesNotExist()
         onNodeWithText("Saved progress by user").assertDoesNotExist()
         onNodeWithText("Current activity").assertExists()
-        onNodeWithText("Run progress").assertExists()
+        onNodeWithText("Run progress").assertDoesNotExist()
         onNodeWithText("Which option?").assertExists()
         saveShot("running-grouped")
         onNodeWithText("Approve submission").performClick()
@@ -266,7 +266,7 @@ class HomeScreensUiTest {
         runOnIdle { viewModel.start() }
         waitUntil(timeoutMillis = 5_000) { automation.clicks.isNotEmpty() }
         onNodeWithText("Clicking").assertExists()
-        onNodeWithText("Run details").performScrollTo()
+        onNodeWithText("Routine type").performScrollTo()
         onNodeWithText("Stop").assertIsDisplayed()
         onNodeWithContentDescription("Edit Chrome button").assertDoesNotExist()
         onNodeWithText("Stop").performClick()

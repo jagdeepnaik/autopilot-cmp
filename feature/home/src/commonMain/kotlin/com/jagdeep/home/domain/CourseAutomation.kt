@@ -64,6 +64,7 @@ internal data class CourseAction(val request: Long, val document: String, val el
 internal data class CourseCommand(val session: String, val action: CourseAction? = null, val playbackSpeed: Double = 1.0)
 
 internal data class CourseCompletion(val key: String, val course: String, val kind: String, val title: String, val details: String)
+internal data class AssessmentAnswerStats(val automatic: Int, val manual: Int)
 
 /** App-owned decisions; the extension only describes elements and executes a specific command. */
 internal class CourseAutomationSession(val session: String, private val waitAfterClickMillis: Long = 0, playbackSpeed: Double = 1.0, private val answerAssessments: Boolean = false,
@@ -120,6 +121,8 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var answerBank: CourseAnswerBank? = null
     private var persistedAnswerBank: CourseAnswerBank? = null
     private val manualAnswers = mutableMapOf<String, Pair<String, CourseAnswer>>()
+    private val automaticAnswerKeys = mutableSetOf<String>()
+    private val manualAnswerKeys = mutableSetOf<String>()
     fun configureAnswers(bank: CourseAnswerBank?) { persistedAnswerBank = bank; answerBank = bank }
     var approval: CourseApprovalRequest? = null
         private set
@@ -137,6 +140,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
 
     fun acceptManualAnswer(token: String, savedBank: CourseAnswerBank? = null): Boolean {
         val request = manualAnswer?.takeIf { it.token == token } ?: return false
+        manualAnswerKeys += "${CourseAnswerBank.normalize(request.module)}:${CourseAnswerBank.normalize(request.question)}"
         val row = CourseAnswer(request.question, request.options, request.answer)
         if (savedBank != null) persistedAnswerBank = savedBank
         manualAnswers[token] = request.module to row
@@ -149,6 +153,14 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         manualAnswer = null
         attention = null
         return true
+    }
+
+    internal fun answerStats(module: String): AssessmentAnswerStats {
+        val prefix = "${CourseAnswerBank.normalize(module)}:"
+        return AssessmentAnswerStats(
+            automaticAnswerKeys.count { it.startsWith(prefix) },
+            manualAnswerKeys.count { it.startsWith(prefix) },
+        )
     }
 
     fun retryAssessment(token: String): Boolean {
@@ -452,6 +464,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     attention = "$path:${CourseAnswerBank.normalize(unknown.text)}:" + unknown.options.map { CourseAnswerBank.optionText(it.text) }.sorted().joinToString("|")
                     val selected = unknown.options.singleOrNull { it.selected && it.visible && it.enabled }
                     if (selected != null && unknown.options.map { CourseAnswerBank.optionText(it.text) }.distinct().size == unknown.options.size) {
+                        manualAnswerKeys += "${CourseAnswerBank.normalize(assessment.module)}:${CourseAnswerBank.normalize(unknown.text)}"
                         manualAnswer = ManualAnswerRequest("$attention:${CourseAnswerBank.optionText(selected.text)}", assessment.module, unknown.text,
                             unknown.options.map { it.text }, selected.text, persistedAnswerBank?.entry(assessment.module, unknown)?.answer)
                     }
@@ -574,6 +587,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     unknown.options.map { CourseAnswerBank.normalize(it.text) }.sorted().joinToString("|")
                 val selected = unknown.options.singleOrNull { it.selected && it.visible && it.enabled }
                 if (selected != null && unknown.options.map { CourseAnswerBank.optionText(it.text) }.distinct().size == unknown.options.size) {
+                    manualAnswerKeys += "${CourseAnswerBank.normalize(assessment.module)}:${CourseAnswerBank.normalize(unknown.text)}"
                     manualAnswer = ManualAnswerRequest("$attention:${CourseAnswerBank.optionText(selected.text)}", assessment.module, unknown.text, unknown.options.map { it.text }, selected.text,
                         persistedAnswerBank?.entry(assessment.module, unknown)?.answer)
                 }
@@ -588,6 +602,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val unanswered = answers.firstOrNull { !it.second!!.selected }
             if (unanswered != null) {
                 val option = unanswered.second!!
+                automaticAnswerKeys += "${CourseAnswerBank.normalize(assessment.module)}:${CourseAnswerBank.normalize(unanswered.first.text)}"
                 issue(CourseElement(option.id, tag = "radio", label = option.text), "assessmentAnswer", "Selecting a matching answer from the local file.")
                 return
             }

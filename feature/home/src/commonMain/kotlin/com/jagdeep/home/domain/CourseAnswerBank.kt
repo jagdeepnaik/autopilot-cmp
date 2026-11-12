@@ -102,6 +102,7 @@ internal data class CourseAssessment(
     val module: String,
     val questions: List<CourseQuestion> = emptyList(),
     val result: String? = null,
+    val score: Double? = null,
     val next: String? = null,
     val submit: String? = null,
     val start: String? = null,

@@ -817,7 +817,11 @@ class PageController(
             val videos = records.any { it.kind == "module-videos" && it.status == "completed" && CourseAnswerBank.normalize(it.course) == normalized }
             val passed = records.any { it.kind == "assessment" && it.status == "passed" && CourseAnswerBank.normalize(it.course) == normalized }
             val certificate = passed && certificateStore.hasCertificate(CourseCertificateTarget(profile, module))
-            CourseModuleStatus(module, videos, passed, certificate)
+            val assessment = records.filter { it.kind == "assessment" && CourseAnswerBank.normalize(it.course) == normalized }
+                .maxByOrNull { it.observedAt }
+            val details = assessment?.details.orEmpty()
+            fun metric(name: String) = Regex("(?:^|\\n)$name=([0-9]+)").find(details)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            CourseModuleStatus(module, videos, passed, certificate, assessment?.score, metric("automaticAnswers"), metric("manualAnswers"))
         }
     }
 
