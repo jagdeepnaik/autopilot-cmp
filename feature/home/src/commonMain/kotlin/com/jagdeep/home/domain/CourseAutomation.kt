@@ -514,10 +514,18 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                         issue(certificate, "certificateDownload", "Downloading the $module certificate before returning to the dashboard.")
                     } else if (pendingCertificate != null && certificate?.label?.trim().equals("Download PDF", true)) {
                         issue(requireNotNull(certificate), "certificateDownload", "Downloading the $module certificate PDF.")
-                    } else if (pendingCertificate != null) {
+                    } else {
+                        // Windows can render the certificate preview in a separate window
+                        // that the extension cannot expose as a clickable course element.
+                        // Start the same manual-confirmation fallback even when View
+                        // certificate was never reported, instead of waiting forever.
+                        if (pendingCertificate == null) {
+                            pendingCertificate = requireNotNull(target)
+                            pendingCertificateAt = now
+                        }
                         if (now - (pendingCertificateAt ?: now) > 20_000) requestManualCertificate(now)
-                        else detail = "Waiting for the $module certificate download to finish."
-                    } else detail = "Assessment passed. Waiting for the View certificate button."
+                        else detail = "Waiting for the $module certificate button. If it does not appear, AutoPilot will ask you to download it manually."
+                    }
                     return
                 }
                 val certificateClose = elements.firstOrNull { it.id == assessment.certificateClose && it.label.trim().equals("Close", true) }

@@ -585,4 +585,30 @@ class CourseAssessmentTest {
         runner.read(page(home, assessment = passed), 2)
         assertEquals("assessmentReturn", runner.action?.kind)
     }
+
+    @Test
+    fun `given Windows does not expose the certificate button then ask for manual confirmation`() {
+        val stored = mutableSetOf<CourseCertificateTarget>()
+        val certificates = object : CourseCertificateStore {
+            override fun hasCertificate(target: CourseCertificateTarget) = target in stored
+            override fun prepareDownload(target: CourseCertificateTarget) = Unit
+            override fun collectDownloaded(target: CourseCertificateTarget) = false
+            override fun confirmDownloaded(target: CourseCertificateTarget) { stored += target }
+            override fun recordResultUrl(target: CourseCertificateTarget, url: String) = Unit
+        }
+        val runner = CourseAutomationSession("s", answerAssessments = true)
+        runner.configureCertificates("Jagdeep", certificates)
+        val passed = CourseAssessment("Wellness", result = "passed")
+        val resultPage = page(assessment = passed)
+
+        runner.read(resultPage, 0)
+        assertNull(runner.approval)
+        runner.read(resultPage, 20_001)
+
+        assertEquals(CourseApprovalKind.CertificateDownloaded, runner.approval?.kind)
+        runner.approveAssessment(requireNotNull(runner.approval).token)
+        assertTrue(stored.contains(CourseCertificateTarget("Jagdeep", "Wellness")))
+        runner.read(page(home, assessment = passed), 20_002)
+        assertEquals("assessmentReturn", runner.action?.kind)
+    }
 }
