@@ -1,35 +1,47 @@
-# 07 — Copy the AutoPilot Windows Installer
+# 07 — Fetch AutoPilot Build Artifacts to the Mac
 
-[All guides](00_INDEX.md) · [Build first](02_BUILD_WINDOWS_ON_LEGION.md) · [Install and test](03_INSTALL_AND_TEST_WINDOWS.md)
+[All guides](00_INDEX.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md#quick-reference) · [Linux server build](09_BUILD_LINUX_ON_SERVER.md) · [Legion build](02_BUILD_WINDOWS_ON_LEGION.md)
 
-## PART D — COPY INSTALLERS — fresh Mac Terminal
+## One command: fetch every build artifact
 
-Skip this if you only want to install the locally built MSI on Legion. These commands run in a **new Mac Terminal**, outside the Windows SSH session.
-
-### D1. Create AutoPilot's download folder
+From the project root on the Mac, run:
 
 ```sh
-mkdir -p "$HOME/Downloads/Builds/autopilot-cmp"
+private/scripts/desktop.sh all fetch
 ```
 
-### D2. Download the installer
+That is the only command needed to collect the existing remote release files. It copies:
+
+- every Windows MSI from Legion (`home-legion`);
+- every Linux DEB from the home server (`home-server`).
+
+The files go to `~/Downloads/Builds/AutoPilot`. The script checks the SHA256 hash of every copied file against the machine it came from, then reports each verified file.
+
+It does **not** push or pull Git, build a new installer, install an app, or remove old files. Build first when needed with `private/scripts/desktop.sh legion build` and `private/scripts/desktop.sh server build`; use this command afterwards whenever you want copies on the Mac.
+
+For the Cloudflare connection to the home server, use:
 
 ```sh
-scp 'home-legion:C:/Users/jagde/Projects/autopilot-cmp/composeApp/build/compose/binaries/main-release/msi/AutoPilot-*.msi' "$HOME/Downloads/Builds/autopilot-cmp/"
+private/scripts/desktop.sh all fetch --remote
 ```
 
-### D3. Check the downloaded hash
+Legion remains on its normal local SSH connection. If its MSI folder or the server's DEB folder is empty, the command stops and tells you which machine must build first.
+
+## Use the files
+
+- Install an MSI on Legion with [03 — Install and test](03_INSTALL_AND_TEST_WINDOWS.md).
+- Install a DEB on a Linux desktop, not on the production home server:
+
+  ```sh
+  sudo apt install ./autopilot_<version>_amd64.deb
+  ```
+
+## By hand, if the one-command fetch is unavailable
+
+These are fallbacks only. The script above is safer because it verifies every transferred file.
 
 ```sh
-shasum -a 256 "$HOME/Downloads/Builds/autopilot-cmp/"AutoPilot-*.msi
-```
-
-Compare the same filename's hash with [the Windows build hash](02_BUILD_WINDOWS_ON_LEGION.md#c6-locate-the-autopilot-installer). If old versions are also present, identify the newly built version before sharing.
-
-### D4. Optional: send a Mac-held installer back to Legion
-
-Only needed if the desired MSI is on the Mac. This example uses version 1.0.0; change the version only if your actual filename differs.
-
-```sh
-scp "$HOME/Downloads/Builds/autopilot-cmp/AutoPilot-1.0.0.msi" home-legion:C:/Users/jagde/Downloads/
+mkdir -p "$HOME/Downloads/Builds/AutoPilot"
+scp 'home-legion:C:/Users/jagde/Projects/autopilot-cmp/composeApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
+scp 'home-server:/srv/build/autopilot-cmp/composeApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/Builds/AutoPilot/"
 ```

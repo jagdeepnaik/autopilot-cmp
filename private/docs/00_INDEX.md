@@ -31,7 +31,7 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | Debug the Windows app from Android Studio on the Mac | [04_DEBUG_WINDOWS_FROM_MAC.md](04_DEBUG_WINDOWS_FROM_MAC.md) |
 | Check the Chrome extension version and alert sounds after an update | [05_BROWSER_AND_ALERT_SETTINGS.md](05_BROWSER_AND_ALERT_SETTINGS.md) |
 | Add or update a versioned answer bank | [06_UPDATE_ANSWER_BANK.md](06_UPDATE_ANSWER_BANK.md) |
-| Copy an MSI between Legion and the Mac | [07_COPY_WINDOWS_INSTALLER.md](07_COPY_WINDOWS_INSTALLER.md) |
+| Copy all existing Legion and server build files to the Mac | [07 · Fetch all build artifacts](07_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact) |
 | Fix installer errors: Error 1723, "Smart App Control blocked an app", "already installed" | [08_FIX_WINDOWS_INSTALLER.md](08_FIX_WINDOWS_INSTALLER.md) |
 
 **Usual order:** run `private/scripts/desktop.sh legion` (or `mac`, `server`, `all`) from the Mac, then open the app on that machine and check it. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
@@ -41,11 +41,11 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | What you want to do | Guide |
 | --- | --- |
 | Build the Linux DEB on Debian | [09_BUILD_LINUX_ON_SERVER.md](09_BUILD_LINUX_ON_SERVER.md) |
-| Copy server-built installers to the Mac | [10_COPY_SERVER_INSTALLERS.md](10_COPY_SERVER_INSTALLERS.md) |
+| Copy server-built installers to the Mac, including the server VM MSI | [10_COPY_SERVER_INSTALLERS.md](10_COPY_SERVER_INSTALLERS.md) |
 | Start, stop, test or monitor the server's Windows VM (one line: `private/scripts/server-vm.sh`) | [11_START_STOP_WINDOWS_BUILD_VM.md](11_START_STOP_WINDOWS_BUILD_VM.md) |
 | Build the MSI inside that VM (alternative to Legion) | [12_BUILD_WINDOWS_IN_SERVER_VM.md](12_BUILD_WINDOWS_IN_SERVER_VM.md) |
 
-`private/scripts/desktop.sh server` and `private/scripts/desktop.sh vm` run these steps in one command. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.
+`private/scripts/desktop.sh server` and `private/scripts/desktop.sh vm` can build and fetch one machine's installer. `private/scripts/desktop.sh all` deliberately leaves the server DEB on the server; use `private/scripts/desktop.sh all fetch` when you want to collect the remote artifacts. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.
 
 ## 13–18 · Background, reference and recorded evidence
 

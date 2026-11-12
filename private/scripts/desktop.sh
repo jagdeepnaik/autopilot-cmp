@@ -7,17 +7,23 @@
 #            legion   Windows laptop (ssh home-legion): MSI, installed on Legion
 #            server   Debian home server (ssh home-server): Linux DEB, copied to the Mac
 #            vm       Windows VM on the home server (ssh home-server-build): MSI, copied to the Mac
-#            all      mac, legion and server: build and install (or copy); no debugging
+#            windows-local  Windows VM on this Mac (SSH host/path supplied by environment variables)
+#            linux-local    Linux VM on this Mac (SSH host/path supplied by environment variables)
+#            local-all      this Mac plus its local Windows and Linux VMs; build only the VMs
+#            all      mac, legion and server: build and install; the server DEB stays on the server
 #
 #   action   all      (default) every step the target supports, in order
 #            sync     push the Mac's commits and pull them on the target
 #            build    sync, focused tests, then the installer
 #            install  build, then install and check   (mac, legion)
-#            fetch    build, then copy the installer to ~/Downloads/Builds/AutoPilot   (server, vm)
+#            fetch    copy existing installers to ~/Downloads/Builds/AutoPilot   (all); build then copy one installer (server, vm)
 #            debug    sync, start a debug run waiting on port 5005   (mac, legion)
 #
 #   --no-tests  skip the focused tests
 #   --remote    reach the home server through Cloudflare (home-server-remote, home-server-build-remote)
+#
+#   Local VM configuration (defaults are examples; set these to your SSH aliases and checkout paths):
+#   MAC_WINDOWS_HOST, MAC_WINDOWS_DIR, MAC_LINUX_HOST, MAC_LINUX_DIR
 #
 # Remote machines always build from Git: the Mac's work must be committed; unpushed commits are
 # pushed; the target pulls and must end on the same commit. Uncommitted changes on either side are
@@ -34,6 +40,10 @@ SERVER_HOST="${SERVER_HOST:-home-server}"
 SERVER_DIR='/srv/build/autopilot-cmp'
 VM_HOST="${VM_HOST:-home-server-build}"
 VM_DIR='C:\Build\autopilot-cmp'
+MAC_WINDOWS_HOST="${MAC_WINDOWS_HOST:-mac-windows}"
+MAC_WINDOWS_DIR="${MAC_WINDOWS_DIR:-C:\Users\jagde\Projects\autopilot-cmp}"
+MAC_LINUX_HOST="${MAC_LINUX_HOST:-mac-linux}"
+MAC_LINUX_DIR="${MAC_LINUX_DIR:-/home/jagdeep/Projects/AndroidStudio/AutoPilot}"
 DOWNLOADS="$HOME/Downloads/Builds/AutoPilot"
 DEBUG_PORT=5005
 LOW_MEMORY=(--no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process')
@@ -115,6 +125,15 @@ if [ -n \"\$(git status --porcelain)\" ]; then git status --short; echo 'The ser
 git pull --ff-only -q
 [ \"\$(git rev-parse HEAD)\" = $MAC_HEAD ] || { echo 'The server is not on the Mac commit after pulling.' >&2; exit 1; }
 echo \"Server: \$(git log -1 --format='%h %s')\"" || fail "the server couldn't be synced (see above)."
+}
+
+# Sync a Linux VM using the same clean-check and exact-commit rule as the home server.
+linux_sync() {
+    local name="$1" host="$2" dir="$3"
+    mac_check_pushed
+    step "$name: pull"
+    ssh "$host" "set -e; cd '$dir'; dirty=\$(git status --porcelain); if [ -n \"\$dirty\" ]; then git status --short; echo '$name has uncommitted changes. Compare them with GitHub and stash them as a backup before syncing.' >&2; exit 1; fi; git pull --ff-only -q; [ \"\$(git rev-parse HEAD)\" = '$MAC_HEAD' ] || { echo '$name is not on the Mac commit after pulling.' >&2; exit 1; }; echo \"$name: \$(git log -1 --format='%h %s')\"" \
+        || fail "$name couldn't be synced (see above)."
 }
 
 # --- Mac ----------------------------------------------------------------------------------------
@@ -205,6 +224,43 @@ while (-not (Get-NetTCPConnection -LocalPort $DEBUG_PORT -State Listen -ErrorAct
     ssh -S none -N -o ExitOnForwardFailure=yes -L "127.0.0.1:$DEBUG_PORT:127.0.0.1:$DEBUG_PORT" "$LEGION_HOST"
 }
 
+# --- Mac-local Windows and Linux VMs ------------------------------------------------------------
+local_windows_build() {
+    windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR"
+    step "Mac Windows VM: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the MSI"
+    windows_ps "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR" "& .\\private\\scripts\\windows\\Build-Distribution.ps1$( [ "$TESTS" -eq 1 ] || echo ' -SkipTests')" \
+        || fail "the Mac Windows VM build failed (see above)."
+}
+
+local_windows_install() {
+    step "Mac Windows VM: install or update, then check"
+    windows_ps "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR" "& .\\private\\scripts\\windows\\Install-Msi.ps1 -LaunchCheck -SkipIfInstalled" \
+        || fail "the Mac Windows VM install or its checks failed (see above)."
+}
+
+local_linux_build() {
+    linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR"
+    step "Mac Linux VM: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the DEB"
+    local tasks=("${LOW_MEMORY[@]}")
+    [ "$TESTS" -eq 1 ] && tasks+=("${FOCUSED_TESTS[@]}")
+    tasks+=(:composeApp:packageReleaseDeb)
+    ssh "$MAC_LINUX_HOST" "cd '$MAC_LINUX_DIR' && ./gradlew $(printf "%q " "${tasks[@]}")" \
+        || fail "the Mac Linux VM build failed (see above)."
+}
+
+local_all_sync() {
+    mac_check_pushed
+    windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR"
+    linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR"
+}
+
+local_all_build() {
+    mac_check_pushed
+    mac_build
+    local_windows_build
+    local_linux_build
+}
+
 # --- Home server (Debian DEB) -------------------------------------------------------------------
 server_build() {
     server_sync
@@ -229,6 +285,51 @@ server_fetch() {
     [ "$remote" = "$local_hash" ] || fail "the copied $name doesn't match the server's (hash mismatch)."
     echo "Copied $DOWNLOADS/$name (SHA256 $local_hash, matches the server)."
     echo "Install it on a Linux desktop, not on the server: sudo apt install ./$name"
+}
+
+# --- Fetch every existing Legion MSI and server DEB ---------------------------------------------
+# This is deliberately separate from a build: it never syncs Git, builds, installs or deletes.
+safe_artifact_name() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.(msi|deb)$ ]]; }
+
+fetch_artifact_group() {
+    local label="$1" host="$2" remote_dir="$3" extension="$4"
+    local names name remote_hash local_hash copied=0
+    step "$label: find .$extension artifacts"
+    if [ "$extension" = msi ]; then
+        names=$(ssh "$host" "powershell -NoProfile -Command \"Get-ChildItem -LiteralPath '$remote_dir' -Filter '*.$extension' -File | Sort-Object Name | ForEach-Object { \$_.Name }\"" | tr -d '\r') \
+            || fail "$label couldn't be reached."
+    else
+        names=$(ssh "$host" "find '$remote_dir' -maxdepth 1 -type f -name '*.$extension' -printf '%f\\n' | sort") \
+            || fail "$label couldn't be reached."
+    fi
+    [ -n "$names" ] || fail "no .$extension artifacts found on $label. Build one there first."
+    mkdir -p "$DOWNLOADS"
+
+    while IFS= read -r name; do
+        [ -n "$name" ] || continue
+        safe_artifact_name "$name" || fail "$label returned an unsafe artifact name: $name"
+        step "$label: copy $name"
+        scp -q "$host:$remote_dir/$name" "$DOWNLOADS/$name" \
+            || fail "couldn't copy $name from $label."
+        if [ "$extension" = msi ]; then
+            remote_hash=$(ssh "$host" "powershell -NoProfile -Command \"(Get-FileHash -Algorithm SHA256 -LiteralPath '$remote_dir/$name').Hash\"" | tr -d '\r' | tr 'A-F' 'a-f') \
+                || fail "couldn't read the hash for $name on $label."
+        else
+            remote_hash=$(ssh "$host" "sha256sum '$remote_dir/$name'" | awk '{print $1}') \
+                || fail "couldn't read the hash for $name on $label."
+        fi
+        local_hash=$(shasum -a 256 "$DOWNLOADS/$name" | awk '{print $1}')
+        [ "$remote_hash" = "$local_hash" ] || fail "$name doesn't match $label after copying (hash mismatch)."
+        echo "Copied $DOWNLOADS/$name (SHA256 $local_hash, matches $label)."
+        copied=$((copied + 1))
+    done <<< "$names"
+    echo "$label: copied and verified $copied .$extension file(s)."
+}
+
+fetch_all_builds() {
+    fetch_artifact_group Legion "$LEGION_HOST" 'C:/Users/jagde/Projects/autopilot-cmp/composeApp/build/compose/binaries/main-release/msi' msi
+    fetch_artifact_group "Home server" "$SERVER_HOST" "$SERVER_DIR/composeApp/build/compose/binaries/main-release/deb" deb
+    echo "All available Legion MSIs and home-server DEBs are in $DOWNLOADS."
 }
 
 # --- Home server Windows VM (MSI) ---------------------------------------------------------------
@@ -284,13 +385,34 @@ case "$TARGET" in
             sync) windows_sync "Server VM" "$VM_HOST" "$VM_DIR" ;; build) vm_build ;; fetch|all) vm_build; vm_fetch ;;
             install|debug) unsupported "Install and test MSIs on Legion." ;;
         esac ;;
+    windows-local)
+        case "$ACTION" in
+            sync) windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR" ;;
+            build) local_windows_build ;;
+            install|all) local_windows_build; local_windows_install ;;
+            fetch|debug) unsupported "The Mac Windows VM builds locally; install or inspect its MSI there." ;;
+        esac ;;
+    linux-local)
+        case "$ACTION" in
+            sync) linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR" ;;
+            build|all) local_linux_build ;;
+            install|fetch|debug) unsupported "Build the DEB in the Mac Linux VM, then install it inside that VM." ;;
+        esac ;;
+    local-all)
+        case "$ACTION" in
+            sync) local_all_sync ;;
+            build|all) local_all_build ;;
+            install) local_all_build; mac_install; local_windows_install ;;
+            fetch|debug) unsupported "Use windows-local or linux-local for platform-specific local VM work." ;;
+        esac ;;
     all)
         case "$ACTION" in
             sync) mac_check_pushed; windows_sync Legion "$LEGION_HOST" "$LEGION_DIR"; server_sync ;;
             build) mac_check_pushed; mac_build; legion_build; server_build ;;
-            all|install|fetch) mac_check_pushed; mac_build; mac_install; legion_build; legion_install; server_build; server_fetch ;;
+            all|install) mac_check_pushed; mac_build; mac_install; legion_build; legion_install; server_build ;;
+            fetch) fetch_all_builds ;;
             debug) unsupported "Debug one machine at a time: private/scripts/desktop.sh mac debug, or private/scripts/desktop.sh legion debug." ;;
         esac ;;
-    *) fail "unknown target '$TARGET'. Use mac, legion, server, vm or all (see --help)." ;;
+    *) fail "unknown target '$TARGET'. Use mac, legion, server, vm, windows-local, linux-local, local-all or all (see --help)." ;;
 esac
 step "Done"

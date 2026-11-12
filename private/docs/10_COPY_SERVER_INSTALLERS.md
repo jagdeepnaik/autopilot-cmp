@@ -4,6 +4,8 @@
 
 ## 3. Download installers to the Mac
 
+For the usual case, use [07 — Fetch build artifacts](07_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact). It collects the Legion MSI and server DEBs in one command and verifies them. The manual commands below remain useful when you specifically need the server VM MSI.
+
 Use a **new Mac Terminal window**, not a Windows or Debian SSH prompt.
 
 ### 3.1 Create the download folder
