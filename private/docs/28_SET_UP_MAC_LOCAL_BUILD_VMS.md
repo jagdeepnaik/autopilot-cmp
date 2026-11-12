@@ -165,8 +165,8 @@ Use a dedicated clean checkout in each VM. The paths below are examples.
 ```powershell
 New-Item -ItemType Directory -Force C:\Users\Jagdeep\Projects | Out-Null
 Set-Location C:\Users\Jagdeep\Projects
-git clone https://github.com/jagdeepnaik/autopilot-cmp.git autopilot-cmp
-Set-Location C:\Users\Jagdeep\Projects\autopilot-cmp
+git clone https://github.com/jagdeepnaik/autopilot-cmp.git AutoPilot
+Set-Location C:\Users\Jagdeep\Projects\AutoPilot
 git status --short
 ```
 
@@ -342,7 +342,7 @@ In the Mac Terminal, set the aliases and exact checkout paths:
 
 ```sh
 export MAC_WINDOWS_HOST='mac-windows-vm'
-export MAC_WINDOWS_DIR='C:\Users\Jagdeep\Projects\autopilot-cmp'
+export MAC_WINDOWS_DIR='C:\Users\Jagdeep\Projects\AutoPilot'
 
 export MAC_LINUX_HOST='mac-linux-vm'
 export MAC_LINUX_DIR='/home/jagdeep/Projects/AutoPilot'
@@ -381,7 +381,7 @@ For Windows VM debugging, register the scheduled launcher once from an interacti
 window inside the VM:
 
 ```powershell
-Set-Location C:\Users\Jagdeep\Projects\autopilot-cmp
+Set-Location C:\Users\Jagdeep\Projects\AutoPilot
 & .\private\scripts\windows\Register-DebugLauncher.ps1
 ```
 

@@ -106,7 +106,7 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 <tr><td><code>private/scripts/desktop.sh debug mac-vm-win</code></td><td>Sync, start the Mac-local Windows VM debug run, and tunnel port 5005.</td></tr>
 <tr><td><code>private/scripts/desktop.sh debug mac-vm-linux</code></td><td>Sync, start the Mac-local Linux VM debug run, and tunnel port 5005.</td></tr>
 <tr><td><strong>Targets</strong></td><td><code>mac</code>, <code>legion</code>, <code>server</code>, <code>server-vm-win</code>, <code>mac-vm-win</code>, <code>mac-vm-linux</code>, <code>local-all</code> and <code>all</code>.</td></tr>
-<tr><td><strong>Mac-local VM setup</strong></td><td>Use your SSH aliases and checkout paths, for example:<br><code>MAC_WINDOWS_HOST=mac-windows-vm MAC_WINDOWS_DIR='C:\Users\Jagdeep\Projects\autopilot-cmp'</code><br><code>MAC_LINUX_HOST=mac-linux-vm MAC_LINUX_DIR='/home/jagdeep/Projects/AutoPilot'</code></td></tr>
+<tr><td><strong>Mac-local VM setup</strong></td><td>Use your SSH aliases and checkout paths, for example:<br><code>MAC_WINDOWS_HOST=mac-windows-vm MAC_WINDOWS_DIR='C:\Users\Jagdeep\Projects\AutoPilot'</code><br><code>MAC_LINUX_HOST=mac-linux-vm MAC_LINUX_DIR='/home/jagdeep/Projects/AutoPilot'</code></td></tr>
 <tr><td><strong>Remote build rule</strong></td><td>Your Mac work must be committed. The script pushes unpushed commits automatically, then makes the remote checkout match that commit.</td></tr>
 <tr><td><code>--no-tests</code></td><td>Skip the focused tests.</td></tr>
 <tr><td><code>--remote</code></td><td>Reach the home server through Cloudflare instead of the local network. For artifact fetching: <code>private/scripts/desktop.sh --remote fetch all</code>.</td></tr>
