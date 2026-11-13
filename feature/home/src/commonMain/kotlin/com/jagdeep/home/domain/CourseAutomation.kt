@@ -437,7 +437,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 ?: "")
             // Count the actual question attempt, not time spent waiting on the module's
             // "Start Assessment" page or an approval dialog.
-            if (assessment.result == null && assessment.questions.isNotEmpty()) assessmentStartedAt.putIfAbsent(path, now)
+            if (assessment.result == null && assessment.questions.isNotEmpty()) { if (path !in assessmentStartedAt) assessmentStartedAt[path] = now }
             assessment.questions.forEach { observedQuestions.getOrPut(path) { mutableMapOf() }[CourseAnswerBank.normalize(it.text) + it.options.map { option -> CourseAnswerBank.optionText(option.text) }.sorted().joinToString("|")] = it }
             if (assessment.result == "failed") {
                 val failedDuration = assessmentStartedAt.remove(path)?.let { (now - it).coerceAtLeast(0) } ?: 0
@@ -671,7 +671,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val video = elements.firstOrNull { it.tag == "video" && !it.decorative && !it.ended }
             if (video != null) {
                 if (!video.paused) {
-                    videoStartedAt.putIfAbsent("${snapshot.document}:${video.id}", now)
+                    "${snapshot.document}:${video.id}".let { key -> if (key !in videoStartedAt) videoStartedAt[key] = now }
                     detail = "Watching the video. It continues when the video ends."; return
                 }
                 // Use the player's own start control first: it may initialize its media source.
