@@ -3,7 +3,7 @@
 This file has two parts:
 
 - **Part A — Core CMP instructions:** reusable coding preferences, project structure, and engineering guidelines applicable to all CMP projects using this template.
-- **Part B — Vaulty-specific instructions:** project conventions and constraints that supplement Part A.
+- **Part B — AutoPilot-specific instructions:** project conventions and constraints that supplement Part A.
 
 **Project standard:** every CMP project follows [the CMP project standard and migration guide](private/docs/30_CMP_PROJECT_STANDARD_AND_MIGRATION.md): module layout, package layout, Gradle setup, the `private/` folder, and the step-by-step migration with a reusable prompt.
 
@@ -46,7 +46,7 @@ The app is split the way the current Android Studio Compose Multiplatform templa
 - Keep the shells thin. Put new app code in `shared`, and expose to a shell only the small public entry point it calls.
 - Values every module needs (for example the per-commit desktop version) are computed once in the root `build.gradle.kts` and read with `rootProject.extra`.
 - A `core:*` module owns a reusable technical concern; `core:ui` owns reusable design-system/UI/navigation infrastructure and `core:persistence` owns Room setup and database access. Product-specific module responsibilities belong in the relevant plan under `private/plans/`.
-- Keep `core:*` modules project-agnostic, because they are reused across projects built from this template. Name their classes, objects, functions, files, constants, and theme/API types generically (for example `Palette`, `AppColors`, `AppTheme`), never after the product (`Vaulty…`, `VAULTY_…`). Supply product-specific values (app name, user-facing copy, brand colours, service identifiers) from `shared` or a feature through configuration or parameters.
+- Keep `core:*` modules project-agnostic, because they are reused across projects built from this template. Name their classes, objects, functions, files, constants, and theme/API types generically (for example `Palette`, `AppColors`, `AppTheme`), never after the product (`<Product>…`, `<PRODUCT>_…`). Supply product-specific values (app name, user-facing copy, brand colours, service identifiers) from `shared` or a feature through configuration or parameters.
   - Exceptions: persistence entities, DAOs, and table/column names in `core:persistence` may use domain names.
   - Already-shipped wire, storage, and platform identifiers (for example mDNS service types, protocol tags, Keystore aliases, DataStore keys, and file names) keep their values for compatibility. Rename the code symbol that holds them, and change a value only through an approved migration.
 - Each concrete feature remains independent. Never import one concrete feature from another.
@@ -241,35 +241,73 @@ private/
 - Keep the app name configurable.
 - Show changed-file ownership and test/build evidence in each delivery summary.
 
-# Part B — Vaulty-specific instructions
+# Part B — AutoPilot-specific instructions
 
 ## Project conventions
 
-- Vaulty is an offline-first, locally encrypted password manager. Priorities, in order: security, privacy, reliability, maintainability, performance, UX. Follow [the project guide](private/VAULTY_PROJECT_GUIDE.md) for architecture and [the security instructions](private/VAULTY_CHATGPT_INSTRUCTIONS.md) for the threat model, cryptography, and acceptance criteria. [The security and architecture explanation](private/VAULTY_SECURITY_AND_ARCHITECTURE.md) describes how it works today and its known weaknesses; update it when the design changes.
-- No backend, account, analytics, or telemetry. The Android `INTERNET` permission exists only for local-network sync sockets; Vaulty never contacts a server of its own. Sync while apart goes through a folder another app syncs (iCloud Drive, Google Drive), holding only encrypted files. `core:network` and `core:parser` are inherited template modules that Vaulty does not use; don't wire them into features.
-- The UI follows the Zynk template's design system in `core:ui` (palettes, `AdaptiveNavigationScaffold`, `TopLevelPager`, `TopAppBarState`, toasts) and its rules above. Reuse the shared rows in `core:ui` (`SectionHeader`, `SwitchRow`, `PasswordField`, `StatusLine`, `Monogram`, `EmptyState`, `ReadableColumn`) before writing new ones.
-- `Palette.Default` is Vaulty's default palette (`DEFAULT_COLOR_PALETTE` in `feature:shared`). Appearance (theme and palette) is ordinary, non-sensitive preferences, read before unlock.
-- Navigation has two shells in `shared`: the locked shell (`RouteFlow.Unlock`, `RouteFlow.BackupRestore`; full screen, no navigation bars) and the unlocked shell (top-level `Vault` (start), `Generator`, `Security`, `Settings`). The unlocked shell is keyed by the unlocked keyring; locking discards it and all its state.
-- The Room schema stays at version 1 during development by owner decision (2026-10-31): after a schema change, delete the database or reinstall instead of writing a migration.
-- Vaulty has no `feature:home`: the Vault tab is the start destination (decided 2026-10-31). This is a deliberate exception to Part A's "retain `feature:home`" rule.
-- Cross-feature navigation uses `RouteFlow` keys in `core:ui` (for example, Security opens `RouteFlow.ItemDetail`); a feature never imports another concrete feature.
-- The shared core modules (`core:common`, `core:logger`, `core:network`, `core:notifications`, `core:parser`, `core:persistence`, `core:ui`) are reused across projects. Change them only with explicit approval, and keep them product-neutral. `core:ui` was replaced with the Zynk template's design system on 2026-10-31 at the owner's request.
+- AutoPilot is a desktop automation app, built with Kotlin and Compose Multiplatform. It has two kinds of work:
+  - **Routines** click for the user in any app: click, multi-point click, and scroll-and-click.
+  - **Course routines** work through Sagar Mein Yog and DGS e-learning courses in Chrome, through the bundled Chrome extension.
 
-## Security and validation
+  macOS and Windows are the supported platforms, and a Linux DEB is built. Android and iOS build and run, but show "Desktop only for now". Priorities, in order: the user stays in control of every automation, privacy, correctness of saved progress and answers, reliability, maintainability, UX. [How AutoPilot works](private/docs/14_HOW_AUTOPILOT_WORKS.md) explains the design; update it when the design changes.
+- **No backend, account, analytics or telemetry.** The app and the extension talk only to each other, over loopback, through `core:localbridge`: `127.0.0.1:47613`, accepting only the origin `chrome-extension://ebilomdffnbhihdfgkeienfcbceomkap`. These values are `BROWSER_LINK_PORT`, `BROWSER_EXTENSION_ORIGIN` and `BROWSER_EXTENSION_ID` in `shared` `platform/BrowserExtension.kt`, and the extension manifest's key fixes that ID. Never widen the extension's host permissions or the trusted origin, and never add an outside connection.
+- **Modules in use:**
+  - `core:automation` is the only code that touches the mouse, keyboard state, the front app and the Accessibility permission.
+  - `core:localbridge`, `core:common`, `core:logger`, `core:persistence` and `core:ui` are also used.
+  - `feature:home` holds the Routines page, the routine editor, the runners and course automation. `feature:activity` holds history and the live log, `feature:settings` holds settings, and `feature:shared` holds the cross-feature contracts.
 
-- Never implement cryptographic primitives. One keyring (the master vault) opens every vault: Argon2id derives a key from the master password that wraps a random keyring key, which wraps each vault's own random key (VEK). AES-256-GCM does the wrapping and encrypts each item with record identity bound as AAD. Every platform's Argon2id must use the saved parameters exactly, so a vault opens on any device; test with the shared reference vector. Credential fields are encrypted before they reach Room; no plaintext secret goes to Room, preferences, temporary files, logs, exceptions, navigation keys, saved state, or backups.
-- Route keys hold opaque item IDs only. Editor drafts and typed passwords live in ViewModels (in memory), never in `rememberSaveable` or navigation state. Encode typed master passwords to bytes only for the call and wipe them afterwards.
-- Secrets are hidden by default, revealed explicitly, and hidden again after 30 seconds. Copied values clear from the clipboard after 30 seconds when unchanged. The vault locks after 5 minutes without input, on backgrounding, and when the desktop window loses focus.
-- Biometric/device unlock is optional convenience, never the root of trust; the master password always works.
-- Quick unlock (PIN/biometrics) seals the keyring key under a slot bound to the keyring's ID; it is per device and never in backups or sync. A PIN-sealed key is always wrapped again by a hardware/OS-held device key; five wrong PINs delete it. The master password is required after a restart, every 14 days, and for export, master-password change, and vault deletion.
-- Own-device sync uses the keyring key as its trust root; each shared vault syncs on its own channel keyed by that vault's key, reaching only that vault's items (see private/plans/MULTI_VAULT_AND_RICH_ITEMS_PLAN.md). Only encrypted rows travel, over the network or through a sync folder; every live row is verified by decrypting under its vault key and its own ID before it is stored. `core:sync` moves opaque frames only and must stay vault-agnostic.
-- A vault set to "ask again" keeps its key out of the session until the user confirms again. Notifications never name an item or reminder.
-- QR sharing carries only non-secret details (name, username, website) or a one-time connection code. Never put passwords, notes, keys, or backup data in a QR code; those travel inside the encrypted channel the code opens.
-- Copy is direct and human, and never exposes raw exceptions or crypto jargon. Wrong-password and tampered-data errors don't reveal which check failed.
-- Add focused tests for crypto vectors, wrong passwords, tampering, backup/restore, key wiping, and every ViewModel state change. Claim platform support only with recorded evidence. Build iOS with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (the system default points at the Command Line Tools); the simulator has no Bluetooth or enrolled Face ID, so those need a real iPhone.
+  `core:network`, `core:notifications` and `core:transfer` are inherited template modules that AutoPilot doesn't use; don't wire them into features. The shared core modules are reused across projects: change them only with explicit approval, and keep them product-neutral.
+- **Navigation:**
+  - The top-level destinations are Routines (`RouteTopLevel.Home`, the start destination), Activity and Settings.
+  - The desktop app uses `DesktopShell`: a toolbar with the routine picker and Start/Stop, a sidebar, a page panel and a status bar. Starting a routine opens the **Running routine** screen.
+  - Cross-feature navigation uses `RouteFlow` keys in `core:ui`; a feature never imports another concrete feature.
+- **UI:**
+  - It follows the Zynk template's design system in `core:ui`: palettes, `AdaptiveNavigationScaffold`, `TopLevelPager`, `TopAppBarState`, toasts, and the shared rows. Reuse those before writing new components.
+  - `Palette.Default` is AutoPilot's default palette (`DEFAULT_COLOR_PALETTE` in `feature:shared`).
+- **App data** lives in `~/.autopilot/` (`%USERPROFILE%\.autopilot\` on Windows), owned by `DesktopDataPaths`:
+  - `settings/`, `routines/` and `history/` hold DataStore files.
+  - `databases/course-progress.db` is the Room database with saved course progress.
+  - `answer-banks/` holds the answer banks, `extensions/chrome/` the unpacked extension, and `logs/` the logs.
+
+  Installers and updates never touch this folder. A move between paths renames files, never overwrites an existing one. The course-progress database is real user progress: never delete or reset it as a shortcut. Schema changes follow Part A's version-1 rule, and dropping data needs the owner's explicit approval.
+- **Answer banks:**
+  - Files are named `name-ver-X.Y.json`, for example `sagarmeinyog-ver-1.0.json`, with plain-text `options` and `answer` values.
+  - The project's source copy is in `private/answer-banks/`. The bundled copy in `shared/src/jvmMain/resources/answer-banks/` is refreshed from it, and `BundledAnswerBankTest` checks its question count and that every answer is one of its options.
+  - The app copies a bundled bank to the user's folder only when no file of that name exists. To update installed banks, merge them: keep every question, and stop to ask if two banks give different answers for the same question.
+- **The Chrome extension's source** is `shared/src/jvmMain/resources/chrome-extension/`. Raise the manifest version when it changes. The app writes it to `~/.autopilot/extensions/chrome/` at every start; the user reloads it in Chrome.
+
+## Automation safety and privacy
+
+- The user can always stop a run with a hot key or Stop, from any app. "Only in one app" pauses clicking whenever another app is in front.
+- Course automation never guesses:
+  - No fuzzy matching, AI calls or invented answers.
+  - An unknown question, a changed option set or a missing answer pauses the run, alerts the user, and shows the question.
+  - Assessment starts and submissions need approval, except in **Automatic** mode, which the user authorises when starting the run.
+  - A failed attempt is retried only when the user explicitly chooses to.
+- The extension's own page clicks need a key press, except for the documented video play button.
+- From a page, the app receives only what it needs: a target's label (up to 40 characters), page and video state, and change hashes. It never receives page text in general, page addresses, passwords or anything typed. Logs and history never contain screen contents or form data.
+- Copy is direct and human. It says what happened and what to do next, and never shows raw exceptions.
+
+## Desktop distribution
+
+- The desktop version is `<major>.<minor>.<commit count>`, computed once in the root `build.gradle.kts`, so each commit's MSI upgrades the installed app in place.
+- Keep these unchanged, or installed apps stop updating in place: the MSI `upgradeUuid` (`bcdbe1a6-ef5a-4214-a3b6-021a08293966`), `packageName` `AutoPilot`, and the macOS `bundleID` `com.jagdeep.autopilot`.
+- Keep the Windows Smart App Control fixes in `desktopApp/build.gradle.kts`, until a trusted code-signing certificate is in place:
+  - the runtime image's native files replaced with the JDK's signed copies
+  - the signed `javaw.exe` launcher for both shortcuts
+  - jpackage's unsigned `JpCaDll` removed from the MSI
+
+  See [the installer fix guide](private/docs/09_FIX_WINDOWS_INSTALLER.md).
+- Build and install with `private/scripts/desktop.sh` (for example `run legion`, `run mac`, `run all`). Legion, the home server and the VMs build only from Git; `desktop.sh` pushes and pulls first.
+
+## Testing and validation
+
+- Add focused tests for every ViewModel state change, routine timing and stop condition, course decision (answer matching, pauses, approvals, saved progress), answer-bank validation, extension messages, and data-path moves.
+- Browser and live tests are in `shared` `integration/`. Live tests against real sites run only when asked.
+- Claim platform support only with recorded evidence. Build iOS with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (the system default points at the Command Line Tools).
 
 ## Project documentation
 
 - Keep plans, proposals, roadmaps, phase tracking, and implementation status in `private/plans/`; follow Part A's "Private folder" layout for the rest of `private/`. Part B contains durable project instructions and links, not the plans themselves.
 - [The documentation index](private/docs/00_INDEX.md) is the entry point to every guide in `private/docs/`. Keep it current whenever a guide is added, renamed or renumbered.
-- `private/zynk-cmp-main/` is a read-only reference copy of the Zynk template project (git-ignored). Use it to match patterns; never edit it or depend on it from the build.
+- `private/zynk-cmp-main/` is a read-only reference copy of the Zynk template project, and `private/Test/` of the current Android Studio CMP template (both git-ignored). Use them to match patterns; never edit them or depend on them from the build.
