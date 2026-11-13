@@ -5,7 +5,7 @@ This file has two parts:
 - **Part A — Core CMP instructions:** reusable coding preferences, project structure, and engineering guidelines applicable to all CMP projects using this template.
 - **Part B — Vaulty-specific instructions:** project conventions and constraints that supplement Part A.
 
-**Project standard:** every CMP project follows [the CMP project standard and migration guide](private/docs/29_CMP_PROJECT_STANDARD_AND_MIGRATION.md): module layout, package layout, Gradle setup, the `private/` folder, and the step-by-step migration with a reusable prompt.
+**Project standard:** every CMP project follows [the CMP project standard and migration guide](private/docs/30_CMP_PROJECT_STANDARD_AND_MIGRATION.md): module layout, package layout, Gradle setup, the `private/` folder, and the step-by-step migration with a reusable prompt.
 
 **Project guides:** start at [the documentation index](private/docs/00_INDEX.md). It lists every guide in `private/docs/` by how often it is used: one-command builds, installing, debugging, the home server, the Git guide and setup.
 
@@ -219,7 +219,7 @@ private/
 ```
 
 - **`misc/` is the default for anything temporary or unimportant:** backups, screenshots, captures, research notes, throwaway reports, scratch files, old copies and one-off helpers. Reports worth keeping go in `reports/`. It's git-ignored as a whole, so nothing in it reaches GitHub. Never make the build, the app or a tracked guide depend on a file in `misc/`; move the file to its proper folder first.
-- `docs/`: number the guides `NN_TOPIC.md` by how often they're used, keep `00_INDEX.md` current, and update every link when renumbering. Link to a section with GitHub-style heading links (`[text](#heading-text)`, or `file.md#heading-text` for another guide): lowercase, punctuation dropped, spaces as hyphens. Keep a long guide in one file with an "On this page" list. In Android Studio, Cmd+Click a link in the editor to follow it; the Markdown preview follows `#` links only when the IDE runs on JetBrains Runtime with JCEF (see `private/docs/18_GIT_GUIDE.md`).
+- `docs/`: number the guides `NN_TOPIC.md` by how often they're used, keep `00_INDEX.md` current, and update every link when renumbering. Link to a section with GitHub-style heading links (`[text](#heading-text)`, or `file.md#heading-text` for another guide): lowercase, punctuation dropped, spaces as hyphens. Keep a long guide in one file with an "On this page" list. In Android Studio, Cmd+Click a link in the editor to follow it; the Markdown preview follows `#` links only when the IDE runs on JetBrains Runtime with JCEF (see `private/docs/19_GIT_GUIDE.md`).
 - `scripts/` is tracked because the build machines pull it from Git and the build may run scripts from it. Reference scripts by their path under `private/scripts/` from Gradle, CI and the guides.
 - `plans/` follows the planning rule at the top of this file, and stays local.
 - Keep a data folder only for data that's part of the project. Put temporary exports and captures of it in `misc/`.

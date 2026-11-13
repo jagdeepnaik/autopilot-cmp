@@ -1,8 +1,8 @@
-# 23 — Set Up the Home Server and Windows Build VM
+# 24 — Set Up the Home Server and Windows Build VM
 
 [All guides](00_INDEX.md)
 
-**One-time preparation only. Already configured? Use [VM controls](11_START_STOP_WINDOWS_BUILD_VM.md), [Windows VM build](12_BUILD_WINDOWS_IN_SERVER_VM.md), or [Linux build](09_BUILD_LINUX_ON_SERVER.md).**
+**One-time preparation only. Already configured? Use [VM controls](12_START_STOP_WINDOWS_BUILD_VM.md), [Windows VM build](13_BUILD_WINDOWS_IN_SERVER_VM.md), or [Linux build](10_BUILD_LINUX_ON_SERVER.md).**
 
 # Debian + Windows 11 Home/Pro: build-server installation
 
@@ -17,7 +17,7 @@ Prepared for Jagdeep, 10 November 2026. This document separates one-time server 
 
 **YOUR CURRENT POSITION: preparation is complete.** Both Windows and Linux start Gradle with JDK 21. Do not repeat the ISO download, disk creation, Windows installation, account/key setup, or clone commands.
 
-**To build now, open [PART B — Build commands](26_BUILD_TASKS_QUICK_LINKS.md).** For Windows, start at **1.2** if the VM is already running, or **1.1** if it is off. For Linux, start at **2.1**.
+**To build now, open [PART B — Build commands](27_BUILD_TASKS_QUICK_LINKS.md).** For Windows, start at **1.2** if the VM is already running, or **1.1** if it is off. For Linux, start at **2.1**.
 
 **Current build results:** Linux tests and DEB packaging completed. The Windows MSI build was stopped at your request; no successful MSI result is claimed. No further builds or monitoring will run unless requested.
 
@@ -971,7 +971,7 @@ Set-Location C:\Build\autopilot-cmp
 if ($LASTEXITCODE -ne 0) { throw 'Gradle startup failed.' }
 ```
 
-**Windows preparation stops here.** A successful `--version` check confirms the tools start; it does not create an installer. Do not repeat this checkout setup for each build. The actual MSI build command is in [Part B, section 1.6](12_BUILD_WINDOWS_IN_SERVER_VM.md#16-build-the-msi).
+**Windows preparation stops here.** A successful `--version` check confirms the tools start; it does not create an installer. Do not repeat this checkout setup for each build. The actual MSI build command is in [Part B, section 1.6](13_BUILD_WINDOWS_IN_SERVER_VM.md#16-build-the-msi).
 
 ## 13. Prepare the Linux build checkout
 
@@ -998,7 +998,7 @@ You now have the VM, SSH connections, JDK/Git/Gradle, and separate Windows/Linux
 
 # PART B — REPEATABLE BUILD AND DOWNLOAD
 
-Use the separate **[Build commands guide](26_BUILD_TASKS_QUICK_LINKS.md)** from this point onward:
+Use the separate **[Build commands guide](27_BUILD_TASKS_QUICK_LINKS.md)** from this point onward:
 
 1. **Windows MSI:** section 1.1 to start the VM if off, otherwise section 1.2 to connect. The build itself is section 1.6.
 2. **Linux DEB:** start at section 2.1. The build itself is section 2.5.
@@ -1060,7 +1060,7 @@ An MSI cannot be installed on the Mac. Transfer it to the Windows laptop for ins
 
 ## 15. Start, monitor and shut down
 
-**For the clearer step-by-step SSH instructions, use [Part B, section 1.1](11_START_STOP_WINDOWS_BUILD_VM.md#11-windows-vm-connect-check-start-monitor-and-stop): connect to Debian, check/start the VM, monitor resources, shut down Windows through SSH, or disconnect without stopping it. Each action identifies the correct Terminal window. The commands below are supplementary reference.**
+**For the clearer step-by-step SSH instructions, use [Part B, section 1.1](12_START_STOP_WINDOWS_BUILD_VM.md#11-windows-vm-connect-check-start-monitor-and-stop): connect to Debian, check/start the VM, monitor resources, shut down Windows through SSH, or disconnect without stopping it. Each action identifies the correct Terminal window. The commands below are supplementary reference.**
 
 
 Start the VM when required, **Debian**:

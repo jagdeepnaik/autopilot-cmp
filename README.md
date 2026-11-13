@@ -177,7 +177,7 @@ feature/shared     Contracts shared by more than one feature
 iosApp/            iOS entry point (Xcode project)
 ```
 
-Features depend only on core modules and `feature:shared`, never on each other. [How it works](private/docs/13_HOW_AUTOPILOT_WORKS.md) explains every step, including how the app talks to Chrome. Coding and architecture conventions are in [AGENTS.md](./AGENTS.md).
+Features depend only on core modules and `feature:shared`, never on each other. [How it works](private/docs/14_HOW_AUTOPILOT_WORKS.md) explains every step, including how the app talks to Chrome. Coding and architecture conventions are in [AGENTS.md](./AGENTS.md).
 
 ## AutoPilot identity
 

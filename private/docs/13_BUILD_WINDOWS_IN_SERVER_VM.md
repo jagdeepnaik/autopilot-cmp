@@ -1,8 +1,8 @@
-# 12 — Build AutoPilot in the Server Windows VM
+# 13 — Build AutoPilot in the Server Windows VM
 
-[All guides](00_INDEX.md) · [Preferred: build on Legion](02_BUILD_WINDOWS_ON_LEGION.md) · [Copy server installers](10_COPY_SERVER_INSTALLERS.md)
+[All guides](00_INDEX.md) · [Preferred: build on Legion](02_BUILD_WINDOWS_ON_LEGION.md) · [Copy server installers](11_COPY_SERVER_INSTALLERS.md)
 
-Alternative to Legion. Run Windows commands only in the VM PowerShell window. If the VM is stopped, [start it first](11_START_STOP_WINDOWS_BUILD_VM.md).
+Alternative to Legion. Run Windows commands only in the VM PowerShell window. If the VM is stopped, [start it first](12_START_STOP_WINDOWS_BUILD_VM.md).
 
 ### 1.2 Connect to Windows
 

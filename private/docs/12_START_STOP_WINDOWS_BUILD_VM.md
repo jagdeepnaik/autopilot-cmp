@@ -1,6 +1,6 @@
-# 11 — Start, Stop, Test and Monitor the Server's Windows VM
+# 12 — Start, Stop, Test and Monitor the Server's Windows VM
 
-[All guides](00_INDEX.md) · [Build in the VM](12_BUILD_WINDOWS_IN_SERVER_VM.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md)
+[All guides](00_INDEX.md) · [Build in the VM](13_BUILD_WINDOWS_IN_SERVER_VM.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md)
 
 **On this page:** [One line with the script](#one-line-with-the-script) · [Separately, by hand](#separately-by-hand) · [Recorded test](#recorded-test--11-november-2026) · [Detailed steps: monitor, Screen Sharing, troubleshooting](#11-windows-vm-connect-check-start-monitor-and-stop) · [Cancel, disconnect or shut down](#5-cancel-disconnect-or-shut-down--choose-the-right-action)
 

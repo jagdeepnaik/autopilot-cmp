@@ -1,10 +1,10 @@
 # 01 — One Command: Sync, Build, Install and Debug on Every Desktop Machine
 
-[All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](09_BUILD_LINUX_ON_SERVER.md)
+[All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](10_BUILD_LINUX_ON_SERVER.md)
 
 **On this page:** [Commit and push everything](#commit-and-push-everything) · [Quick reference](#quick-reference) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
 
-**Related:** [Git guide](18_GIT_GUIDE.md) · [Fetch all remote artifacts](07_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact) · [Start/stop/test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](08_FIX_WINDOWS_INSTALLER.md)
+**Related:** [Git guide](19_GIT_GUIDE.md) · [Fetch all remote artifacts](08_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact) · [Start/stop/test the server VM](12_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](09_FIX_WINDOWS_INSTALLER.md)
 
 `private/scripts/desktop.sh` runs the build chain for one machine, or all of them, from a Mac Terminal. The only supported form puts one action first and the target last. Every step stops with a plain reason when something isn't right.
 
@@ -65,7 +65,7 @@ The script finds the project itself, so it works from any folder. From the proje
 
 ## Server Windows VM — start and stop
 
-`desktop.sh build server-vm-win` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [11 — Start, stop and test the server VM](11_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script).
+`desktop.sh build server-vm-win` needs the server's Windows VM running. Start, stop and test it in one line with `private/scripts/server-vm.sh start --headless`, `stop`, `status` or `test`. The full guide, with the manual commands, is [12 — Start, stop and test the server VM](12_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script).
 
 ## Quick reference
 
@@ -169,7 +169,7 @@ Windows commands go through `ssh` → the remote default shell (Command Prompt o
 ### 4. Build
 
 - **Mac:** `./gradlew` with the focused tests, then `:desktopApp:createReleaseDistributable`.
-- **Legion and the VM:** `private/scripts/windows/Build-Distribution.ps1`. It runs the focused tests and then `:desktopApp:packageReleaseMsi`, with two workers and a 2 GB heap. Packaging also patches the MSI so it installs and runs under Smart App Control: it removes jpackage's unsigned helper DLL and points the shortcuts at the signed `javaw.exe` (see [08](08_FIX_WINDOWS_INSTALLER.md)). The build output shows `Removed JpCaDll …` and `Pointed 2 shortcuts …`.
+- **Legion and the VM:** `private/scripts/windows/Build-Distribution.ps1`. It runs the focused tests and then `:desktopApp:packageReleaseMsi`, with two workers and a 2 GB heap. Packaging also patches the MSI so it installs and runs under Smart App Control: it removes jpackage's unsigned helper DLL and points the shortcuts at the signed `javaw.exe` (see [09](09_FIX_WINDOWS_INSTALLER.md)). The build output shows `Removed JpCaDll …` and `Pointed 2 shortcuts …`.
 - **Server:** the same Gradle settings, run with `nice` and `ionice`, so the websites keep priority.
 
 The focused tests are `core:automation`, the DGS study tests, the desktop data-path tests and the version test. They're quick checks, not the full suite.
@@ -206,7 +206,7 @@ All build, install and debug scripts are in `private/scripts/` (moved from `tool
 | *The installed AutoPilot is open on Legion* | Close it normally on Legion, rerun |
 | *Version … is not newer than the installed …* | Commit a change and rerun, or uninstall first ([03, S6](03_INSTALL_AND_TEST_WINDOWS.md)) |
 | *the Windows VM isn't running* | `private/scripts/server-vm.sh start --headless`, then rerun |
-| *The AutoPilot-Debug task is not registered* | Run `private\scripts\windows\Register-DebugLauncher.ps1` once on the Legion desktop ([22](22_SET_UP_WINDOWS_DEBUG_LAUNCHER.md)) |
+| *The AutoPilot-Debug task is not registered* | Run `private\scripts\windows\Register-DebugLauncher.ps1` once on the Legion desktop ([23](23_SET_UP_WINDOWS_DEBUG_LAUNCHER.md)) |
 | *port 5005 is already in use* | Close the earlier tunnel or debug run (`lsof -nP -iTCP:5005`) |
 | A build or test failure | Read the Gradle output above the message; nothing was installed |
 

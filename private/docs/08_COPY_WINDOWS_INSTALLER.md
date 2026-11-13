@@ -1,6 +1,6 @@
-# 07 — Fetch AutoPilot Build Artifacts to the Mac
+# 08 — Fetch AutoPilot Build Artifacts to the Mac
 
-[All guides](00_INDEX.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md#quick-reference) · [Linux server build](09_BUILD_LINUX_ON_SERVER.md) · [Legion build](02_BUILD_WINDOWS_ON_LEGION.md)
+[All guides](00_INDEX.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md#quick-reference) · [Linux server build](10_BUILD_LINUX_ON_SERVER.md) · [Legion build](02_BUILD_WINDOWS_ON_LEGION.md)
 
 ## One command: fetch every build artifact
 

@@ -1,4 +1,4 @@
-# 15 — AutoPilot Windows Build and Debug Reference
+# 16 — AutoPilot Windows Build and Debug Reference
 
 [All guides](00_INDEX.md)
 
@@ -211,8 +211,8 @@ The historical Windows app PID was `20288`, in session 1; the Mac SSH listener P
 | Mac `desktopApp/build/windows-distribution/` | Downloaded CI MSI |
 | Mac `/tmp/autopilot-windows-hostkey` | Current temporary verified server public key |
 | Mac `/tmp/autopilot-windows-ssh` | Current temporary connection-sharing socket |
-| `private/docs/24_WINDOWS_TASKS_QUICK_LINKS.md` | Build, copy, install, and debugging workflow |
-| `private/docs/25_INITIAL_SETUP_QUICK_LINKS.md` | One-time SSH and machine setup |
+| `private/docs/25_WINDOWS_TASKS_QUICK_LINKS.md` | Build, copy, install, and debugging workflow |
+| `private/docs/26_INITIAL_SETUP_QUICK_LINKS.md` | One-time SSH and machine setup |
 
 For a local file hash, use `Get-FileHash -Algorithm SHA256 <path>` on Windows or `shasum -a 256 <path>` on the Mac. Do not infer that a file is signed merely because a hash was printed.
 

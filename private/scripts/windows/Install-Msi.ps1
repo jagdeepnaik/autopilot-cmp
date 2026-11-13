@@ -87,5 +87,5 @@ Write-Output "Smart App Control blocks since install: $($blocks.Count)"
 $blocks | ForEach-Object { Write-Output ('  ' + ($_.Message -replace '(?s).*attempted to load (.*?) that.*', '$1')) }
 if ($blocks.Count -gt 0) { $problems += 'Smart App Control blocked files' }
 
-if ($problems.Count -gt 0) { throw ('Installed, but: ' + ($problems -join '; ') + '. See private/docs/08_FIX_WINDOWS_INSTALLER.md.') }
+if ($problems.Count -gt 0) { throw ('Installed, but: ' + ($problems -join '; ') + '. See private/docs/09_FIX_WINDOWS_INSTALLER.md.') }
 Write-Output 'OK: open AutoPilot from its desktop or Start menu shortcut.'

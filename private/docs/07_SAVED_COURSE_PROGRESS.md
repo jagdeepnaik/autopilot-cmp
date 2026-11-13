@@ -1,4 +1,4 @@
-# 26 — Resume Saved Sagar Mein Yog Progress
+# 07 — Resume Saved Sagar Mein Yog Progress
 
 [All guides](00_INDEX.md) · [Run settings and alerts](05_BROWSER_AND_ALERT_SETTINGS.md)
 

@@ -1,6 +1,6 @@
-# 29 — CMP Project Standard and Migration Guide
+# 30 — CMP Project Standard and Migration Guide
 
-[All guides](00_INDEX.md) · [Git guide](18_GIT_GUIDE.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md)
+[All guides](00_INDEX.md) · [Git guide](19_GIT_GUIDE.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md)
 
 This is the standard layout for every Compose Multiplatform (CMP) project from now on, and the procedure for moving an older project to it. It follows the structure Android Studio's current CMP template generates (`shared` + `androidApp` + `desktopApp` + `iosApp`), extended with this template's `core:*` and `feature:*` modules and the `private/` folder. AutoPilot was migrated with this procedure on 13 November 2026; the recorded result is at the end.
 
@@ -371,7 +371,7 @@ Paste this into Claude Code at the root of the project to migrate. Copy this gui
 
 ```text
 Migrate this Compose Multiplatform project to the standard layout in
-private/docs/29_CMP_PROJECT_STANDARD_AND_MIGRATION.md (copy it from AutoPilot if missing), using
+private/docs/30_CMP_PROJECT_STANDARD_AND_MIGRATION.md (copy it from AutoPilot if missing), using
 the Android Studio CMP template in private/Test as the reference. The code must not break.
 
 Follow the guide's section 6 in order:

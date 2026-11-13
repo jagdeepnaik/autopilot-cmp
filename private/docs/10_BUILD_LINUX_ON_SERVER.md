@@ -1,6 +1,6 @@
-# 09 — Build AutoPilot for Linux on the Home Server
+# 10 — Build AutoPilot for Linux on the Home Server
 
-[All guides](00_INDEX.md) · [Copy the DEB](10_COPY_SERVER_INSTALLERS.md)
+[All guides](00_INDEX.md) · [Copy the DEB](11_COPY_SERVER_INSTALLERS.md)
 
 ## 2. DEBIAN ONLY — build a DEB installer
 

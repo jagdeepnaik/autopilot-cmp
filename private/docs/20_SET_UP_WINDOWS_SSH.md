@@ -1,6 +1,6 @@
-# 19 — Set Up AutoPilot SSH Access to Legion
+# 20 — Set Up AutoPilot SSH Access to Legion
 
-[All guides](00_INDEX.md) · [Password-free login](20_SET_UP_PASSWORD_FREE_SSH.md) · [SSH basics](17_UNDERSTAND_SSH_AND_KEYS.md)
+[All guides](00_INDEX.md) · [Password-free login](21_SET_UP_PASSWORD_FREE_SSH.md) · [SSH basics](18_UNDERSTAND_SSH_AND_KEYS.md)
 
 ## PART A — MACHINE PREPARATION — already configured
 

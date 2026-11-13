@@ -1,6 +1,6 @@
 # 02 — Build AutoPilot for Windows on Legion
 
-[All guides](00_INDEX.md) · [Git guide](18_GIT_GUIDE.md) · [Fetch remote build artifacts](07_COPY_WINDOWS_INSTALLER.md) · [Install and test](03_INSTALL_AND_TEST_WINDOWS.md)
+[All guides](00_INDEX.md) · [Git guide](19_GIT_GUIDE.md) · [Fetch remote build artifacts](08_COPY_WINDOWS_INSTALLER.md) · [Install and test](03_INSTALL_AND_TEST_WINDOWS.md)
 
 ## ONE COMMAND — sync, build, install, debug
 

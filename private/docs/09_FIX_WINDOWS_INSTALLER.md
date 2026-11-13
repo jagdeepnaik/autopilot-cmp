@@ -1,6 +1,6 @@
-# 08 — Fix and Verify the AutoPilot Windows Installer
+# 09 — Fix and Verify the AutoPilot Windows Installer
 
-[All guides](00_INDEX.md) · [Normal installation](03_INSTALL_AND_TEST_WINDOWS.md) · [Diagnosis evidence](14_WINDOWS_INSTALLER_DIAGNOSIS.md)
+[All guides](00_INDEX.md) · [Normal installation](03_INSTALL_AND_TEST_WINDOWS.md) · [Diagnosis evidence](15_WINDOWS_INSTALLER_DIAGNOSIS.md)
 
 ## PART H — MSI UNDER SMART APP CONTROL — build, check, reinstall
 
@@ -46,7 +46,7 @@ Expected: `Valid`, then `C:\Program Files\AutoPilot\runtime\bin\javaw.exe`.
 | Check | `Install-Msi.ps1` lists any unsigned files left in the runtime. Its launch check now requires the Java VM to be loaded in the process, because `javaw.exe` stays open while it shows a load error. |
 | Still unsigned | `app\skiko-windows-x64.dll` (Compose's graphics library) and JNA's helper DLL, which it extracts at run time. Smart App Control allows them today, since many apps ship them unchanged. Only trusted code signing removes that remaining risk. |
 
-Full evidence: [Windows installer diagnosis](14_WINDOWS_INSTALLER_DIAGNOSIS.md).
+Full evidence: [Windows installer diagnosis](15_WINDOWS_INSTALLER_DIAGNOSIS.md).
 
 ### H1. Push the code from the Mac
 

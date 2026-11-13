@@ -1,4 +1,4 @@
-# 18 — Git: How It Works and How to Use It
+# 19 — Git: How It Works and How to Use It
 
 [All guides](00_INDEX.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md) · [Build on Legion](02_BUILD_WINDOWS_ON_LEGION.md)
 

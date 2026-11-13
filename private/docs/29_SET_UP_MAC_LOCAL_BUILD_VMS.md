@@ -1,6 +1,6 @@
-# 28 — Set Up Windows and Linux Build VMs on the Mac
+# 29 — Set Up Windows and Linux Build VMs on the Mac
 
-[All guides](00_INDEX.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md#quick-reference) · [SSH setup](19_SET_UP_WINDOWS_SSH.md) · [Git guide](18_GIT_GUIDE.md)
+[All guides](00_INDEX.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md#quick-reference) · [SSH setup](20_SET_UP_WINDOWS_SSH.md) · [Git guide](19_GIT_GUIDE.md)
 
 This guide prepares the Mac to build AutoPilot locally on macOS, Windows 11 in a VM, and Linux in a VM. The build code remains in `private/scripts/desktop.sh`; the local VM targets use SSH.
 
@@ -209,7 +209,7 @@ ssh mac-windows-vm powershell -NoProfile -Command "hostname"
 ssh mac-linux-vm 'hostname && uname -m'
 ```
 
-Use the existing [password-free SSH guide](20_SET_UP_PASSWORD_FREE_SSH.md). Never put passwords or private keys in `desktop.sh`.
+Use the existing [password-free SSH guide](21_SET_UP_PASSWORD_FREE_SSH.md). Never put passwords or private keys in `desktop.sh`.
 
 ### 6.1 If the VM addresses in the aliases do not work
 
@@ -236,7 +236,7 @@ On this Mac, the guests were found on 2026-11-13 as follows:
 
 Update only the `HostName` values in `~/.ssh/config` when the addresses change. A reachable
 port is not enough: the VM user must also have the Mac public key in its authorized-keys file.
-Complete the key installation from [password-free SSH](20_SET_UP_PASSWORD_FREE_SSH.md), then
+Complete the key installation from [password-free SSH](21_SET_UP_PASSWORD_FREE_SSH.md), then
 repeat:
 
 ```sh
@@ -252,7 +252,7 @@ SSH user is not `jagdeep`, change the `User` line in the matching alias to the a
 On 2026-11-13 the Mac reached both active VM addresses and verified their host keys, but both
 logins returned `Permission denied (publickey,password,keyboard-interactive)`. This means the
 network and SSH servers are working; the Mac public key has not yet been authorized for the
-`jagdeep` account in one or both guests. Follow [password-free SSH section 9.3](20_SET_UP_PASSWORD_FREE_SSH.md#93-append-without-losing-existing-keys)
+`jagdeep` account in one or both guests. Follow [password-free SSH section 9.3](21_SET_UP_PASSWORD_FREE_SSH.md#93-append-without-losing-existing-keys)
 on each guest, then run the two alias tests above again. Do not use `-o StrictHostKeyChecking=no`
 as a permanent fix.
 
