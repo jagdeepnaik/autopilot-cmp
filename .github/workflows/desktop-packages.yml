@@ -49,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: AutoPilot-windows-x64
-          path: composeApp/build/compose/binaries/main-release/msi/*.msi
+          path: desktopApp/build/compose/binaries/main-release/msi/*.msi
           if-no-files-found: error
 
   other:
@@ -63,15 +63,15 @@ jobs:
           - name: Debian Ubuntu Linux x64
             os: ubuntu-latest
             java_architecture: x64
-            gradle_task: :composeApp:packageReleaseDeb
+            gradle_task: :desktopApp:packageReleaseDeb
             artifact_name: AutoPilot-linux-x64
-            artifact_path: composeApp/build/compose/binaries/main-release/deb/*.deb
+            artifact_path: desktopApp/build/compose/binaries/main-release/deb/*.deb
           - name: macOS Intel
             os: macos-15-intel
             java_architecture: x64
-            gradle_task: :composeApp:packageReleaseDmg
+            gradle_task: :desktopApp:packageReleaseDmg
             artifact_name: AutoPilot-macos-x64
-            artifact_path: composeApp/build/compose/binaries/main-release/dmg/*.dmg
+            artifact_path: desktopApp/build/compose/binaries/main-release/dmg/*.dmg
     steps:
       - name: Check out source
         uses: actions/checkout@v6

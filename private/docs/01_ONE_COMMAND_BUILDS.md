@@ -129,12 +129,12 @@ Use `private/scripts/desktop.sh build legion` for Legion builds.
 <tr><th>Machine</th><th>Target</th><th>Builds</th><th>Installs</th><th>Debug</th></tr>
 </thead>
 <tbody>
-<tr><td>This Mac</td><td><code>mac</code></td><td>macOS app<br><code>createReleaseDistributable</code></td><td>Copies it to <code>/Applications/AutoPilot.app</code></td><td><code>gradlew :composeApp:run --debug-jvm</code><br>Attach <strong>AutoPilot Mac (local)</strong></td></tr>
+<tr><td>This Mac</td><td><code>mac</code></td><td>macOS app<br><code>createReleaseDistributable</code></td><td>Copies it to <code>/Applications/AutoPilot.app</code></td><td><code>gradlew :desktopApp:run --debug-jvm</code><br>Attach <strong>AutoPilot Mac (local)</strong></td></tr>
 <tr><td>Legion laptop<br><code>home-legion</code></td><td><code>legion</code></td><td>Windows MSI<br><code>Build-Distribution.ps1</code></td><td>Silent update with <code>Install-Msi.ps1</code>, then checks it</td><td><code>AutoPilot-Debug</code> task and SSH tunnel<br>Attach <strong>AutoPilot Windows (SSH tunnel)</strong></td></tr>
 <tr><td>Home server, Debian<br><code>home-server</code></td><td><code>server</code></td><td>Linux DEB<br><code>packageReleaseDeb</code><br>Low priority</td><td>No: headless website host.<br><code>desktop.sh fetch server</code> can copy its DEB; <code>desktop.sh run all</code> leaves it remote.</td><td>No</td></tr>
 <tr><td>Home server Windows VM<br><code>home-server-build</code></td><td><code>server-vm-win</code></td><td>Windows MSI<br><code>Build-Distribution.ps1</code></td><td>No. Its MSI is copied to <code>~/Downloads/Builds/AutoPilot</code>; install it on Legion.</td><td>No</td></tr>
 <tr><td>Windows VM on this Mac</td><td><code>mac-vm-win</code></td><td>Windows MSI<br><code>Build-Distribution.ps1</code></td><td><code>run mac-vm-win</code> runs <code>Install-Msi.ps1 -LaunchCheck -SkipIfInstalled</code> inside the VM.</td><td><code>debug mac-vm-win</code> starts <code>AutoPilot-Debug</code> and tunnels port 5005.</td></tr>
-<tr><td>Linux VM on this Mac</td><td><code>mac-vm-linux</code></td><td>Linux DEB<br><code>packageReleaseDeb</code></td><td><code>run mac-vm-linux</code> installs the newest DEB with <code>sudo apt-get</code> inside the VM.</td><td><code>debug mac-vm-linux</code> runs <code>:composeApp:run --debug-jvm</code> and tunnels port 5005; the VM needs a desktop session.</td></tr>
+<tr><td>Linux VM on this Mac</td><td><code>mac-vm-linux</code></td><td>Linux DEB<br><code>packageReleaseDeb</code></td><td><code>run mac-vm-linux</code> installs the newest DEB with <code>sudo apt-get</code> inside the VM.</td><td><code>debug mac-vm-linux</code> runs <code>:desktopApp:run --debug-jvm</code> and tunnels port 5005; the VM needs a desktop session.</td></tr>
 </tbody>
 </table>
 
@@ -157,7 +157,7 @@ The Mac target builds from your working folder and doesn't need a push. If you h
 
 Every desktop build uses `<major>.<minor>.<commit count>`, for example `1.0.30`. Major and minor come from `versionName` in `gradle/libs.versions.toml`; the third part is `git rev-list --count HEAD`. The same number goes on:
 
-- the MSI, DMG and DEB (`packageVersion` in `composeApp/build.gradle.kts`);
+- the MSI, DMG and DEB (`packageVersion` in `desktopApp/build.gradle.kts`; the number itself is computed once in the root `build.gradle.kts`);
 - the app's About screen and status bar (passed to the app as `-Dautopilot.version`).
 
 Each commit's MSI is therefore newer than the last one, so Windows updates the installed app in place. Building the same commit twice gives the same version: `Install-Msi.ps1 -SkipIfInstalled` then reports *already installed* and moves on, instead of failing. Android and iOS keep `versionName` from the version catalog.
@@ -168,8 +168,8 @@ Windows commands go through `ssh` → the remote default shell (Command Prompt o
 
 ### 4. Build
 
-- **Mac:** `./gradlew` with the focused tests, then `:composeApp:createReleaseDistributable`.
-- **Legion and the VM:** `private/scripts/windows/Build-Distribution.ps1`. It runs the focused tests and then `:composeApp:packageReleaseMsi`, with two workers and a 2 GB heap. Packaging also patches the MSI so it installs and runs under Smart App Control: it removes jpackage's unsigned helper DLL and points the shortcuts at the signed `javaw.exe` (see [08](08_FIX_WINDOWS_INSTALLER.md)). The build output shows `Removed JpCaDll …` and `Pointed 2 shortcuts …`.
+- **Mac:** `./gradlew` with the focused tests, then `:desktopApp:createReleaseDistributable`.
+- **Legion and the VM:** `private/scripts/windows/Build-Distribution.ps1`. It runs the focused tests and then `:desktopApp:packageReleaseMsi`, with two workers and a 2 GB heap. Packaging also patches the MSI so it installs and runs under Smart App Control: it removes jpackage's unsigned helper DLL and points the shortcuts at the signed `javaw.exe` (see [08](08_FIX_WINDOWS_INSTALLER.md)). The build output shows `Removed JpCaDll …` and `Pointed 2 shortcuts …`.
 - **Server:** the same Gradle settings, run with `nice` and `ionice`, so the websites keep priority.
 
 The focused tests are `core:automation`, the DGS study tests, the desktop data-path tests and the version test. They're quick checks, not the full suite.
@@ -186,10 +186,10 @@ The focused tests are `core:automation`, the DGS study tests, the desktop data-p
 
 Both debug runs build from source at the synced commit, so breakpoints match the code on the Mac.
 
-- **Mac:** stops if AutoPilot is already running or port 5005 is taken. It then runs `./gradlew :composeApp:run --debug-jvm`, which waits for the debugger. In Android Studio choose **AutoPilot Mac (local)** → Debug. Closing the app window ends the run.
+- **Mac:** stops if AutoPilot is already running or port 5005 is taken. It then runs `./gradlew :desktopApp:run --debug-jvm`, which waits for the debugger. In Android Studio choose **AutoPilot Mac (local)** → Debug. Closing the app window ends the run.
 - **Legion:** checks that the `AutoPilot-Debug` task exists and that the installed app isn't open, since both would share `.autopilot`. It starts the task on the signed-in desktop and waits up to 15 minutes until the debug run listens on Legion's port 5005. It then opens `ssh -N -L 127.0.0.1:5005:127.0.0.1:5005 home-legion` on the Mac. In Android Studio choose **AutoPilot Windows (SSH tunnel)** → Debug; the window appears on Legion. Control-C in the Terminal closes the tunnel. Port 5005 is never opened to the network.
 - **Mac Windows VM:** uses the same `AutoPilot-Debug` scheduled task and opens an SSH tunnel to the VM's port 5005. Register the task once inside the VM with `private\scripts\windows\Register-DebugLauncher.ps1`, then use `private/scripts/desktop.sh debug mac-vm-win`.
-- **Mac Linux VM:** runs `:composeApp:run --debug-jvm` over SSH and forwards port 5005 to the Mac. The Linux VM must have an active desktop session available to the SSH user.
+- **Mac Linux VM:** runs `:desktopApp:run --debug-jvm` over SSH and forwards port 5005 to the Mac. The Linux VM must have an active desktop session available to the SSH user.
 
 ## Where the scripts live
 

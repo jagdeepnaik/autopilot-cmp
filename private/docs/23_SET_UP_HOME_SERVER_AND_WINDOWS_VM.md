@@ -1023,13 +1023,13 @@ Linux installer:
 **Local network:**
 
 ```sh
-scp 'home-server:/srv/build/autopilot-cmp/composeApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/AutoPilot-builds/"
+scp 'home-server:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/AutoPilot-builds/"
 ```
 
 **Cloudflare / Internet:**
 
 ```sh
-scp 'home-server-remote:/srv/build/autopilot-cmp/composeApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/AutoPilot-builds/"
+scp 'home-server-remote:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/AutoPilot-builds/"
 ```
 
 Windows installer:
@@ -1037,13 +1037,13 @@ Windows installer:
 **Local network:**
 
 ```sh
-scp 'home-server-build:C:/Build/autopilot-cmp/composeApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/AutoPilot-builds/"
+scp 'home-server-build:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/AutoPilot-builds/"
 ```
 
 **Cloudflare / Internet:**
 
 ```sh
-scp 'home-server-build-remote:C:/Build/autopilot-cmp/composeApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/AutoPilot-builds/"
+scp 'home-server-build-remote:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/AutoPilot-builds/"
 ```
 
 Compare downloaded hashes against the same source artifacts:
@@ -1099,7 +1099,7 @@ Close the Mac's VNC SSH tunnel with Control-C when no longer needed. No physical
 
 The assistant connected independently to Debian and the Windows VM using the configured SSH shortcuts. Both clean checkouts were at GitHub `main`, commit `9a4a180`. Recent uncommitted Mac UI changes were not part of this server baseline test.
 
-**Linux completed successfully:** focused core automation, DGS study and desktop data-path tests ran: 30 tests, zero failures/errors/skips. `:composeApp:packageReleaseDeb` produced `/srv/build/autopilot-cmp/composeApp/build/compose/binaries/main-release/deb/autopilot_1.0.0_amd64.deb`. Package metadata reports `autopilot`, version `1.0.0`, architecture `amd64`.
+**Linux completed successfully:** focused core automation, DGS study and desktop data-path tests ran: 30 tests, zero failures/errors/skips. `:desktopApp:packageReleaseDeb` produced `/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/autopilot_1.0.0_amd64.deb`. Package metadata reports `autopilot`, version `1.0.0`, architecture `amd64`.
 
 - First cold build: 8 minutes 56 seconds, 79 executed tasks, including first-time dependency downloads.
 - Artifact SHA256: `d0da4da86b92791fdba2ccffd10d0781bce6872a7e95d5d8be8e2e7aab0c0df3`.

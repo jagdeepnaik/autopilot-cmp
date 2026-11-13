@@ -50,7 +50,7 @@ Example (replace the username, IP and path):
 ssh WINDOWS_USER@WINDOWS_LAN_IP 'powershell.exe -NoProfile -File "C:\Users\WINDOWS_USER\Projects\autopilot-cmp\private\scripts\windows\Build-Distribution.ps1"'
 ```
 
-MSI output: `composeApp/build/compose/binaries/main-release/msi/`. Copy the exact produced MSI back with `scp`, or download the Windows artifact from GitHub Actions → Desktop packages. Building over SSH is supported; launching a GUI directly inside an SSH service session is not the desktop testing path.
+MSI output: `desktopApp/build/compose/binaries/main-release/msi/`. Copy the exact produced MSI back with `scp`, or download the Windows artifact from GitHub Actions → Desktop packages. Building over SSH is supported; launching a GUI directly inside an SSH service session is not the desktop testing path.
 
 ## Debug the Windows GUI from Android Studio on the Mac
 
@@ -75,13 +75,13 @@ MSI output: `composeApp/build/compose/binaries/main-release/msi/`. Copy the exac
    ```
 
    Gradle's `--debug-jvm` uses localhost port 5005. Do not expose port 5005 or use a wildcard debugger address. See [Gradle's JavaExec documentation](https://docs.gradle.org/current/javadoc/org/gradle/api/tasks/JavaExec.html).
-4. Open this project in Android Studio on the Mac. Choose **AutoPilot Windows (SSH tunnel)** from the checked-in `.run` configuration and click Debug. If the IDE does not import it, add a Remote JVM Debug configuration with Attach, socket transport, `127.0.0.1`, port `5005`, and the composeApp JVM module classpath. Set Kotlin breakpoints and inspect the Windows process. See [JetBrains' remote-debug guide](https://www.jetbrains.com/help/idea/tutorial-remote-debug.html).
+4. Open this project in Android Studio on the Mac. Choose **AutoPilot Windows (SSH tunnel)** from the checked-in `.run` configuration and click Debug. If the IDE does not import it, add a Remote JVM Debug configuration with Attach, socket transport, `127.0.0.1`, port `5005`, and the shared jvmMain module classpath. Set Kotlin breakpoints and inspect the Windows process. See [JetBrains' remote-debug guide](https://www.jetbrains.com/help/idea/tutorial-remote-debug.html).
 5. Use a Windows desktop-sharing client to see and interact with the app if needed; debugger attachment alone does not share the Windows screen. A whole-JVM breakpoint also stops extension polling and can pause the routine; expect to resume/restart it after stepping. Do not test timed assessments while stopping at breakpoints.
 6. Close AutoPilot normally to flush progress. End the SSH tunnel when finished. Remove the optional launcher with `Register-DebugLauncher.ps1 -Remove`. Avoid stopping every Java process: other apps may use Java.
 
 ## First Windows acceptance check
 
-Install the MSI in the signed-in desktop. Start it and check the window, saved settings, sound and display-awake controls. AutoPilot writes its bundled Chrome extension to `%USERPROFILE%\.autopilot\extensions\chrome` at every start, rewriting only changed files. Load that folder in Chrome once (`chrome://extensions` → Developer mode → Load unpacked); after an app update, press reload on the extension card. Verify Chrome connected. The app also ships `composeApp/src/jvmMain/resources/answer-banks/sagarmeinyog-ver-1.0.json` and copies it to `%USERPROFILE%\.autopilot\answer-banks` only when that folder has no file of that name, so answers saved on a PC are never replaced. To release another bank, use a new versioned JSON filename and update the default deliberately. Keep personal answer-bank updates out of a public push unless explicitly approved. Test a short ordinary course session, Stop, restart, and confirm cumulative progress. The course database is not in Git. Keep Windows and Mac databases separate during live testing.
+Install the MSI in the signed-in desktop. Start it and check the window, saved settings, sound and display-awake controls. AutoPilot writes its bundled Chrome extension to `%USERPROFILE%\.autopilot\extensions\chrome` at every start, rewriting only changed files. Load that folder in Chrome once (`chrome://extensions` → Developer mode → Load unpacked); after an app update, press reload on the extension card. Verify Chrome connected. The app also ships `shared/src/jvmMain/resources/answer-banks/sagarmeinyog-ver-1.0.json` and copies it to `%USERPROFILE%\.autopilot\answer-banks` only when that folder has no file of that name, so answers saved on a PC are never replaced. To release another bank, use a new versioned JSON filename and update the default deliberately. Keep personal answer-bank updates out of a public push unless explicitly approved. Test a short ordinary course session, Stop, restart, and confirm cumulative progress. The course database is not in Git. Keep Windows and Mac databases separate during live testing.
 
 ## One-time SSH key setup
 

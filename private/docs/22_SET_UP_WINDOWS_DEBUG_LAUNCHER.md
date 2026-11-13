@@ -50,7 +50,7 @@ The task action invokes `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned
 The debug script resolves the project root, creates `%USERPROFILE%\.autopilot\logs`, starts a timestamped PowerShell transcript, then runs:
 
 ```powershell
-.\gradlew.bat --no-daemon --console=plain :composeApp:run --debug-jvm
+.\gradlew.bat --no-daemon --console=plain :desktopApp:run --debug-jvm
 ```
 
 It checks Gradle's exit code and stops the transcript in cleanup. A transcript records the PowerShell session; native-process output coverage can vary, so it is not guaranteed to contain every Gradle/compiler line. The script's “Waiting for the Mac debugger” message explains why the app may not be visible yet.

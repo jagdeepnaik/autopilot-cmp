@@ -57,7 +57,7 @@ Wait for success. This fetches committed GitHub changes; it does not include unc
 Paste this **one complete line** and press Enter:
 
 ```powershell
-.\gradlew.bat --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :composeApp:packageReleaseMsi
+.\gradlew.bat --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :desktopApp:packageReleaseMsi
 ```
 
 Wait until it says **BUILD SUCCESSFUL**. The first build can take several minutes while downloading tools/dependencies. Later builds reuse caches. Do not start another build in the meantime. If it says **BUILD FAILED**, preserve the error; do not distribute an old installer just because one exists in the folder.
@@ -65,11 +65,11 @@ Wait until it says **BUILD SUCCESSFUL**. The first build can take several minute
 ### 1.7 Check the generated installer
 
 ```powershell
-Get-ChildItem C:\Build\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\*.msi
+Get-ChildItem C:\Build\autopilot-cmp\desktopApp\build\compose\binaries\main-release\msi\*.msi
 ```
 
 Then, separately:
 
 ```powershell
-Get-ChildItem C:\Build\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\*.msi | Get-FileHash -Algorithm SHA256
+Get-ChildItem C:\Build\autopilot-cmp\desktopApp\build\compose\binaries\main-release\msi\*.msi | Get-FileHash -Algorithm SHA256
 ```

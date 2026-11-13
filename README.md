@@ -116,8 +116,8 @@ Use `.\gradlew.bat` on Windows.
 
 | Target | Command |
 | --- | --- |
-| Desktop | `./gradlew :composeApp:run` |
-| Android (debug) | `./gradlew :composeApp:installDebug` |
+| Desktop | `./gradlew :desktopApp:run` |
+| Android (debug) | `./gradlew :androidApp:installDebug` |
 | iOS | Open [`iosApp`](./iosApp) in Xcode and run |
 
 ## Tests
@@ -130,9 +130,9 @@ Three extras are opt-in:
 
 - `UI_TEST_SHOT_DIR=/some/dir` saves what each UI test rendered.
 - `AUTOPILOT_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInputTest*' --rerun` sends real clicks and a key press to its own window. It moves your pointer, so keep your hands off while it runs.
-- `AUTOPILOT_LIVE_CHROME_TEST="<path to Chrome>" ./gradlew :composeApp:jvmTest --tests '*LiveChromeExtensionTest*' --rerun` runs the extension's scripts in headless Chrome with a throwaway profile.
+- `AUTOPILOT_LIVE_CHROME_TEST="<path to Chrome>" ./gradlew :shared:jvmTest --tests '*LiveChromeExtensionTest*' --rerun` runs the extension's scripts in headless Chrome with a throwaway profile.
 
-For the new routine, use `AUTOPILOT_LIVE_CHROME_TEST="<path to Chrome>" ./gradlew :composeApp:jvmTest --tests '*LiveCourseAutomationTest*' --rerun`. Its protocol tests also run with `node --test composeApp/src/jvmTest/resources/course-automation-background.test.cjs`.
+For the new routine, use `AUTOPILOT_LIVE_CHROME_TEST="<path to Chrome>" ./gradlew :shared:jvmTest --tests '*LiveCourseAutomationTest*' --rerun`. Its protocol tests also run with `node --test shared/src/jvmTest/resources/course-automation-background.test.cjs`.
 
 ## Release builds
 
@@ -140,7 +140,7 @@ Version name and code live in [`gradle/libs.versions.toml`](./gradle/libs.versio
 
 | Platform | Built on | Command | Output |
 | --- | --- | --- | --- |
-| macOS DMG (Apple Silicon) | Mac | `./gradlew :composeApp:packageReleaseDmg` | `composeApp/build/compose/binaries/main-release/dmg/` |
+| macOS DMG (Apple Silicon) | Mac | `./gradlew :desktopApp:packageReleaseDmg` | `desktopApp/build/compose/binaries/main-release/dmg/` |
 | Windows MSI | GitHub Actions | `gh workflow run desktop-packages.yml` | Run artifacts |
 | Linux DEB, macOS DMG (Intel) | GitHub Actions | `gh workflow run desktop-packages.yml -f platforms=all` | Run artifacts |
 
@@ -157,7 +157,10 @@ DGS assessments remain manual. `dgs-elearning-ver-1.0.json` is the reserved bank
 ## Project structure
 
 ```text
-composeApp/        App shell: App.kt, navigation host, platform entry points, desktop packaging
+shared/            Shared app: App.kt, AppServices, navigation host, platform actuals, desktop window, bundled extension
+androidApp/        Android app shell: MainActivity, MainApplication, manifest, launcher icons, signing
+desktopApp/        Desktop app shell: main(), MSI/DMG/DEB packaging, app icons, Smart App Control fixes
+iosApp/            Xcode project; links the Shared framework built by :shared
 core/automation    Clicks, global hot keys, front app, input permission (macOS, Windows)
 core/localbridge   Loopback link to a trusted local client, such as the Chrome extension
 core/common        Platform and time helpers (template)

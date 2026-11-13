@@ -12,7 +12,7 @@ Use this part when you need an installer that installs and runs on Legion with S
 | --- | --- |
 | Symptom | The MSI stops with *"Error 1723. A DLL required for this install to complete could not be run"*. The action named is `JpFindRelatedProducts`, and the install log shows status 1603. |
 | Cause | Smart App Control (`VerifiedAndReputablePolicyState` = 1 on Legion) blocks `JpCaDll`. That is an unsigned helper DLL the Java packager (jpackage) puts in every MSI. Windows logs Code Integrity events 3077/3033. No DLL is missing. |
-| Fix | After every MSI packaging task, `composeApp/build.gradle.kts` runs `private/scripts/windows/Remove-UnsignedMsiHelper.ps1`. The script removes `JpCaDll` and the two optional actions it backs. Commit `b0faba5`. |
+| Fix | After every MSI packaging task, `desktopApp/build.gradle.kts` runs `private/scripts/windows/Remove-UnsignedMsiHelper.ps1`. The script removes `JpCaDll` and the two optional actions it backs. Commit `b0faba5`. |
 | What you lose | Only the installer's *"folder is not empty"* warning on the install-folder page. Upgrades still work through the MSI's standard upgrade actions (`FindRelatedProducts` and `RemoveExistingProducts`). WiX's signed `WixUIValidatePath` check still validates the folder. |
 | Safety | If `JpCaDll` backs any other action (for example after a JDK update), the script stops with an error and leaves the MSI unchanged. Running it twice is harmless. |
 | Not changed | Smart App Control stays on. The installer and app are still unsigned, so SmartScreen can still warn on other PCs. Trusted signing remains the release step for other people's PCs. |
@@ -94,7 +94,7 @@ The log must show `b0faba5` or a later commit.
 **Windows SSH PowerShell**, in the checkout:
 
 ```powershell
-.\gradlew.bat --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :composeApp:packageReleaseMsi
+.\gradlew.bat --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :desktopApp:packageReleaseMsi
 ```
 
 Wait for **BUILD SUCCESSFUL**. With a warm cache this takes about a minute. Removing the helper happens inside this task, so there's no extra step. For a release check with tests, use `.\private\scripts\windows\Build-Distribution.ps1` (C5) instead; it runs the same packaging task.
@@ -104,7 +104,7 @@ Wait for **BUILD SUCCESSFUL**. With a warm cache this takes about a minute. Remo
 **Windows SSH PowerShell:**
 
 ```powershell
-$m = (Get-ChildItem .\composeApp\build\compose\binaries\main-release\msi\*.msi).FullName
+$m = (Get-ChildItem .\desktopApp\build\compose\binaries\main-release\msi\*.msi).FullName
 $db = (New-Object -ComObject WindowsInstaller.Installer).OpenDatabase($m, 0)
 $v = $db.OpenView('SELECT `Name` FROM `Binary` WHERE `Name`=''JpCaDll'''); [void]$v.Execute()
 if ($v.Fetch()) { 'NOT FIXED: JpCaDll still present' } else { 'OK: JpCaDll removed' }
@@ -117,7 +117,7 @@ Expected: `OK: JpCaDll removed`, followed by the SHA256. The H3 build output als
 To patch an MSI built before the fix, without rebuilding:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\private\scripts\windows\Remove-UnsignedMsiHelper.ps1 -Path .\composeApp\build\compose\binaries\main-release\msi
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\private\scripts\windows\Remove-UnsignedMsiHelper.ps1 -Path .\desktopApp\build\compose\binaries\main-release\msi
 ```
 
 ### H5. Updating an installed copy
@@ -140,7 +140,7 @@ To see the installed and new versions:
 
 ```powershell
 (Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' | Where-Object DisplayName -eq 'AutoPilot').DisplayVersion
-Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\*.msi | Select-Object Name
+Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\desktopApp\build\compose\binaries\main-release\msi\*.msi | Select-Object Name
 ```
 
 **When you still need to uninstall:** the installer opens repair/remove instead of updating when the new MSI has the **same** version as the installed one. That happens when you rebuild the same commit, or when the installed copy was built from local uncommitted changes. Commit, or uninstall first. Uninstalling also leaves `.autopilot` alone:
@@ -157,7 +157,7 @@ An older MSI installed over a newer one doesn't downgrade cleanly; uninstall fir
 **Option A — Legion desktop, with installer dialogs.** In PowerShell as Administrator:
 
 ```powershell
-$msi = (Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
+$msi = (Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\desktopApp\build\compose\binaries\main-release\msi\*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
 $log = "$env:TEMP\AutoPilot-install.log"
 msiexec.exe /i "$msi" /L*V "$log" /norestart
 ```
@@ -165,7 +165,7 @@ msiexec.exe /i "$msi" /L*V "$log" /norestart
 **Option B — silently, from the Windows SSH PowerShell:**
 
 ```powershell
-$msi = (Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
+$msi = (Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\desktopApp\build\compose\binaries\main-release\msi\*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
 $log = "$env:TEMP\AutoPilot-install.log"
 $start = Get-Date
 $p = Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart /L*V `"$log`"" -Wait -PassThru
@@ -218,7 +218,7 @@ Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='MsiInstalle
 
 ### H10. Using the fix in another Compose app
 
-Copy `private/scripts/windows/Remove-UnsignedMsiHelper.ps1` and `private/scripts/windows/Use-SignedJavaLauncher.ps1` into the other repository. Then add the Smart App Control block from AutoPilot's `composeApp/build.gradle.kts`: the `AbstractJLinkTask` and `AbstractJPackageTask` hooks, plus their imports from `org.jetbrains.compose.desktop.application.tasks`. Build and check with H3–H4 in that app's own folder.
+Copy `private/scripts/windows/Remove-UnsignedMsiHelper.ps1` and `private/scripts/windows/Use-SignedJavaLauncher.ps1` into the other repository. Then add the Smart App Control block from AutoPilot's `desktopApp/build.gradle.kts`: the `AbstractJLinkTask` and `AbstractJPackageTask` hooks, plus their imports from `org.jetbrains.compose.desktop.application.tasks`. Build and check with H3–H4 in that app's own folder.
 
 ### H11. Recorded result — 10 November 2026
 

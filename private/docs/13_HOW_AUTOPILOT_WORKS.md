@@ -71,11 +71,13 @@ flowchart LR
 
 ## 2. Project layout
 
-The project uses Kotlin Multiplatform and Compose Multiplatform. Modules depend in one direction: `composeApp` uses features, and features use core modules. A feature never uses another concrete feature; `verifyFeatureModuleBoundaries` enforces that part in the build.
+The project uses Kotlin Multiplatform and Compose Multiplatform. Modules depend in one direction: the app modules (`shared`, with the `androidApp` and `desktopApp` shells and the iOS app on top) use features, and features use core modules. A feature never uses another concrete feature; `verifyFeatureModuleBoundaries` enforces that part in the build.
 
 | Module | Job |
 | --- | --- |
-| `composeApp` | The app shell: `main.kt`, `App.kt`, `AppServices.kt`, navigation, saved-file setup, and the bundled extension |
+| `shared` | The shared app: `App.kt`, `AppServices.kt`, navigation, the desktop window (`DesktopApp.kt`), saved-file setup, and the bundled extension |
+| `androidApp` | The Android app shell: `MainActivity`, `MainApplication`, manifest and launcher icons |
+| `desktopApp` | The desktop app shell: `main()` and the MSI, DMG and DEB packaging |
 | `core:automation` | The only code that touches the mouse, keyboard state, Accessibility permission and front app |
 | `core:localbridge` | The HTTP link to a trusted local client. It carries JSON and doesn't interpret it |
 | `core:persistence` | `PreferencesStore`, backed by DataStore |
@@ -316,7 +318,7 @@ This stops **web pages** from driving the app. It doesn't stop **another program
 
 ## 8. The Chrome extension
 
-The files are in `composeApp/src/jvmMain/resources/chrome-extension/` and ship inside the app. **Show extension folder** copies them to `~/.autoclicker/chrome-extension`, and Chrome loads them from there as an unpacked extension.
+The files are in `shared/src/jvmMain/resources/chrome-extension/` and ship inside the app. **Show extension folder** copies them to `~/.autoclicker/chrome-extension`, and Chrome loads them from there as an unpacked extension.
 
 **Permissions:** `alarms`, plus `host_permissions` for `127.0.0.1:47613` only. `content.js` runs on all pages, because the helper has to work on whichever page you're using. A test confirms the only address in the scripts is the local one.
 
@@ -550,7 +552,7 @@ The window's size and position are stored separately, in Java Preferences under 
 
 Room is set up by the template but not used. Absent or unknown saved values fall back to defaults, and unreadable documents are treated as empty. The first launch creates one ready-to-use routine.
 
-**Routine files:** **Export** on a routine, or **Export all**, writes a readable JSON file (`RoutineFileCodec`) naming itself `autoclicker-routines`, version 1, with each routine in the same shape the app saves. **Import** reads one back through the system's Open panel: each routine gets a new id, so nothing of the user's is replaced, and must pass the editor's own checks, so a damaged or hand-edited file can't add, for example, a 0 ms interval. Files over 2 million characters, other formats and unknown routine kinds are refused. The file dialogs are `DesktopRoutineFiles` in `composeApp`; phones don't offer import or export.
+**Routine files:** **Export** on a routine, or **Export all**, writes a readable JSON file (`RoutineFileCodec`) naming itself `autoclicker-routines`, version 1, with each routine in the same shape the app saves. **Import** reads one back through the system's Open panel: each routine gets a new id, so nothing of the user's is replaced, and must pass the editor's own checks, so a damaged or hand-edited file can't add, for example, a 0 ms interval. Files over 2 million characters, other formats and unknown routine kinds are refused. The file dialogs are `DesktopRoutineFiles` in `shared`; phones don't offer import or export.
 
 **Uninstalling:** delete `/Applications/AutoClicker.app`, `~/.autoclicker`, and the extension in `chrome://extensions`. To clear the permission entry, run `tccutil reset Accessibility com.jagdeep.autoclicker`.
 
@@ -577,7 +579,7 @@ Screen  ←  renders one UI state  ←  ViewModel  ←  flows
 | Activity | `ActivityViewModel` | Shows history, and asks before clearing it |
 | Settings | `SettingsViewModel` | Rejects a hot key already in use, and shows the extension's setup and connection |
 
-Desktop uses `DesktopShell` in `composeApp`, laid out like Android Studio: a toolbar (app name, a routine picker with Start and Stop, Chrome's status) in the title bar row, a narrow icon strip for the pages, the page in a rounded panel, and a status bar. `ShellModel` feeds the toolbar from the same `ClickController` and routines as the Routines page, so both always agree. Pages change with a fade. Phones use `TopLevelPager` with swiping, though the app itself is desktop-only for now.
+Desktop uses `DesktopShell` in `shared`, laid out like Android Studio: a toolbar (app name, a routine picker with Start and Stop, Chrome's status) in the title bar row, a narrow icon strip for the pages, the page in a rounded panel, and a status bar. `ShellModel` feeds the toolbar from the same `ClickController` and routines as the Routines page, so both always agree. Pages change with a fade. Phones use `TopLevelPager` with swiping, though the app itself is desktop-only for now.
 
 ---
 
@@ -604,7 +606,7 @@ With **Developer mode** on in Settings, Activity gains a **Live log** view, next
 | Keys | both runners | Each hot key pressed, and what it did |
 | App | `AppServices` | Developer mode on, Chrome brought forward, display kept on or released |
 
-The log is `LiveLog` in `feature:shared`, implemented by `MemoryLiveLog` in `composeApp`. It keeps the newest 500 entries in memory only, never saved or sent anywhere. Recording happens only while the switch is on, and the `log { }` helper doesn't even build the text otherwise. **Pause** freezes the view for reading, **Copy** puts the whole log on the clipboard, and **Clear** empties it.
+The log is `LiveLog` in `feature:shared`, implemented by `MemoryLiveLog` in `shared`. It keeps the newest 500 entries in memory only, never saved or sent anywhere. Recording happens only while the switch is on, and the `log { }` helper doesn't even build the text otherwise. **Pause** freezes the view for reading, **Copy** puts the whole log on the clipboard, and **Clear** empties it.
 
 ## 15. Privacy and security
 
@@ -629,11 +631,11 @@ The log is `LiveLog` in `feature:shared`, implemented by `MemoryLiveLog` in `com
 ## 16. Build, install and release
 
 ```shell
-./gradlew :composeApp:run                 # run from source
-./gradlew :composeApp:packageReleaseDmg   # build the Mac installer
+./gradlew :desktopApp:run                 # run from source
+./gradlew :desktopApp:packageReleaseDmg   # build the Mac installer
 ```
 
-The DMG is written to `composeApp/build/compose/binaries/main-release/dmg/`. The version is in `gradle/libs.versions.toml`, and the extension has its own in `manifest.json`.
+The DMG is written to `desktopApp/build/compose/binaries/main-release/dmg/`. The version is in `gradle/libs.versions.toml`, and the extension has its own in `manifest.json`.
 
 **After installing a new build:**
 
@@ -666,7 +668,7 @@ Two tests are opt-in because they do real things:
 ```shell
 # Runs the extension's scripts in headless Chrome, with a throwaway profile.
 AUTOCLICKER_LIVE_CHROME_TEST="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  ./gradlew :composeApp:jvmTest --tests '*LiveChromeExtensionTest*' --rerun
+  ./gradlew :shared:jvmTest --tests '*LiveChromeExtensionTest*' --rerun
 
 # Sends real clicks and a key press to its own window. Keep your hands off the mouse.
 AUTOCLICKER_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInputTest*' --rerun

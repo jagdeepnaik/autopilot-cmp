@@ -55,7 +55,7 @@ LOW_MEMORY=(--no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-X
 # The Mac-local Linux VM may have less memory than the home server. Keep Gradle and the Kotlin
 # compiler daemon inside a smaller envelope so the guest OS does not kill the build process.
 LOCAL_LINUX_MEMORY=(--no-daemon --console=plain --max-workers=1 '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' '-Dkotlin.daemon.jvm.options=-Xmx512m')
-FOCUSED_TESTS=(:core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :composeApp:jvmTest --tests '*DesktopDataPathsTest*' --tests '*AppVersionTest*')
+FOCUSED_TESTS=(:core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :shared:jvmTest --tests '*DesktopDataPathsTest*' --tests '*AppVersionTest*')
 
 # The help text is the comment block at the top of this file, up to the first line of code.
 usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$SCRIPT"; }
@@ -168,14 +168,14 @@ mac_build() {
     mac_sync
     local tasks=()
     [ "$TESTS" -eq 1 ] && tasks+=("${FOCUSED_TESTS[@]}")
-    tasks+=(:composeApp:createReleaseDistributable)
+    tasks+=(:desktopApp:createReleaseDistributable)
     step "Mac: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the app"
     ./gradlew --console=plain "${tasks[@]}" || fail "the Mac build failed (see above)."
-    echo "Built: $ROOT/composeApp/build/compose/binaries/main-release/app/AutoPilot.app"
+    echo "Built: $ROOT/desktopApp/build/compose/binaries/main-release/app/AutoPilot.app"
 }
 
 mac_install() {
-    local app="$ROOT/composeApp/build/compose/binaries/main-release/app/AutoPilot.app"
+    local app="$ROOT/desktopApp/build/compose/binaries/main-release/app/AutoPilot.app"
     step "Mac: install to /Applications"
     [ -d "$app" ] || fail "no built app at $app."
     mac_app_running && fail "AutoPilot is running on the Mac. Quit it normally (so progress is saved), then run this again."
@@ -193,7 +193,7 @@ mac_debug() {
     lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 && fail "port $DEBUG_PORT is in use (a Legion tunnel or another debug run?)."
     echo "In Android Studio, choose \"AutoPilot Mac (local)\" and click Debug; the app opens once it attaches."
     echo "Close the app window to end the debug run."
-    ./gradlew --console=plain :composeApp:run --debug-jvm
+    ./gradlew --console=plain :desktopApp:run --debug-jvm
 }
 
 # --- Legion -------------------------------------------------------------------------------------
@@ -260,7 +260,7 @@ local_linux_build() {
     step "Mac Linux VM: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the DEB"
     local tasks=("${LOCAL_LINUX_MEMORY[@]}")
     [ "$TESTS" -eq 1 ] && tasks+=("${FOCUSED_TESTS[@]}")
-    tasks+=(:composeApp:packageReleaseDeb)
+    tasks+=(:desktopApp:packageReleaseDeb)
     ssh "$MAC_LINUX_HOST" "cd '$MAC_LINUX_DIR' && ./gradlew $(printf "%q " "${tasks[@]}")" \
         || fail "the Mac Linux VM build failed (see above)."
 }
@@ -268,7 +268,7 @@ local_linux_build() {
 local_linux_install() {
     step "Mac Linux VM: install the newest DEB and check"
     local deb
-    deb=$(ssh "$MAC_LINUX_HOST" "find '$MAC_LINUX_DIR/composeApp/build/compose/binaries/main-release/deb' -maxdepth 1 -type f -name '*.deb' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-" | tr -d '\r') \
+    deb=$(ssh "$MAC_LINUX_HOST" "find '$MAC_LINUX_DIR/desktopApp/build/compose/binaries/main-release/deb' -maxdepth 1 -type f -name '*.deb' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-" | tr -d '\r') \
         || fail "couldn't find the Mac Linux VM DEB. Build it first."
     [ -n "$deb" ] || fail "no DEB found on the Mac Linux VM. Build it first."
     # Allocate a terminal so sudo can prompt the Linux VM user for its password.
@@ -307,7 +307,7 @@ local_linux_debug() {
     step "Mac Linux VM: start the debug run and tunnel port $DEBUG_PORT"
     echo "The Linux VM must have a desktop session available to the SSH user. Press Control-C to stop the run and close the tunnel."
     ssh -t -S none -o ExitOnForwardFailure=yes -L "127.0.0.1:$DEBUG_PORT:127.0.0.1:$DEBUG_PORT" "$MAC_LINUX_HOST" \
-        "cd '$MAC_LINUX_DIR' && ./gradlew --console=plain :composeApp:run --debug-jvm"
+        "cd '$MAC_LINUX_DIR' && ./gradlew --console=plain :desktopApp:run --debug-jvm"
 }
 
 local_all_sync() {
@@ -336,7 +336,7 @@ server_build() {
     step "Server: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the DEB (low priority, beside the websites)"
     local tasks=("${LOW_MEMORY[@]}")
     [ "$TESTS" -eq 1 ] && tasks+=("${FOCUSED_TESTS[@]}")
-    tasks+=(:composeApp:packageReleaseDeb)
+    tasks+=(:desktopApp:packageReleaseDeb)
     ssh "$SERVER_HOST" "cd $SERVER_DIR && nice -n 10 ionice -c 2 -n 7 ./gradlew $(printf "%q " "${tasks[@]}")" \
         || fail "the server build failed (see above)."
 }
@@ -344,7 +344,7 @@ server_build() {
 server_fetch() {
     step "Server: copy the DEB to the Mac"
     local deb
-    deb=$(ssh "$SERVER_HOST" "ls -t $SERVER_DIR/composeApp/build/compose/binaries/main-release/deb/*.deb | head -1") || fail "no DEB on the server."
+    deb=$(ssh "$SERVER_HOST" "ls -t $SERVER_DIR/desktopApp/build/compose/binaries/main-release/deb/*.deb | head -1") || fail "no DEB on the server."
     mkdir -p "$DOWNLOADS"
     scp -q "$SERVER_HOST:$deb" "$DOWNLOADS/"
     local name remote local_hash
@@ -396,8 +396,8 @@ fetch_artifact_group() {
 }
 
 fetch_all_builds() {
-    fetch_artifact_group Legion "$LEGION_HOST" 'C:/Users/jagde/Projects/autopilot-cmp/composeApp/build/compose/binaries/main-release/msi' msi
-    fetch_artifact_group "Home server" "$SERVER_HOST" "$SERVER_DIR/composeApp/build/compose/binaries/main-release/deb" deb
+    fetch_artifact_group Legion "$LEGION_HOST" 'C:/Users/jagde/Projects/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi' msi
+    fetch_artifact_group "Home server" "$SERVER_HOST" "$SERVER_DIR/desktopApp/build/compose/binaries/main-release/deb" deb
     echo "All available Legion MSIs and home-server DEBs are in $DOWNLOADS."
 }
 
@@ -415,13 +415,13 @@ vm_build() {
 vm_fetch() {
     step "Server VM: copy the MSI to the Mac"
     local msi
-    msi=$(windows_ps "$VM_HOST" "$VM_DIR" "(Get-ChildItem .\\composeApp\\build\\compose\\binaries\\main-release\\msi\\*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).Name" | tr -d '\r') \
+    msi=$(windows_ps "$VM_HOST" "$VM_DIR" "(Get-ChildItem .\\desktopApp\\build\\compose\\binaries\\main-release\\msi\\*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).Name" | tr -d '\r') \
         || fail "no MSI in the server VM."
     [ -n "$msi" ] || fail "no MSI in the server VM."
     mkdir -p "$DOWNLOADS"
-    scp -q "$VM_HOST:C:/Build/autopilot-cmp/composeApp/build/compose/binaries/main-release/msi/$msi" "$DOWNLOADS/"
+    scp -q "$VM_HOST:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/$msi" "$DOWNLOADS/"
     local remote local_hash
-    remote=$(windows_ps "$VM_HOST" "$VM_DIR" "(Get-FileHash .\\composeApp\\build\\compose\\binaries\\main-release\\msi\\$msi).Hash" | tr -d '\r' | tr 'A-F' 'a-f')
+    remote=$(windows_ps "$VM_HOST" "$VM_DIR" "(Get-FileHash .\\desktopApp\\build\\compose\\binaries\\main-release\\msi\\$msi).Hash" | tr -d '\r' | tr 'A-F' 'a-f')
     local_hash=$(shasum -a 256 "$DOWNLOADS/$msi" | cut -d' ' -f1)
     [ "$remote" = "$local_hash" ] || fail "the copied $msi doesn't match the VM's (hash mismatch)."
     echo "Copied $DOWNLOADS/$msi (SHA256 $local_hash, matches the VM)."

@@ -409,7 +409,7 @@ Linux VM debugging requires a graphical desktop session for the SSH user:
 private/scripts/desktop.sh debug mac-vm-linux
 ```
 
-The command runs `:composeApp:run --debug-jvm`, forwards port 5005 to the Mac, and keeps the SSH
+The command runs `:desktopApp:run --debug-jvm`, forwards port 5005 to the Mac, and keeps the SSH
 session open until `Control-C`. Installation uses `sudo apt-get` through an interactive SSH
 terminal. When you run `run mac-vm-linux`, type the Linux user's sudo password when prompted; the
 password is not captured or passed through the Mac. If unattended installs are required, configure

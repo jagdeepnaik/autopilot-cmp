@@ -213,7 +213,7 @@ git diff -- path/to/file      # one file only
 
 ```sh
 git add file.kt                 # stage one file
-git add composeApp/src          # stage everything under a folder
+git add shared/src          # stage everything under a folder
 git add -A                      # stage all changes: new, modified and deleted
 git add -p                      # go through each change and choose y/n (interactive)
 ```

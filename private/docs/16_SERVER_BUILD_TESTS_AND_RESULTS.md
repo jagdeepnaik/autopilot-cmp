@@ -9,13 +9,13 @@ Run these when validating a change or preparing a release. They are not GUI test
 **Windows SSH window, in `C:\Build\autopilot-cmp`:**
 
 ```powershell
-.\gradlew.bat --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :composeApp:jvmTest --tests '*DesktopDataPathsTest*'
+.\gradlew.bat --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :shared:jvmTest --tests '*DesktopDataPathsTest*'
 ```
 
 **Debian SSH window, in `/srv/build/autopilot-cmp`:**
 
 ```bash
-nice -n 10 ionice -c 2 -n 7 ./gradlew --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :composeApp:jvmTest --tests '*DesktopDataPathsTest*'
+nice -n 10 ionice -c 2 -n 7 ./gradlew --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :shared:jvmTest --tests '*DesktopDataPathsTest*'
 ```
 
 Fix/report test failures before release. Keep interactive UI/browser tests on the laptop or a dedicated display environment.
@@ -29,7 +29,7 @@ Fix/report test failures before release. Keep interactive UI/browser tests on th
 - Linux: 30 focused tests passed, zero failures/errors/skips. DEB packaging succeeded; downloaded to the Mac and SHA256 matched.
 - Linux artifact: `autopilot_1.0.0_amd64.deb`.
 - Linux SHA256: `d0da4da86b92791fdba2ccffd10d0781bce6872a7e95d5d8be8e2e7aab0c0df3`.
-- Local downloaded copy: `/Users/jagdeep/Projects/AndroidStudio/AutoPilot/composeApp/build/home-server-distribution/linux/autopilot_1.0.0_amd64.deb`.
+- Local downloaded copy: `/Users/jagdeep/Projects/AndroidStudio/AutoPilot/desktopApp/build/home-server-distribution/linux/autopilot_1.0.0_amd64.deb`.
 - First Linux cold build: 8 minutes 56 seconds, including initial dependency preparation.
 - The first Windows MSI build was stopped at the owner's request. It is not a verified completed MSI build.
 - Logs: Debian `/srv/build/logs/autopilot-linux-first-build.log`; Windows `C:\Build\logs\autopilot-windows-first-build.log`.

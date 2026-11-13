@@ -4,7 +4,7 @@
 
 ## Fix in place (10 November 2026)
 
-The build now removes the unsigned helper instead of waiting for signing. After every MSI packaging task, `composeApp/build.gradle.kts` runs `private/scripts/windows/Remove-UnsignedMsiHelper.ps1`, which deletes the `JpCaDll` binary and the two actions it backs:
+The build now removes the unsigned helper instead of waiting for signing. After every MSI packaging task, `desktopApp/build.gradle.kts` runs `private/scripts/windows/Remove-UnsignedMsiHelper.ps1`, which deletes the `JpCaDll` binary and the two actions it backs:
 
 - `JpFindRelatedProducts` refines the standard `FindRelatedProducts`. The MSI still runs that standard action and `RemoveExistingProducts` against its Upgrade table, so upgrades keep working.
 - `JpCheckInstallDir` only warns, on the folder page, that the chosen folder is not empty. The signed WiX path check (`WixUIValidatePath`) still validates the folder.
@@ -68,7 +68,7 @@ Microsoft identifies the policy above as the Smart App Control enforcement polic
 Only one AutoPilot MSI was found under the owner's Windows profile:
 
 ```text
-C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\AutoPilot-1.0.0.msi
+C:\Users\jagde\Projects\autopilot-cmp\desktopApp\build\compose\binaries\main-release\msi\AutoPilot-1.0.0.msi
 ```
 
 - Size: 115,867,435 bytes.

@@ -21,8 +21,8 @@ Set-Location (Join-Path $env:USERPROFILE 'Projects\autopilot-cmp')
 .\gradlew.bat --no-daemon --console=plain `
   :core:automation:jvmTest `
   :feature:home:jvmTest --tests '*DgsStudy*' `
-  :composeApp:jvmTest --tests '*DesktopDataPathsTest*' `
-  :composeApp:packageReleaseMsi
+  :shared:jvmTest --tests '*DesktopDataPathsTest*' `
+  :desktopApp:packageReleaseMsi
 if ($LASTEXITCODE -ne 0) { throw 'Tests or packaging failed.' }
 ```
 
@@ -44,14 +44,14 @@ The release MSI includes a Java runtime, so recipients do not need a separate Ja
 The laptop produced:
 
 ```text
-C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\AutoPilot-1.0.0.msi
+C:\Users\jagde\Projects\autopilot-cmp\desktopApp\build\compose\binaries\main-release\msi\AutoPilot-1.0.0.msi
 SHA256: 39047816A2EAFD63DCBD30EAE2B3A800B3532EE5801E8584BD4B883AE35FD2F9
 ```
 
 A separate successful Windows CI run produced the Mac download:
 
 ```text
-composeApp/build/windows-distribution/AutoPilot-1.0.0.msi
+desktopApp/build/windows-distribution/AutoPilot-1.0.0.msi
 SHA256: 24618df745a798bed5719c4f56370b95b090a958764db4b32ce0b2efede8555f
 ```
 
@@ -143,7 +143,7 @@ Use one method, not both on the same local port. `ExitOnForwardFailure` catches 
 6. Set a breakpoint in the shared/JVM code and reproduce the behavior on Windows.
 7. Resume paused threads before detaching when you want the app to continue.
 
-The stored configuration uses remote JVM attach mode, socket transport, host `127.0.0.1`, port `5005`, and module `AutoPilot.composeApp.jvmMain`. It connects to the tunnel, not directly to the laptop's LAN address. See [JetBrains remote debugging](https://www.jetbrains.com/help/idea/tutorial-remote-debug.html).
+The stored configuration uses remote JVM attach mode, socket transport, host `127.0.0.1`, port `5005`, and module `AutoPilot.shared.jvmMain`. It connects to the tunnel, not directly to the laptop's LAN address. See [JetBrains remote debugging](https://www.jetbrains.com/help/idea/tutorial-remote-debug.html).
 
 Source files remain in both checkouts. SSH does not synchronize edits or automatically hot-reload them. Commit/pull the intended changes and restart the debug app when required. Kotlin-generated wrappers and optimized code can affect breakpoint placement. The configuration was created; the attachment actually demonstrated in this session used `jdb`, not the Android Studio UI.
 
@@ -207,8 +207,8 @@ The historical Windows app PID was `20288`, in session 1; the Mac SSH listener P
 | `.run/AutoPilot-Windows-SSH.run.xml` | Mac IDE attach configuration |
 | `.github/workflows/desktop-packages.yml` | Manually requested platform packaging CI |
 | Windows `%USERPROFILE%\.autopilot\logs\debug-*.log` | Debug-launch transcripts |
-| Windows `composeApp\build\compose\binaries\main-release\msi\` | Laptop-generated MSI |
-| Mac `composeApp/build/windows-distribution/` | Downloaded CI MSI |
+| Windows `desktopApp\build\compose\binaries\main-release\msi\` | Laptop-generated MSI |
+| Mac `desktopApp/build/windows-distribution/` | Downloaded CI MSI |
 | Mac `/tmp/autopilot-windows-hostkey` | Current temporary verified server public key |
 | Mac `/tmp/autopilot-windows-ssh` | Current temporary connection-sharing socket |
 | `private/docs/24_WINDOWS_TASKS_QUICK_LINKS.md` | Build, copy, install, and debugging workflow |

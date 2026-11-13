@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="AutoPilot Mac (local)" type="Remote" factoryName="Remote JVM Debug">
-    <module name="AutoPilot.composeApp.jvmMain" />
+    <module name="AutoPilot.shared.jvmMain" />
     <option name="USE_SOCKET_TRANSPORT" value="true" />
     <option name="SERVER_MODE" value="false" />
     <option name="HOST" value="127.0.0.1" />

@@ -42,6 +42,6 @@ These are fallbacks only. The script above is safer because it verifies every tr
 
 ```sh
 mkdir -p "$HOME/Downloads/Builds/AutoPilot"
-scp 'home-legion:C:/Users/jagde/Projects/autopilot-cmp/composeApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
-scp 'home-server:/srv/build/autopilot-cmp/composeApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/Builds/AutoPilot/"
+scp 'home-legion:C:/Users/jagde/Projects/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
+scp 'home-server:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/Builds/AutoPilot/"
 ```

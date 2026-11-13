@@ -60,26 +60,26 @@ git log -1 --oneline
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\private\scripts\windows\Build-Distribution.ps1
 ```
 
-This AutoPilot helper runs `core:automation` tests, DGS study tests, desktop data-path tests, and `:composeApp:packageReleaseMsi`. The script permission applies only to this PowerShell process. Do not add `-SkipTests` for a release check.
+This AutoPilot helper runs `core:automation` tests, DGS study tests, desktop data-path tests, and `:desktopApp:packageReleaseMsi`. The script permission applies only to this PowerShell process. Do not add `-SkipTests` for a release check.
 
 Wait for **BUILD SUCCESSFUL**, the installer path, and SHA256 output. Stop on any error; do not distribute an older MSI as the new build. This builds the installer; it does not install or launch AutoPilot.
 
 For changes to the desktop window/sidebar, also run:
 
 ```powershell
-.\gradlew.bat :composeApp:jvmTest --tests '*WindowsWindowControlsTest' --tests '*DesktopShellUiTest' --console=plain
+.\gradlew.bat :shared:jvmTest --tests '*WindowsWindowControlsTest' --tests '*DesktopShellUiTest' --console=plain
 ```
 
 ### C6. Locate the AutoPilot installer
 
 ```powershell
-Get-ChildItem .\composeApp\build\compose\binaries\main-release\msi\AutoPilot-*.msi
+Get-ChildItem .\desktopApp\build\compose\binaries\main-release\msi\AutoPilot-*.msi
 ```
 
 Record its hash separately if needed:
 
 ```powershell
-Get-ChildItem .\composeApp\build\compose\binaries\main-release\msi\AutoPilot-*.msi | Get-FileHash -Algorithm SHA256
+Get-ChildItem .\desktopApp\build\compose\binaries\main-release\msi\AutoPilot-*.msi | Get-FileHash -Algorithm SHA256
 ```
 
 The filename contains the MSI version, `<major>.<minor>.<commit count>`, for example `AutoPilot-1.0.22.msi` (commit `c11518c` is the 22nd). A newer version updates an installed copy in place. Use the actual output of this build. A matching hash verifies copying, not signing.

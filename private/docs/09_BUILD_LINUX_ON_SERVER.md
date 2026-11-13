@@ -49,7 +49,7 @@ git pull --ff-only
 Paste this **one complete line**:
 
 ```bash
-nice -n 10 ionice -c 2 -n 7 ./gradlew --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :composeApp:packageReleaseDeb
+nice -n 10 ionice -c 2 -n 7 ./gradlew --no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' :desktopApp:packageReleaseDeb
 ```
 
 Wait for **BUILD SUCCESSFUL**. The command runs at reduced scheduling priority, with two workers and a 2 GB Gradle heap. It does not install the app or restart the website containers.
@@ -57,11 +57,11 @@ Wait for **BUILD SUCCESSFUL**. The command runs at reduced scheduling priority, 
 ### 2.6 Check the generated installer
 
 ```bash
-ls -lh composeApp/build/compose/binaries/main-release/deb/*.deb
+ls -lh desktopApp/build/compose/binaries/main-release/deb/*.deb
 ```
 
 Then, separately:
 
 ```bash
-sha256sum composeApp/build/compose/binaries/main-release/deb/*.deb
+sha256sum desktopApp/build/compose/binaries/main-release/deb/*.deb
 ```

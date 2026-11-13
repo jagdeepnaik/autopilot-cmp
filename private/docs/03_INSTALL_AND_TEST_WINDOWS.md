@@ -17,7 +17,7 @@ Stop any running routine, save changes, and close AutoPilot. Preserve its `.auto
 **Legion File Explorer — paste into its address bar:**
 
 ```text
-C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi
+C:\Users\jagde\Projects\autopilot-cmp\desktopApp\build\compose\binaries\main-release\msi
 ```
 
 Select the MSI from the successful build. Right-click → **Copy as path**.
@@ -66,7 +66,7 @@ Installs or updates AutoPilot silently, with no installer dialogs, from a Mac Te
 
 | Item | Value |
 | --- | --- |
-| MSI folder on Legion | `C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi` |
+| MSI folder on Legion | `C:\Users\jagde\Projects\autopilot-cmp\desktopApp\build\compose\binaries\main-release\msi` |
 | Install folder | `C:\Program Files\AutoPilot\` |
 | App data (never touched by install, update or uninstall) | `C:\Users\jagde\.autopilot` |
 | Install log | `%TEMP%\AutoPilot-install.log` |
@@ -86,7 +86,7 @@ If the prompt doesn't start with `PS`, enter `powershell.exe -NoProfile`. Everyt
 The folder can hold several builds (for example `AutoPilot-1.0.24.msi` and `AutoPilot-1.0.25.msi`), so pick the newest:
 
 ```powershell
-$msi = (Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\composeApp\build\compose\binaries\main-release\msi\AutoPilot-*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
+$msi = (Get-ChildItem C:\Users\jagde\Projects\autopilot-cmp\desktopApp\build\compose\binaries\main-release\msi\AutoPilot-*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
 $installed = (Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' | Where-Object DisplayName -eq 'AutoPilot').DisplayVersion
 "New MSI:   $msi"
 "Installed: $installed"

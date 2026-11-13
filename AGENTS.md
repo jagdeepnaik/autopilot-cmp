@@ -18,7 +18,7 @@ All implementation plans, proposals, roadmaps, and project-specific planning dec
 - Use Kotlin Multiplatform, Compose Multiplatform, Material 3, Navigation 3, Coroutines/Flow, Kotlin Serialization, Gradle Kotlin DSL, and the version catalog.
 - Reuse existing core modules, UI components, Navigation 3, Koin DI, logging, networking, and persistence before adding new abstractions or dependencies.
 - Do not introduce another navigation framework or duplicate existing core functionality.
-- Preserve the feature-module boundary: a concrete feature may depend on core modules and an explicitly shared feature module, never another concrete feature. `core:*` modules never depend on `feature:*`, and no module may depend on `composeApp`.
+- Preserve the feature-module boundary: a concrete feature may depend on core modules and an explicitly shared feature module, never another concrete feature. `core:*` modules never depend on `feature:*`, and only the app shells (`androidApp`, `desktopApp`, the iOS app) may depend on `shared`.
 - Keep core modules as independent leaves. A `core:*` module may depend only on `core:common` and `core:logger`; it must not depend on another feature-specific or technical `core:*` module. If two tightly coupled core modules require each other, merge them into one core module with separate packages.
 - Keep `verifyFeatureModuleBoundaries` current whenever modules are added or removed.
 - Prefer incremental, compile-verified changes. Do not change unrelated core modules without explicit approval.
@@ -29,15 +29,22 @@ All implementation plans, proposals, roadmaps, and project-specific planning dec
 Use this dependency direction. It is intentional and must not be bypassed:
 
 ```text
-composeApp  -> feature:* -> core:common / core:logger / independent core modules
-                    \-> feature:shared (only for genuinely cross-feature contracts)
+androidApp / desktopApp / iosApp -> shared -> feature:* -> core:common / core:logger / independent core modules
+                                                   \-> feature:shared (only for genuinely cross-feature contracts)
 independent core:* -> core:common and/or core:logger only
-core:*      -X-> feature:* or composeApp
+core:*      -X-> feature:*, shared or an app shell
 ```
 
-- `composeApp` is the composition root and platform application shell. It owns `App`, platform `actual` factories, app-wide startup wiring, navigation assembly, and desktop entry points. It must not contain feature business logic.
+The app is split the way the current Android Studio Compose Multiplatform template does it:
+
+- `shared` is the composition root: a Kotlin Multiplatform library (`com.android.kotlin.multiplatform.library`, configured in `kotlin { androidLibrary { } }`) with every target. It owns `App`, platform `actual` factories, app-wide startup wiring, navigation assembly, the desktop window (`DesktopApp.kt`, `runDesktopApp()`), classpath resources, Compose resources (`Res` in `<app>.shared.generated.resources`), and the iOS framework `Shared`. It must not contain feature business logic.
+- `androidApp` is only the Android application shell (`com.android.application`, AGP built-in Kotlin): `MainActivity`, `MainApplication` (which calls `AndroidPlatform.init` in `shared`), the manifest, launcher icons, the application ID, versions and signing.
+- `desktopApp` is only the desktop shell (`org.jetbrains.kotlin.jvm` plus Compose Desktop): `main()` calling `runDesktopApp()`, and the MSI, DMG and DEB packaging with its icons and packaging hooks. Run it with `:desktopApp:run`; package with `:desktopApp:package<Release><Format>`.
+- `iosApp` is the Xcode project; its build phase runs `:shared:embedAndSignAppleFrameworkForXcode` and Swift imports `Shared`.
+- Keep the shells thin. Put new app code in `shared`, and expose to a shell only the small public entry point it calls.
+- Values every module needs (for example the per-commit desktop version) are computed once in the root `build.gradle.kts` and read with `rootProject.extra`.
 - A `core:*` module owns a reusable technical concern; `core:ui` owns reusable design-system/UI/navigation infrastructure and `core:persistence` owns Room setup and database access. Product-specific module responsibilities belong in the relevant plan under `private/plans/`.
-- Keep `core:*` modules project-agnostic, because they are reused across projects built from this template. Name their classes, objects, functions, files, constants, and theme/API types generically (for example `Palette`, `AppColors`, `AppTheme`), never after the product (`Vaulty…`, `VAULTY_…`). Supply product-specific values (app name, user-facing copy, brand colours, service identifiers) from `composeApp` or a feature through configuration or parameters.
+- Keep `core:*` modules project-agnostic, because they are reused across projects built from this template. Name their classes, objects, functions, files, constants, and theme/API types generically (for example `Palette`, `AppColors`, `AppTheme`), never after the product (`Vaulty…`, `VAULTY_…`). Supply product-specific values (app name, user-facing copy, brand colours, service identifiers) from `shared` or a feature through configuration or parameters.
   - Exceptions: persistence entities, DAOs, and table/column names in `core:persistence` may use domain names.
   - Already-shipped wire, storage, and platform identifiers (for example mDNS service types, protocol tags, Keystore aliases, DataStore keys, and file names) keep their values for compatibility. Rename the code symbol that holds them, and change a value only through an approved migration.
 - Each concrete feature remains independent. Never import one concrete feature from another.
@@ -45,9 +52,12 @@ core:*      -X-> feature:* or composeApp
 - Project structure (product-specific core modules are listed in Part B):
 
 ```text
-composeApp/                 # app shell and composition root
-  com.jagdeep.<app>/        # App.kt, app services, Platform*.kt actual factories
+shared/                     # shared app and composition root (KMP library, all targets)
+  com.jagdeep.<app>/        # App.kt, app services, Platform*.kt actual factories, DesktopApp.kt
     presentation/navigation/  # AppNavHost, decorated back stacks, transitions
+androidApp/                 # Android shell: MainActivity, MainApplication, manifest, res, signing
+desktopApp/                 # desktop shell: main(), MSI/DMG/DEB packaging, app-icons/
+iosApp/                     # Xcode project linking the Shared framework
 core/common/                # com.jagdeep.common: platform/, time/
 core/logger/                # com.jagdeep.logger
 core/ui/                    # com.jagdeep.ui
@@ -88,19 +98,19 @@ When creating a new project from this template, perform a targeted product clean
 - First inventory each module and classify every file as **template infrastructure**, **common feature pattern**, or **old-product behavior/assets**. Review the module build files, navigation registration, platform entry points, and tests before deleting anything.
 - Retain all reusable `core:*` modules and their module structure unless a module is demonstrably old-product-specific. Adapt models/DAOs carefully instead of deleting the entire infrastructure.
 - Retain the common feature-module pattern even if the old feature's behavior is removed: its Gradle KMP targets, `data`/`domain`/`ui`/`navigation` package skeleton, ViewModel state/event pattern, Navigation 3 entry provider, tests, and app-shell registration. Replace old-product content inside that structure with the new app's feature, or leave a small empty-state implementation until its phase begins.
-- Preserve the app shell in `composeApp`: `App`, adaptive navigation scaffold, top-app-bar/toast infrastructure, `AppNavHost`, navigation state, platform entry points, and desktop window configuration. Rename packages/resources and routes deliberately; do not delete the shell because a template screen is obsolete.
+- Preserve the app in `shared` and the thin shells in `androidApp`, `desktopApp` and `iosApp`: `App`, adaptive navigation scaffold, top-app-bar/toast infrastructure, `AppNavHost`, navigation state, platform entry points, and desktop window configuration. Rename packages/resources and routes deliberately; do not delete the shell because a template screen is obsolete.
 - Retain the template's foundational feature modules (including `feature:shared`, `feature:home`, and `feature:settings` where present) during cleanup. Remove or replace only old-product behavior, assets, models, repositories, and routes while preserving Gradle/KMP setup, package skeletons, ViewModels, navigation entry providers, tests, and app-shell registration.
 - Retain `feature:shared` as the cross-feature contract module. Remove old-product contracts and implementations from it, then introduce the new product's shared contracts when two or more features need the same model/store/use case.
 - Before deleting a feature, core API, dependency, database table, asset, or platform implementation, search all source sets, Gradle files, tests, documentation, and generated-resource references. Remove only the old-product dependency chain and update every affected registration/reference in the same change.
 - Do not delete a feature merely because its old screen is product-specific. Keep or recreate its standard skeleton when the new product needs that app concern (for example Home, Sharing, Settings, History, or onboarding).
 - Product-specific items that are normally safe to remove after reference checks include old brand assets, old package names, old route names, old media/content parsers, product-only repositories/DAOs/entities, legacy external-tool binaries, and documentation tied solely to the old product.
 - After cleanup, verify: Gradle settings include every retained/new module; build files have no stale project dependencies; `App.kt` and `AppNavHost` register the intended top-level features; Android/iOS/JVM entry points use the new package; Room schema/database code has no stale entities; and focused JVM tests compile.
-- Never delete broad directories such as `core`, `feature`, `composeApp`, or database schema folders as a shortcut. Use explicit file-level targets and retain a compileable, navigable application after each cleanup step.
+- Never delete broad directories such as `core`, `feature`, `shared`, `androidApp`, `desktopApp`, `iosApp`, or database schema folders as a shortcut. Use explicit file-level targets and retain a compileable, navigable application after each cleanup step.
 
 ## Navigation, UI, and DI
 
-- Reuse the Navigation 3 infrastructure in `core:ui`: central top-level routes, serialized saved state, `Navigator`, `NavigationState`, and an `AppNavHost` assembled by `composeApp`.
-- Let each feature own its navigation entry provider. Keep top-level navigation items in `composeApp`.
+- Reuse the Navigation 3 infrastructure in `core:ui`: central top-level routes, serialized saved state, `Navigator`, `NavigationState`, and an `AppNavHost` assembled by `shared`.
+- Let each feature own its navigation entry provider. Keep top-level navigation items in `shared`.
 - Screens receive ViewModels, never repositories directly. Entry providers create ViewModels and supply dependencies.
 - Use Koin for new dependency-injection registrations while preserving compatible existing composition-root behavior during incremental migration.
 - Do not instantiate repositories, Room databases, socket clients, or preference stores inside a screen or a ViewModel. The composition root supplies them through Koin or, during the current incremental migration, through a Navigation entry-provider ViewModel factory.
@@ -174,7 +184,7 @@ When creating a new project from this template, perform a targeted product clean
 ## App startup and initialization
 
 - `App()` is the UI composition root, not a service locator. Create each app-scoped dependency exactly once with `remember` (or retrieve it from initialized Koin), then pass it down through `AppNavHost` to feature entry providers.
-- Use this startup order in `composeApp/.../App.kt`:
+- Use this startup order in `shared/.../App.kt`:
   1. Apply `AppTheme` and create the root `Surface`.
   2. Initialize app-scoped, non-UI dependencies once.
   3. Create app UI state once: top-app-bar state, toast host, navigation state, and `Navigator`.
@@ -229,7 +239,7 @@ private/
 - No backend, account, analytics, or telemetry. The Android `INTERNET` permission exists only for local-network sync sockets; Vaulty never contacts a server of its own. Sync while apart goes through a folder another app syncs (iCloud Drive, Google Drive), holding only encrypted files. `core:network` and `core:parser` are inherited template modules that Vaulty does not use; don't wire them into features.
 - The UI follows the Zynk template's design system in `core:ui` (palettes, `AdaptiveNavigationScaffold`, `TopLevelPager`, `TopAppBarState`, toasts) and its rules above. Reuse the shared rows in `core:ui` (`SectionHeader`, `SwitchRow`, `PasswordField`, `StatusLine`, `Monogram`, `EmptyState`, `ReadableColumn`) before writing new ones.
 - `Palette.Default` is Vaulty's default palette (`DEFAULT_COLOR_PALETTE` in `feature:shared`). Appearance (theme and palette) is ordinary, non-sensitive preferences, read before unlock.
-- Navigation has two shells in `composeApp`: the locked shell (`RouteFlow.Unlock`, `RouteFlow.BackupRestore`; full screen, no navigation bars) and the unlocked shell (top-level `Vault` (start), `Generator`, `Security`, `Settings`). The unlocked shell is keyed by the unlocked keyring; locking discards it and all its state.
+- Navigation has two shells in `shared`: the locked shell (`RouteFlow.Unlock`, `RouteFlow.BackupRestore`; full screen, no navigation bars) and the unlocked shell (top-level `Vault` (start), `Generator`, `Security`, `Settings`). The unlocked shell is keyed by the unlocked keyring; locking discards it and all its state.
 - The Room schema stays at version 1 during development by owner decision (2026-10-31): after a schema change, delete the database or reinstall instead of writing a migration.
 - Vaulty has no `feature:home`: the Vault tab is the start destination (decided 2026-10-31). This is a deliberate exception to Part A's "retain `feature:home`" rule.
 - Cross-feature navigation uses `RouteFlow` keys in `core:ui` (for example, Security opens `RouteFlow.ItemDetail`); a feature never imports another concrete feature.

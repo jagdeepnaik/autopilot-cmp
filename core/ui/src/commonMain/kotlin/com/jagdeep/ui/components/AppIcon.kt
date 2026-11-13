@@ -9,7 +9,7 @@ import zynk.core.ui.generated.resources.zynk_logo
 
 /**
  * The Zynk app icon for in-app use (title bar, splash). Generated with every platform icon by
- * composeApp/app-icons/IconGen.java from the same source artwork.
+ * desktopApp/app-icons/IconGen.java from the same source artwork.
  */
 @Composable
 fun AppIcon(

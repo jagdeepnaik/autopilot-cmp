@@ -23,9 +23,9 @@ $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 if (-not $admin) { throw 'Run this as an administrator; the MSI installs for all users.' }
 
 if (-not $Msi) {
-    $Msi = (Get-ChildItem (Join-Path $projectRoot 'composeApp\build\compose\binaries\main-release\msi\AutoPilot-*.msi') -ErrorAction SilentlyContinue |
+    $Msi = (Get-ChildItem (Join-Path $projectRoot 'desktopApp\build\compose\binaries\main-release\msi\AutoPilot-*.msi') -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime | Select-Object -Last 1).FullName
-    if (-not $Msi) { throw 'No built MSI found. Build it first with :composeApp:packageReleaseMsi.' }
+    if (-not $Msi) { throw 'No built MSI found. Build it first with :desktopApp:packageReleaseMsi.' }
 }
 $newVersion = [regex]::Match((Split-Path $Msi -Leaf), '\d+\.\d+\.\d+').Value
 $installed = Get-InstalledVersion

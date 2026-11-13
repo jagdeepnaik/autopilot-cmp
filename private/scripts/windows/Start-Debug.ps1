@@ -10,7 +10,7 @@ Push-Location $projectRoot
 try {
     Start-Transcript -Path $logPath | Out-Null
     Write-Output 'Waiting for the Mac debugger on Windows localhost:5005. Use the SSH tunnel; do not open a debugger firewall port.'
-    & .\gradlew.bat --no-daemon --console=plain :composeApp:run --debug-jvm
+    & .\gradlew.bat --no-daemon --console=plain :desktopApp:run --debug-jvm
     if ($LASTEXITCODE -ne 0) { throw "Debug run failed (exit $LASTEXITCODE). Log: $logPath" }
 } finally {
     Stop-Transcript -ErrorAction SilentlyContinue | Out-Null

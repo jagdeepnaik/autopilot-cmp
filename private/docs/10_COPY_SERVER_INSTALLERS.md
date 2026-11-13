@@ -19,13 +19,13 @@ mkdir -p "$HOME/Downloads/Builds/AutoPilot"
 **Local network:**
 
 ```sh
-scp 'home-server-build:C:/Build/autopilot-cmp/composeApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
+scp 'home-server-build:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
 ```
 
 **Or Cloudflare:**
 
 ```sh
-scp 'home-server-build-remote:C:/Build/autopilot-cmp/composeApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
+scp 'home-server-build-remote:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
 ```
 
 ### 3.3 Download the Linux DEB — choose one route
@@ -33,13 +33,13 @@ scp 'home-server-build-remote:C:/Build/autopilot-cmp/composeApp/build/compose/bi
 **Local network:**
 
 ```sh
-scp 'home-server:/srv/build/autopilot-cmp/composeApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/Builds/AutoPilot/"
+scp 'home-server:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/Builds/AutoPilot/"
 ```
 
 **Or Cloudflare:**
 
 ```sh
-scp 'home-server-remote:/srv/build/autopilot-cmp/composeApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/Builds/AutoPilot/"
+scp 'home-server-remote:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/Builds/AutoPilot/"
 ```
 
 Wait for each transfer to finish. Compare the Mac hash with the source hash of the same file:
