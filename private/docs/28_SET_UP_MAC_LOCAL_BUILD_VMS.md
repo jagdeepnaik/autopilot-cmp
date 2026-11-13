@@ -434,6 +434,23 @@ The local VMs build from Git. They must not contain uncommitted changes, and the
 
 ## Troubleshooting
 
+### Gradle daemon disappeared in the Linux VM
+
+If `packageReleaseDeb` ends with `Gradle build daemon disappeared unexpectedly`, the Linux VM likely ran out of guest memory while Gradle or the Kotlin compiler was running. `desktop.sh` uses a conservative Mac-local Linux profile: one worker, a 1536 MB Gradle heap and a 512 MB Kotlin daemon heap. Commit and push the script change, then retry:
+
+```sh
+private/scripts/git.sh push-all "Limit Mac Linux VM build memory"
+private/scripts/desktop.sh build mac-vm-linux
+```
+
+If it still fails, check the VM's available memory and kernel OOM messages:
+
+```sh
+ssh mac-linux-vm 'free -h; dmesg -T | tail -30'
+```
+
+Increase the VM's assigned memory, close other applications in the guest, and retry. Do not run multiple Gradle builds at the same time in the VM.
+
 | Problem | Check |
 | --- | --- |
 | `Could not resolve hostname` | The SSH alias is missing or the VM address changed. Test `ssh mac-windows-vm` or `ssh mac-linux-vm`. |

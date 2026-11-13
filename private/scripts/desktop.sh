@@ -52,6 +52,9 @@ MAC_LINUX_DIR="${MAC_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
 DOWNLOADS="$HOME/Downloads/Builds/AutoPilot"
 DEBUG_PORT=5005
 LOW_MEMORY=(--no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process')
+# The Mac-local Linux VM may have less memory than the home server. Keep Gradle and the Kotlin
+# compiler daemon inside a smaller envelope so the guest OS does not kill the build process.
+LOCAL_LINUX_MEMORY=(--no-daemon --console=plain --max-workers=1 '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' '-Dkotlin.daemon.jvm.options=-Xmx512m')
 FOCUSED_TESTS=(:core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :composeApp:jvmTest --tests '*DesktopDataPathsTest*' --tests '*AppVersionTest*')
 
 # The help text is the comment block at the top of this file, up to the first line of code.
@@ -255,7 +258,7 @@ local_windows_install() {
 local_linux_build() {
     linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR"
     step "Mac Linux VM: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the DEB"
-    local tasks=("${LOW_MEMORY[@]}")
+    local tasks=("${LOCAL_LINUX_MEMORY[@]}")
     [ "$TESTS" -eq 1 ] && tasks+=("${FOCUSED_TESTS[@]}")
     tasks+=(:composeApp:packageReleaseDeb)
     ssh "$MAC_LINUX_HOST" "cd '$MAC_LINUX_DIR' && ./gradlew $(printf "%q " "${tasks[@]}")" \
