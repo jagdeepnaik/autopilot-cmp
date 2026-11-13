@@ -4,7 +4,7 @@
 
 **On this page:** [Commit and push everything](#commit-and-push-everything) · [Quick reference](#quick-reference) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
 
-**Related:** [Git guide](19_GIT_GUIDE.md) · [Fetch all remote artifacts](08_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact) · [Start/stop/test the server VM](12_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](09_FIX_WINDOWS_INSTALLER.md)
+**Related:** [Git guide](19_GIT_GUIDE.md) · [Fetch and verify build artifacts](#fetch-and-verify-build-artifacts) · [Start/stop/test the server VM](12_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](09_FIX_WINDOWS_INSTALLER.md)
 
 `private/scripts/desktop.sh` runs the build chain for one machine, or all of them, from a Mac Terminal. The only supported form puts one action first and the target last. Every step stops with a plain reason when something isn't right.
 
@@ -99,6 +99,7 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 <tr><td><code>private/scripts/desktop.sh run local-all</code></td><td>Build and install/check macOS, the local Windows VM and the local Linux VM.</td></tr>
 <tr><td colspan="2"><strong>Fetch — copy already-built remote artifacts</strong></td></tr>
 <tr><td><code>private/scripts/desktop.sh fetch all</code></td><td>Copies existing Legion MSIs and server DEBs to <code>~/Downloads/Builds/AutoPilot</code>, checking each SHA256. It does not sync, build or install.</td></tr>
+<tr><td><code>private/scripts/desktop.sh fetch legion</code></td><td>Copies every existing Legion MSI to <code>~/Downloads/Builds/AutoPilot</code>, checking each SHA256. It does not sync, build or install.</td></tr>
 <tr><td><code>private/scripts/desktop.sh fetch server-vm-win</code></td><td>Builds the server Windows VM MSI, then copies it to <code>~/Downloads/Builds/AutoPilot</code>.</td></tr>
 <tr><td colspan="2"><strong>Debug — sync and start one debug session</strong></td></tr>
 <tr><td><code>private/scripts/desktop.sh debug mac</code></td><td>Sync, then start the Mac debug run on port 5005.</td></tr>
@@ -112,6 +113,105 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 <tr><td><code>--remote</code></td><td>Reach the home server through Cloudflare instead of the local network. For artifact fetching: <code>private/scripts/desktop.sh --remote fetch all</code>.</td></tr>
 </tbody>
 </table>
+
+## Fetch and verify build artifacts
+
+All artifact copying belongs to this section. The commands copy installers to
+`~/Downloads/Builds/AutoPilot` and verify each copied file against the SHA256 hash of the source.
+
+### Fetch all existing remote artifacts
+
+From the project root on the Mac:
+
+```sh
+private/scripts/desktop.sh fetch all
+```
+
+This copies every existing MSI from Legion and every DEB from the home server. It does not push,
+pull, sync, build, install or delete anything. Build first when needed:
+
+```sh
+private/scripts/desktop.sh build legion
+private/scripts/desktop.sh build server
+```
+
+For a Cloudflare connection to the home server, use:
+
+```sh
+private/scripts/desktop.sh --remote fetch all
+```
+
+Legion remains on its normal local SSH connection. If a source release folder is empty, the
+command stops and identifies the machine that must build first.
+
+### Fetch one target
+
+Use the target-specific command when you only want one machine's artifact:
+
+| Command | What it does |
+|---|---|
+| `private/scripts/desktop.sh fetch legion` | Copies all existing Legion MSIs to `~/Downloads/Builds/AutoPilot` and verifies every SHA256. It does not build or install. |
+| `private/scripts/desktop.sh fetch server` | Syncs and builds the server DEB, then copies the newest DEB to `~/Downloads/Builds/AutoPilot` and verifies its SHA256. |
+| `private/scripts/desktop.sh fetch server-vm-win` | Checks that the server Windows VM is running, syncs and builds its MSI, then copies it to `~/Downloads/Builds/AutoPilot` and verifies its SHA256. |
+| `private/scripts/desktop.sh fetch mac` | Not available: the Mac app is built and installed locally; it is not copied to Downloads. Use `run mac` if you want to install it. |
+| `private/scripts/desktop.sh fetch mac-vm-win` | Not available: the Mac Windows VM is a local build/install target. Use `run mac-vm-win` if you want to install it in the VM. |
+| `private/scripts/desktop.sh fetch mac-vm-linux` | Not available: the Mac Linux VM is a local build/install target. Use `run mac-vm-linux` if you want to install it in the VM. |
+| `private/scripts/desktop.sh fetch local-all` | Not available: local targets are installed where they are built. Use `run local-all` for local installation. |
+| `private/scripts/desktop.sh fetch all` | Copies existing Legion MSIs and server DEBs. It does not build, sync, install, or fetch local-VM artifacts. |
+
+For Legion, the command uses the existing release folder. If it is empty, build the MSI first:
+
+```sh
+private/scripts/desktop.sh build legion
+private/scripts/desktop.sh fetch legion
+```
+
+Build the server Windows VM MSI and copy it to the Mac:
+
+```sh
+private/scripts/desktop.sh fetch server-vm-win
+```
+
+This requires the server Windows VM to be running. Start it first when necessary:
+
+```sh
+private/scripts/server-vm.sh start --headless
+private/scripts/desktop.sh fetch server-vm-win
+private/scripts/server-vm.sh stop
+```
+
+The copied files are suitable for testing only. Install an MSI on Legion with [03 — Install and test](03_INSTALL_AND_TEST_WINDOWS.md), or install a DEB on a Linux desktop with:
+
+```sh
+sudo apt install ./autopilot_<version>_amd64.deb
+```
+
+Do not install the DEB on the production home server.
+
+### Manual fallback
+
+Use these only when the one-command fetch is unavailable. The script is preferred because it
+checks every transfer:
+
+```sh
+mkdir -p "$HOME/Downloads/Builds/AutoPilot"
+scp 'home-legion:C:/Users/jagde/Projects/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
+scp 'home-server:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/Builds/AutoPilot/"
+```
+
+For the server Windows VM MSI, use the local or Cloudflare SSH host:
+
+```sh
+scp 'home-server-build:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
+# Or: home-server-build-remote
+```
+
+Check a manually copied file with:
+
+```sh
+shasum -a 256 "$HOME/Downloads/Builds/AutoPilot/"*.msi
+shasum -a 256 "$HOME/Downloads/Builds/AutoPilot/"*.deb
+```
 
 Use `private/scripts/desktop.sh build legion` for Legion builds.
 

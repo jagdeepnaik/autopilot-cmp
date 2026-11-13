@@ -21,7 +21,7 @@
 #   action   sync     push the Mac's commits and pull them on the target
 #            build    sync, focused tests, then build the installer
 #            run      build, then install/check the target
-#            fetch    copy existing installers to ~/Downloads/Builds/AutoPilot   (all); build then copy one installer (server, server-vm-win)
+#            fetch    copy existing installers to ~/Downloads/Builds/AutoPilot   (all, legion); build then copy one installer (server, server-vm-win)
 #            debug    sync, start a debug run waiting on port 5005   (mac, legion, mac-vm-win, mac-vm-linux)
 #
 #   --no-tests  skip the focused tests
@@ -396,9 +396,13 @@ fetch_artifact_group() {
 }
 
 fetch_all_builds() {
-    fetch_artifact_group Legion "$LEGION_HOST" 'C:/Users/jagde/Projects/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi' msi
+    fetch_legion_builds
     fetch_artifact_group "Home server" "$SERVER_HOST" "$SERVER_DIR/desktopApp/build/compose/binaries/main-release/deb" deb
     echo "All available Legion MSIs and home-server DEBs are in $DOWNLOADS."
+}
+
+fetch_legion_builds() {
+    fetch_artifact_group Legion "$LEGION_HOST" 'C:/Users/jagde/Projects/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi' msi
 }
 
 # --- Home server Windows VM (MSI) ---------------------------------------------------------------
@@ -461,9 +465,10 @@ run_action() {
         run:all) mac_check_pushed; mac_build; mac_install; legion_build; legion_install; server_build; vm_build; vm_fetch; local_windows_build; local_windows_install; local_linux_build; local_linux_install ;;
 
         fetch:all) fetch_all_builds ;;
+        fetch:legion) fetch_legion_builds ;;
         fetch:server) server_build; server_fetch ;;
         fetch:server-vm-win) vm_build; vm_fetch ;;
-        fetch:mac|fetch:legion|fetch:mac-vm-win|fetch:mac-vm-linux|fetch:local-all)
+        fetch:mac|fetch:mac-vm-win|fetch:mac-vm-linux|fetch:local-all)
             unsupported fetch "This target does not copy an installer to the Mac." ;;
 
         debug:mac) mac_sync; mac_debug ;;

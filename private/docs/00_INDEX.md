@@ -33,7 +33,7 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | Check the Chrome extension version and alert sounds after an update | [05_BROWSER_AND_ALERT_SETTINGS.md](05_BROWSER_AND_ALERT_SETTINGS.md) |
 | Add or update a versioned answer bank | [06_UPDATE_ANSWER_BANK.md](06_UPDATE_ANSWER_BANK.md) |
 | Resume saved Sagar Mein Yog progress | [07_SAVED_COURSE_PROGRESS.md](07_SAVED_COURSE_PROGRESS.md) |
-| Copy all existing Legion and server build files to the Mac | [08 · Fetch all build artifacts](08_COPY_WINDOWS_INSTALLER.md#one-command-fetch-every-build-artifact) |
+| Copy and verify build files on the Mac | [01 · Fetch and verify build artifacts](01_ONE_COMMAND_BUILDS.md#fetch-and-verify-build-artifacts) |
 | Fix installer errors: Error 1723, "Smart App Control blocked an app", "already installed" | [09_FIX_WINDOWS_INSTALLER.md](09_FIX_WINDOWS_INSTALLER.md) |
 
 **Usual order:** run `private/scripts/desktop.sh run legion` (or `run mac`, `run server`, `run all`) from the Mac, then open the app on that machine and check it. `run all` includes the server Windows VM and both Mac-local VMs. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
