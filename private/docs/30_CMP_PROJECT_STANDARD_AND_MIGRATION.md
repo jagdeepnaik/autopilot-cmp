@@ -337,6 +337,51 @@ Commit the restructure, the package grouping and unrelated fixes **separately**.
 
 ## 7. Verification checklist
 
+### 7.1 Migrate Android Studio and iOS run configurations
+
+This project no longer has a `composeApp` module. The current modules are `androidApp`,
+`desktopApp`, and `shared`. If Android Studio reports that it cannot find
+`:composeApp:assembleDebug`, the run configuration is stale:
+
+1. Sync the project from `settings.gradle.kts` at the repository root.
+2. Select the shared **Android app** run configuration, which uses the `androidApp` module.
+3. Delete any old configuration that contains `:composeApp:assembleDebug`.
+4. Choose an emulator or connected Android device and run again.
+
+For iOS, open `iosApp/iosApp.xcodeproj` in Xcode and select the shared `iosApp` scheme. The Mac
+must use the full Xcode developer directory, not only Command Line Tools:
+
+```sh
+xcode-select -p
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -runFirstLaunch
+```
+
+Verify with `xcodebuild -version`. If `xcode-select -p` still prints
+`/Library/Developer/CommandLineTools`, iOS Gradle sync and the iOS Run button remain disabled.
+
+The shared configurations added by this migration are `.run/Android-app.run.xml` and the shared
+`iosApp` scheme at `iosApp/iosApp.xcodeproj/xcshareddata/xcschemes/iosApp.xcscheme`.
+
+Live verification after the migration:
+
+```sh
+./gradlew :androidApp:assembleDebug --no-daemon --console=plain
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
+  -project iosApp/iosApp.xcodeproj \
+  -scheme iosApp \
+  -configuration Debug \
+  -sdk iphonesimulator \
+  -derivedDataPath /tmp/autopilot-ios-derived \
+  build
+```
+
+Both commands must finish with `BUILD SUCCESSFUL`. The Android verification confirms that
+`androidApp` replaces the old `composeApp` module. The iOS verification confirms that the shared
+`iosApp` scheme and Kotlin framework build phase are valid. The `DEVELOPER_DIR` prefix is useful for
+testing; selecting Xcode with `xcode-select --switch` makes the same toolchain available to
+Android Studio and Gradle without the prefix.
+
 | Check | Command or method | Must match the baseline |
 | --- | --- | --- |
 | All JVM tests | `./gradlew jvmTest`, then sum `build/test-results/jvmTest/*.xml` | Same suites and test count; no new failures |

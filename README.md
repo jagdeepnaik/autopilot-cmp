@@ -120,6 +120,9 @@ Use `.\gradlew.bat` on Windows.
 | Android (debug) | `./gradlew :androidApp:installDebug` |
 | iOS | Open [`iosApp`](./iosApp) in Xcode and run |
 
+Android Studio and iOS run-configuration migration is documented in
+[`30_CMP_PROJECT_STANDARD_AND_MIGRATION.md`](private/docs/30_CMP_PROJECT_STANDARD_AND_MIGRATION.md#71-migrate-android-studio-and-ios-run-configurations).
+
 ## Tests
 
 ```shell

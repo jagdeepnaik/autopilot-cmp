@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Android app" type="AndroidRunConfigurationType" factoryName="Android App">
+    <option name="DEPLOY" value="true" />
+    <option name="DEPLOY_APK_FROM_BUNDLE" value="false" />
+    <option name="PM_INSTALL_OPTIONS" value="" />
+    <option name="ACTIVITY_CLASS" value="com.jagdeep.autopilot.MainActivity" />
+    <option name="MODE" value="default_activity" />
+    <option name="CLEAR_LOGCAT" value="false" />
+    <option name="SHOW_LOGCAT_AUTO" value="true" />
+    <option name="TARGET_SELECTION_MODE" value="DEVICE_AND_SNAPSHOT" />
+    <module name="AutoPilot.androidApp.main" />
+    <method v="2" />
+  </configuration>
+</component>
