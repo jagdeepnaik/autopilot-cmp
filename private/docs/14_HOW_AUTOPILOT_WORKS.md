@@ -2,7 +2,9 @@
 
 [All guides](00_INDEX.md)
 
-This document follows the app from launch to the last click: what each part does, how the parts talk to each other, and how the app talks to Chrome. For setup and build commands, see the [README](../../README.md).
+This document follows the app from launch to the last click: what each part does, how the parts talk to each other, and how the app talks to Chrome. For setup and build commands, see the [README](../../README.md) and [one-command builds](01_ONE_COMMAND_BUILDS.md).
+
+Updated 13 November 2026, for the `shared` / `androidApp` / `desktopApp` layout, the course routines (Sagar Mein Yog automation, DGS E-Learning) and the `~/.autopilot` data folder. The web page helper and course helper routines were retired on 9 November 2026.
 
 ## Contents
 
@@ -14,7 +16,7 @@ This document follows the app from launch to the last click: what each part does
 6. [Routines: the clicker](#6-routines-the-clicker)
 7. [How the app talks to Chrome](#7-how-the-app-talks-to-chrome)
 8. [The Chrome extension](#8-the-chrome-extension)
-9. [Page helper by hand](#9-page-helper-by-hand)
+9. [Course routines: Sagar Mein Yog and DGS](#9-course-routines-sagar-mein-yog-and-dgs)
 10. [Scroll and click, step by step](#10-scroll-and-click-step-by-step)
 11. [Videos, step by step](#11-videos-step-by-step)
 12. [Every way a run can stop](#12-every-way-a-run-can-stop)
@@ -30,21 +32,21 @@ This document follows the app from launch to the last click: what each part does
 
 ## 1. The big picture
 
-AutoClicker does two different kinds of work:
+AutoPilot does two different kinds of work:
 
-| | Clicker (routines) | Page helper (Chrome) |
+| | Clicker (routines) | Chrome routines |
 | --- | --- | --- |
 | **Works in** | Any app | Chrome only |
-| **Knows about** | Screen positions only | The page: buttons, scrolling, videos |
-| **Clicks by** | The operating system, at a screen position | A key press (extension), or the operating system in a Scroll and click run |
+| **Knows about** | Screen positions only | The page: buttons, scrolling, videos, course pages and assessment questions |
+| **Clicks by** | The operating system, at a screen position | The extension inside the page (Sagar Mein Yog), Chrome-native input through the `debugger` permission (DGS navigation), or the operating system at a screen position (Scroll and click) |
 | **Needs the extension** | No | Yes |
 
-This split exists because of one limit: **the desktop app can't see inside a web page.** It knows where the pointer is and which app is in front, but not whether a page has reached the bottom or has a video on it. Only code running inside Chrome can see that, which is why there's an extension. In turn, the extension can't press F-keys from other apps or click outside the page, so the two work as a pair.
+This split exists because of one limit: **the desktop app can't see inside a web page.** It knows where the pointer is and which app is in front, but not whether a page has reached the bottom or has a video on it. Only code running inside Chrome can see that, which is why there's an extension. In turn, the extension can't see hot keys pressed in other apps or click outside the page, so the two work as a pair.
 
 ```mermaid
 flowchart LR
-    User([You]) -->|F6 to F9, buttons| App
-    subgraph App[AutoClicker desktop app]
+    User([You]) -->|F6, F7, F9, buttons| App
+    subgraph App[AutoPilot desktop app]
         UI[Screens and ViewModels]
         CC[ClickController]
         PH[PageController]
@@ -80,14 +82,14 @@ The project uses Kotlin Multiplatform and Compose Multiplatform. Modules depend 
 | `desktopApp` | The desktop app shell: `main()` and the MSI, DMG and DEB packaging |
 | `core:automation` | The only code that touches the mouse, keyboard state, Accessibility permission and front app |
 | `core:localbridge` | The HTTP link to a trusted local client. It carries JSON and doesn't interpret it |
-| `core:persistence` | `PreferencesStore`, backed by DataStore |
+| `core:persistence` | `PreferencesStore` (DataStore) for settings, routines and history; `AppRoomDatabase` (`autopilot.db`) for saved course progress |
 | `core:ui` | Theme, palettes, scaffold, app bars, toasts, navigation helpers |
 | `core:common`, `core:logger` | Platform and time helpers, logging |
 | `core:network`, `core:notifications`, `core:transfer` | Inherited from the template and not used by this app |
-| `feature:home` | The Routines tab: every kind of routine, the editor, `ClickController` and `ClickRun` for click routines, `PageController` and `ScrollClickRun` for Chrome routines |
+| `feature:home` | The Routines tab and the Running routine screen: every kind of routine, the editor, `ClickController` and `ClickRun` for click routines, `PageController` with `ScrollClickRun`, `CourseAutomationSession` and `DgsSession` for Chrome routines, answer banks and course progress |
 | `feature:activity` | The Activity tab and its history store |
 | `feature:settings` | The Settings tab |
-| `feature:shared` | `AppPreferences`, `RunRecord`, `RunOutcome`, `RunHistoryStore`, used by several features |
+| `feature:shared` | `AppPreferences`, `RunRecord`, `RunOutcome`, `RunHistoryStore`, answer-bank file names and the browser-extension status, used by several features |
 | `iosApp` | iOS entry point. The app opens there and says it's desktop-only |
 
 The template's core modules are kept identical to the Zynk template. That's why the root build pins a `zynk.*` resource package for `core:ui`, and why the template's spare `RouteTopLevel.Sync` route is left unused.
@@ -101,21 +103,21 @@ The Routines page lists every routine, whatever its kind, and **New routine** as
 | Click routine | `ClickRoutine` (`click`) with the pointer as its target | `ClickController` with `ClickRun` | Clicks wherever the pointer is, in any app ([section 6](#6-routines-the-clicker)) |
 | Multi-point click | `ClickRoutine` (`click`) with a list of points | `ClickController` with `ClickRun` | Clicks a list of steps in order, each with its own wait and button, once or repeated |
 | Scroll and click | `ScrollClickRoutine` (`scrollClick`) | `PageController` with `ScrollClickRun` | Scrolls a Chrome page to the bottom, plays videos, clicks a spot, repeats ([section 10](#10-scroll-and-click-step-by-step)) |
-| Web page helper | `PageHelperRoutine` (`pageHelper`) | `PageController` | Highlights the next button in Chrome while it runs; F8 clicks it and F9 scrolls ([section 9](#9-page-helper-by-hand)) |
-| Course helper | `CourseHelperRoutine` (`courseHelper`) | `PageController` | For sagarmeinyog.com: outlines the next unfinished part or Back to Course; each key press opens it ([Course helper](#course-helper)) |
+| Sagar Mein Yog automation | `CourseAutomationRoutine` (`courseAutomation`) | `PageController` with `CourseAutomationSession` | Works through unfinished courses and videos on sagarmeinyog.com and handles module assessments in the chosen mode ([section 9](#9-course-routines-sagar-mein-yog-and-dgs)) |
+| DGS E-Learning | `DgsELearningRoutine` (`dgsELearning`) | `PageController` with `DgsSession` | Reads DGS e-book pages and watches their videos until the study-time target ([section 9](#9-course-routines-sagar-mein-yog-and-dgs)) |
 
-To add a kind: add a `Routine` subtype and a `RoutineKind` entry, teach `RoutineDraft` to edit it, add its editor section, and give it a runner that `ClickController.start` hands it to. Routines saved before kinds existed have no `type` and load as click routines.
+To add a kind: add a `Routine` subtype and a `RoutineKind` entry, teach `RoutineDraft` to edit it, add its editor section, and give it a runner that `ClickController.start` hands it to. Routines saved before kinds existed have no `type` and load as click routines. The retired kinds (`pageHelper`, `courseHelper`) are skipped when routines load or are imported, without disturbing the others.
 
 ---
 
 ## 3. What happens at launch
 
-1. **`main.kt`** starts logging and opens the desktop window, restoring its size and position. `DesktopTitleBar` fits the window to the desktop shell: on a Mac the title bar is see-through with the content running under it, so the app's toolbar shares the row with the system's window buttons (as in Android Studio), and `apple.awt.application.appearance=system` keeps those buttons in the Mac's light or dark style. On Windows, one custom toolbar row contains the app identity and caption controls. `WindowsNativeCaption` retains the native resizable-frame and caption capabilities Windows uses for Snap Layouts, while removing the extra native title row. It exposes the maximize control to native Windows hit testing and empty caption space for dragging and double-click maximize/restore. Resize edges retain their native behavior. Other controls retain their regular app input. The app icon navigates Home. `DesktopCaptionClicks` handles unconsumed double-clicks without taking drag or button gestures.
+1. **`desktopApp`'s `main.kt`** calls `runDesktopApp()` in `shared` (`desktop/DesktopApp.kt`). That starts logging, writes the bundled Chrome extension to `~/.autopilot/extensions/chrome` in the background (only changed files), and opens the desktop window, restoring its size and position. `DesktopTitleBar` fits the window to the desktop shell: on a Mac the title bar is see-through with the content running under it, so the app's toolbar shares the row with the system's window buttons (as in Android Studio), and `apple.awt.application.appearance=system` keeps those buttons in the Mac's light or dark style. On Windows, one custom toolbar row contains the app identity and caption controls. `WindowsNativeCaption` retains the native resizable-frame and caption capabilities Windows uses for Snap Layouts, while removing the extra native title row. It exposes the maximize control to native Windows hit testing and empty caption space for dragging and double-click maximize/restore. Resize edges retain their native behavior. Other controls retain their regular app input. The app icon navigates Home. `DesktopCaptionClicks` handles unconsumed double-clicks without taking drag or button gestures.
 2. **`App.kt`** runs and calls `AppServices.get()`, which creates the process-wide services once.
 3. **`AppServices`** creates, in order:
-   - the preference store, for settings
+   - the preference stores, for settings (`DesktopDataPaths` first moves any older files into the `~/.autopilot` subfolders, never overwriting)
    - `DesktopAutomation`, which starts the hot-key polling loop
-   - the routine repository and the history store
+   - the routine repository, the history store, the answer banks (seeding bundled ones that are missing) and the course-progress repository (`autopilot.db`)
    - `LocalBridge`, which starts the HTTP server on `127.0.0.1:47613`
    - `PageController`, which runs Chrome routines and publishes its first state to the extension
    - `ClickController`
@@ -126,7 +128,7 @@ The controllers live in `AppServices`, not in a screen, because hot keys and run
 
 **On close:** `AppServices.shutdown()` stops any routine, cancels all background work (which also ends a Scroll and click run), closes the server and stops hot-key polling. Because the process is exiting, recording the interrupted run is best effort.
 
-**If the port is taken:** another program, usually a second copy of AutoClicker, may hold port 47613. Click routines still work, but a selected Chrome routine shows "Can't reach Chrome" on the Routines page and won't start.
+**If the port is taken:** another program, usually a second copy of AutoPilot, may hold port 47613. Click routines still work, but a selected Chrome routine shows "Can't reach Chrome" on the Routines page and won't start.
 
 ---
 
@@ -162,8 +164,7 @@ Linux, Android and iOS use `UnsupportedDesktopAutomation`, where every action re
 | --- | --- | --- |
 | F6 | Start or stop the selected routine; stop a Scroll and click run | `ClickController` |
 | F7 | Record the pointer position while picking | Both controllers, when they're picking |
-| F8 | Click the highlighted button | `PageController` |
-| F9 | Start or stop auto-scroll; stop a Scroll and click run | `PageController` |
+| F9 | Stop a Scroll and click run | `PageController` |
 
 **How keys are detected:** `PollingHotKeyMonitor` asks the operating system every 30 ms whether each of F1 to F12 is down. `HotKeyEdgeDetector` turns that into single presses, so holding a key counts once, and a key already held when polling starts doesn't count.
 
@@ -214,7 +215,7 @@ Each pass does the following:
 2. Run the **safety checks** ([section 12](#12-every-way-a-run-can-stop)).
 3. Work out the next point, and check whether it should wait:
    - **Wrong app in front** (`WaitingForApp`), when "only in this app" is set.
-   - **On its own window** (`OverOwnWindow`), when the click would land on AutoClicker's focused window. This keeps Stop reachable.
+   - **On its own window** (`OverOwnWindow`), when the click would land on AutoPilot's focused window. This keeps Stop reachable.
    - While waiting it forgets where it last put the pointer, because you may move the mouse to switch apps.
 4. Click, count it, and move to the next point, wrapping back to the first.
 5. Wait for the interval plus any random extra. It waits in slices of up to 50 ms and re-checks safety each time, so a long interval never delays a stop.
@@ -282,23 +283,29 @@ The bridge reports `connected` while a poll is waiting, or if it heard from the 
 
 | Field | Meaning |
 | --- | --- |
-| `enabled` | The page helper is on. When off, the extension does nothing |
+| `enabled` | A Chrome routine is running. When off, the extension does nothing |
 | `scrolling` | Scroll the page now |
 | `pixelsPerSecond` | Scroll speed |
-| `words` | Button words to look for, most important first |
-| `advance` | A **count** of F8 presses. See below |
 | `autoRun` | A Scroll and click run is going, so report where the page is |
 | `watchVideos` | Stop for videos during that run |
+| `clickText`, `clickRequest` | A Scroll and click step that clicks by visible text, and its request number |
+| `courseAutomation` | A Sagar Mein Yog run: its session, the next action (open, play, answer, submit…) and the playback speed |
+| `dgs` | A DGS E-Learning run: what to read, play or open next |
+| `words`, `advance`, `course` | Kept for compatibility with older extensions; always empty, `0` and `false` since the page helper and course helper were retired |
 
-**Why `advance` is a count and not "click now":** state is replaced, not queued, and the extension can reconnect at any time. It clicks only when it sees the number *go up* from one reading to the next. When the link drops it forgets the number, so presses from before reconnecting can never fire later.
+Actions are numbered requests. The extension acts only on a number it hasn't handled, and reports `accepted` or `refused`, so a reconnect can never replay an old action.
 
 ### What the extension sends: events
 
 | Event | Example | Meaning |
 | --- | --- | --- |
-| `found` | `{"type":"found","label":"Next"}` | The button now highlighted, or `null` for none |
-| `videoEnded` | `{"type":"videoEnded"}` | A video ended in the active tab, so the app may play its alert |
-| `page` | `{"type":"page","focused":true,"atBottom":true,"signature":"…","video":"none"}` | During a run: where the page is |
+| `extensionVersion` | `{"type":"extensionVersion","version":"1.14.1"}` | The running extension's version; Settings compares it with the bundled one |
+| `page` | `{"type":"page","focused":true,"atBottom":true,"signature":"…","video":"none"}` | During a Scroll and click run: where the page is |
+| `needsPlay`, `playing` | `{"type":"needsPlay"}` | A video needs a press of play, or is playing |
+| `textClicked` | `{"type":"textClicked","request":3,"success":true}` | Result of a click by text |
+| `courseChunk`, `courseAction` | — | Sagar Mein Yog page inventory (course, lesson and assessment state, split into chunks) and action results |
+| `dgsReading`, `dgsClick`, `dgsBrowserAction` | — | DGS page and video state, and navigation results |
+| `found`, `videoEnded` | — | Older extension events, still accepted |
 
 The app ignores anything malformed or unknown.
 
@@ -306,7 +313,7 @@ The app ignores anything malformed or unknown.
 
 There's no password. Instead it relies on headers that the browser sets and page scripts can't change (`JvmLocalBridge.isAllowed`):
 
-- A request with an `Origin` header is accepted only if it's exactly `chrome-extension://mdnfpmhkcnalejgjenhnlnogkonicboa`.
+- A request with an `Origin` header is accepted only if it's exactly `chrome-extension://ebilomdffnbhihdfgkeienfcbceomkap`.
 - Chrome sends no `Origin` on the extension's own GET, so a request without one must carry `Sec-Fetch-Site: none` and `Sec-Fetch-Mode: cors`.
 - Anything else gets a 403.
 
@@ -318,9 +325,9 @@ This stops **web pages** from driving the app. It doesn't stop **another program
 
 ## 8. The Chrome extension
 
-The files are in `shared/src/jvmMain/resources/chrome-extension/` and ship inside the app. **Show extension folder** copies them to `~/.autoclicker/chrome-extension`, and Chrome loads them from there as an unpacked extension.
+The files are in `shared/src/jvmMain/resources/chrome-extension/` and ship inside the app (version **1.14.1**, "AutoPilot Page Helper"). At every start the app writes them to `~/.autopilot/extensions/chrome/`, rewriting only changed files, and Chrome loads them from there as an unpacked extension. After an update, press reload on the extension in `chrome://extensions`; Settings shows the bundled and running versions.
 
-**Permissions:** `alarms`, plus `host_permissions` for `127.0.0.1:47613` only. `content.js` runs on all pages, because the helper has to work on whichever page you're using. A test confirms the only address in the scripts is the local one.
+**Permissions:** `alarms`; `debugger`, used only for DGS navigation (it attaches to the bound, foreground DGS tab for one pending request, then detaches, and is never used to read pages or network traffic); and `host_permissions` for `127.0.0.1:47613` only. `content.js` runs on all pages, because Scroll and click works on whichever page you use; the course scripts run only on their sites (sagarmeinyog.com, DGS and its YouTube embeds). A test confirms the only address in the scripts is the local one.
 
 ### Two scripts, two roles
 
@@ -380,31 +387,29 @@ Reloading cuts off the `content.js` already running in open tabs, and Chrome doe
 
 ---
 
-## 9. Page helper by hand
+## 9. Course routines: Sagar Mein Yog and DGS
 
-**Pressing F8:**
+Both course routines run in `PageController` like Scroll and click, but the extension reads the course page itself and the app decides each step. The details for users are in the [README](../../README.md); this section covers how they work.
 
-```mermaid
-sequenceDiagram
-    participant K as F8
-    participant C as PageController
-    participant B as background.js
-    participant F as content.js
-    C->>C: Already knows "Next" is highlighted
-    K->>C: Key press
-    C->>C: advance + 1, publish
-    C-->>B: Long poll answers: advance went up
-    B->>F: {type: "click"}, to the selected frame
-    F->>F: Still connected and usable? Then click()
-```
+### Sagar Mein Yog automation
 
-The controller ignores F8 unless a page helper routine is running and a button is highlighted. The extension re-checks the button just before clicking. Some pages ignore this kind of scripted click.
+`CourseAutomationSession` drives a run on sagarmeinyog.com:
 
-**Pressing F9:** flips `isScrolling` and publishes. The scrolling frame starts or stops within one tick.
+1. The extension sends the page as `courseChunk` events: dashboard course cards, the course's chapters and video rows with their completion state, the current lesson's video, and on an assessment page the question, its options and the counter.
+2. The session chooses the next action and publishes it in `courseAutomation`: open the next unfinished course or video, play at the routine's speed (1×, 1.5× or 2×), wait for the video's real `ended`, return to the course, and continue. Completed videos are skipped.
+3. Assessments follow the routine's mode (see [Assessment modes and learning order](#assessment-modes-and-learning-order)). Answers come only from the selected answer bank, matched on the exact question and its full option set, after display-order labels are removed. There's no fuzzy matching and no AI. A missing or ambiguous answer pauses the run and plays the question alert.
+4. Progress is saved to `autopilot.db` as it happens: completed lessons, all-video module markers and real assessment results, per user profile. The next run skips finished work ([saved progress](07_SAVED_COURSE_PROGRESS.md)).
+5. The **Running routine** screen shows the current module, question, approvals and progress. Stop stays at the bottom.
 
-**Video alert:** `content.js` listens for `ended` on each video and passes it on. If the switch is on, the app plays the system alert.
+Answer banks are JSON files in `~/.autopilot/answer-banks/` ([updating them](06_UPDATE_ANSWER_BANK.md)). Approved corrections are saved to the selected bank.
 
----
+### DGS E-Learning
+
+`DgsSession` reads DGS e-books (dgsstcwlms.aduacademy.in) until the study-time target:
+
+- It opens the course chosen in the app's popup, scrolls each page slowly (at least 30 seconds a page), watches videos to their real end, and presses Next. When the book is finished and time remains, it starts again from the first page.
+- Course links and the e-book's Next button need real input, so the extension uses Chrome-native input through the `debugger` permission, attached only for that request.
+- Active study time is saved per DGS user and course in `autopilot.db`. It's an estimate, separate from DGS's official credit. Login, verification, unsupported videos and pages that don't change pause the run.
 
 ## 10. Scroll and click, step by step
 
@@ -525,7 +530,7 @@ This is a scripted click, so **some players ignore it**, and Chrome's autoplay r
 | Accessibility turned off | Yes | Yes | Input permission was turned off |
 | Click couldn't be sent | Yes | Yes | A click couldn't be sent |
 | Page unchanged for 15 seconds | No | Yes | The click didn't change the page |
-| Chrome closed, or helper turned off | No | Yes | Chrome closed or the helper was turned off |
+| Chrome closed, or the extension turned off | No | Yes | Chrome closed or the extension was turned off |
 
 **Pointer-moved details:**
 
@@ -538,23 +543,31 @@ The corner and pointer-moved stops can be turned off in Settings. A routine canc
 
 ## 13. What gets saved, and where
 
-On desktop, data is stored in `~/.autoclicker/` using DataStore files.
+On desktop, everything is in `~/.autopilot/` (`%USERPROFILE%\.autopilot\` on Windows), owned by `DesktopDataPaths`. Installers and updates never touch it.
 
-| File | Holds | Format |
+| Path | Holds | Format |
 | --- | --- | --- |
-| `app_preferences.preferences_pb` | Theme, palette, hot keys, safety switches, keep-display-on | Separate keys |
-| `routines.preferences_pb` | Routines and the selected one | One JSON document |
-| `run_history.preferences_pb` | The newest 200 runs | One JSON document |
-| `page_helper.preferences_pb` | Helper on or off, words, speed, click spot, rounds, video switch | One JSON document |
-| `chrome-extension/` | A copy of the extension for Chrome to load | Files |
+| `settings/app_preferences.preferences_pb` | Theme, palette, hot keys, safety switches, keep-display-on, alert sounds | DataStore, separate keys |
+| `settings/page_helper.preferences_pb` | Chrome routine settings kept from the page helper era | DataStore, one JSON document |
+| `routines/routines.preferences_pb` | Routines and the selected one | DataStore, one JSON document |
+| `history/run_history.preferences_pb` | The newest 200 runs | DataStore, one JSON document |
+| `databases/autopilot.db` | Saved course progress: user profiles, lessons, videos, assessment results, DGS study time | Room (`AppRoomDatabase`, schema version 1) |
+| `databases/course-progress.db` | The older progress database. Imported into `autopilot.db` on its first open and kept as a backup | SQLite |
+| `answer-banks/` | Answer banks such as `sagarmeinyog-ver-1.0.json`, and `backups/` | JSON |
+| `extensions/chrome/` | The unpacked Chrome extension, rewritten at every start | Files |
+| `logs/` | Debug-run logs (Windows debug launcher) | Text |
 
-The window's size and position are stored separately, in Java Preferences under `com/jagdeep/autoclicker/window`.
+The window's size and position are stored separately, in Java Preferences under `com/jagdeep/autopilot/window`.
 
-Room is set up by the template but not used. Absent or unknown saved values fall back to defaults, and unreadable documents are treated as empty. The first launch creates one ready-to-use routine.
+`DesktopDataPaths` moves older files from the top of `~/.autopilot` into these folders before their stores open, and never overwrites an existing file. Absent or unknown saved values fall back to defaults, and unreadable documents are treated as empty. The first launch creates one ready-to-use routine, and the bundled answer bank is copied in only when no file of that name exists.
 
-**Routine files:** **Export** on a routine, or **Export all**, writes a readable JSON file (`RoutineFileCodec`) naming itself `autoclicker-routines`, version 1, with each routine in the same shape the app saves. **Import** reads one back through the system's Open panel: each routine gets a new id, so nothing of the user's is replaced, and must pass the editor's own checks, so a damaged or hand-edited file can't add, for example, a 0 ms interval. Files over 2 million characters, other formats and unknown routine kinds are refused. The file dialogs are `DesktopRoutineFiles` in `shared`; phones don't offer import or export.
+**Routine files:** **Settings → Routine files** exports selected routines, or all of them, to a readable `.autopilot.json` file (`RoutineFileCodec`, format `autopilot-routines`, version 1), with each routine in the same shape the app saves. **Import** reads one back through the system's Open panel: each routine gets a new id, so nothing of the user's is replaced, and must pass the editor's own checks, so a damaged or hand-edited file can't add, for example, a 0 ms interval. Files over 2 million characters, other formats and unknown routine kinds are refused, and retired kinds are skipped. The file dialogs are `DesktopRoutineFiles` in `shared`; phones don't offer import or export.
 
-**Uninstalling:** delete `/Applications/AutoClicker.app`, `~/.autoclicker`, and the extension in `chrome://extensions`. To clear the permission entry, run `tccutil reset Accessibility com.jagdeep.autoclicker`.
+**Uninstalling:**
+
+- **macOS:** delete `/Applications/AutoPilot.app`. To clear the permission entry, run `tccutil reset Accessibility com.jagdeep.autopilot`.
+- **Windows:** uninstall AutoPilot in Settings → Apps.
+- **Data and extension:** both platforms keep `~/.autopilot` until you delete it, along with the extension in `chrome://extensions`. Delete those too only if you want your routines, history, progress and answer banks gone.
 
 ---
 
@@ -577,22 +590,12 @@ Screen  ←  renders one UI state  ←  ViewModel  ←  flows
 | Routines | `HomeViewModel` | Rechecks permission every 2 seconds while it's missing, so allowing it in System Settings shows up by itself |
 | Routine editor | `RoutineEditorViewModel` | Holds the draft and pointer capture, with a section for each kind of routine. Its route holds only the routine's ID, or the kind of a new one |
 | Activity | `ActivityViewModel` | Shows history, and asks before clearing it |
-| Settings | `SettingsViewModel` | Rejects a hot key already in use, and shows the extension's setup and connection |
+| Settings | `SettingsViewModel` | Rejects a hot key already in use, and shows the extension's setup, versions and connection, alert sounds, routine files and the answer-bank folder |
+| Running routine | `HomeViewModel` (shared with Routines) | `RunningRoutineScreen`: live status, approvals, the current module and question, progress and the routine's options while it runs. Back leaves the run going |
 
-Desktop uses `DesktopShell` in `shared`, laid out like Android Studio: a toolbar (app name, a routine picker with Start and Stop, Chrome's status) in the title bar row, a narrow icon strip for the pages, the page in a rounded panel, and a status bar. `ShellModel` feeds the toolbar from the same `ClickController` and routines as the Routines page, so both always agree. Pages change with a fade. Phones use `TopLevelPager` with swiping, though the app itself is desktop-only for now.
+Desktop uses `DesktopShell` in `shared`, laid out like Android Studio: a toolbar (app name, a routine picker with Start and Stop, Chrome's status) in the title bar row, a narrow icon strip for the pages, the page in a rounded panel, and a status bar. `ShellModel` feeds the toolbar from the same `ClickController` and routines as the Routines page, so both always agree. Pages change with a fade. Phones use `TopLevelPager` with swiping, though the app itself is desktop-only for now: Android and iOS show "Desktop only for now".
 
 ---
-
-### Course helper
-
-A hands-on routine for one site, sagarmeinyog.com, built on the web page helper's key-press clicking. While it runs, the command carries `course: true`, and `content.js` uses `findCourseTarget` instead of word matching:
-
-- On the dashboard (`/dashboard`), the first course card that doesn't show "Completed" has its round play button outlined (a card is the nearest container showing "Min. Pass" and "Duration").
-- On a course page (`/dashboard/courses/<id>`), the first **Watch video** button whose row isn't completed, or else the header of a closed chapter (`aria-expanded="false"`), is outlined. Row status is read from the row's text without relying on word breaks.
-- On a lesson (`/dashboard/courses/<id>/<part>`), its `<video>` is started once, at the site's own speed, and **Back to Course** is outlined when it appears.
-- Each press of the click key clicks the outlined element once, exactly as the web page helper does. Play buttons are never pressed by the helper itself, and quizzes and the assessment are never outlined.
-
-It acts only on that site (and on `127.0.0.1` for the extension's own tests).
 
 ### Developer mode's live log
 
@@ -616,36 +619,41 @@ The log is `LiveLog` in `feature:shared`, implemented by `MemoryLiveLog` in `sha
 
 | Sent | Not sent |
 | --- | --- |
-| The highlighted button's label, up to 40 characters, which developer mode's log also shows | Page text in general |
+| A clicked or found control's label, up to 40 characters, which developer mode's log also shows | Page text in general |
+| On sagarmeinyog.com and DGS: course, lesson and video state, and on an assessment page the question, its options and the counter, to match against your answer bank | Anything from other sites |
 | Whether Chrome is in front, the page is at the bottom, and a video is playing | Page addresses |
 | Hashes for spotting a change | Passwords, form contents, anything you type |
 
 **What's stored:** routine names and screen positions, timings, run counts and stop reasons, and your settings. History doesn't record screen contents or the page you were on. Nothing here is encrypted, as none of it is meant to be secret.
 
-**Clicking without a key press:** routines and Scroll and click runs both click on their own once you start them, on whatever is at that screen position. The extension's own clicks need a key press, with one exception, the play button described in [section 11](#pictures-with-a-play-button).
+**Clicking without a key press:** routines, Scroll and click runs and the course routines act on their own once you start them. Routines and Scroll and click click whatever is at the screen position; course routines act only on their own sites. Stop works at any time.
 
-**Use on courses and tests:** the page helper's hands-on mode is designed for working through pages yourself. It doesn't answer questions or get around course checks. Scroll and click isn't meant for completing recorded training with nobody there.
+**Use on courses and tests:** Sagar Mein Yog automation answers assessments only from an answer bank you supply, on exact matches; it never guesses, uses AI or retries a failed attempt by itself. In **Manual** and **Review approvals** modes you approve starts and submissions; **Automatic** acts on your behalf for the run you started. DGS study time is a local estimate, not DGS's official record. Use the course routines within the rules of the course you're taking.
 
 ---
 
 ## 16. Build, install and release
 
+One command builds, installs and tests on each machine; see [one-command builds](01_ONE_COMMAND_BUILDS.md):
+
 ```shell
-./gradlew :desktopApp:run                 # run from source
-./gradlew :desktopApp:packageReleaseDmg   # build the Mac installer
+private/scripts/desktop.sh run mac       # this Mac: build, install to /Applications
+private/scripts/desktop.sh run legion    # Windows laptop: build the MSI from Git, install, check
+private/scripts/desktop.sh run all       # every desktop machine
+./gradlew :desktopApp:run                # run from source
 ```
 
-The DMG is written to `desktopApp/build/compose/binaries/main-release/dmg/`. The version is in `gradle/libs.versions.toml`, and the extension has its own in `manifest.json`.
+- **Versions:** the desktop version is `<major>.<minor>.<commit count>`, computed in the root `build.gradle.kts`, so each commit's MSI updates the installed app in place. About and the status bar show the same number. The extension has its own version in `manifest.json`.
+- **Packages:** `desktopApp` builds the DMG, MSI and DEB (`:desktopApp:packageRelease<Format>`). Legion, the home server and its VMs build only from Git.
+- **Windows and Smart App Control:** the build makes the MSI install and run with Smart App Control on. It ships the JDK's signed runtime files, starts the app through the signed `javaw.exe`, and removes jpackage's unsigned installer helper ([installer fixes](09_FIX_WINDOWS_INSTALLER.md)). The packages aren't code-signed, so SmartScreen and Gatekeeper may still warn.
 
 **After installing a new build:**
 
-1. Allow Accessibility again if asked, or if clicks do nothing.
-2. Press reload on the extension in `chrome://extensions`. Press **Show extension folder** first if the files need updating.
-3. Refresh any open page.
+1. Allow Accessibility again if asked, or if clicks do nothing (macOS).
+2. Press reload on the extension in `chrome://extensions`. The app has already written the new files.
+3. Refresh any open course page.
 
 Only one copy can hold the port, so quit the installed app before running from source.
-
-**Windows, Linux and Intel Mac installers** come from `.github/workflows/desktop-packages.yml`. A manual run builds Windows, `-f platforms=all` adds the others, and a `v*` tag builds everything. Installers aren't code-signed, so macOS and Windows warn on first launch.
 
 ---
 
@@ -653,6 +661,7 @@ Only one copy can hold the port, so quit the installed app before running from s
 
 ```shell
 ./gradlew jvmTest verifyFeatureModuleBoundaries
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./gradlew iosSimulatorArm64Test   # common tests on iOS
 ```
 
 | Level | Examples | Covers |
@@ -661,24 +670,25 @@ Only one copy can hold the port, so quit the installed app before running from s
 | Storage | `PreferencesRoutineRepositoryTest`, `ActivityTest` | Saving and reading back |
 | Link | `JvmLocalBridgeTest` | Long polling and header checks |
 | Screens | `*ScreenUiTest`, `HomeScreensUiTest` | What each state shows. Set `UI_TEST_SHOT_DIR` to save images |
-| Wiring | `AppWiringTest`, `BrowserExtensionTest` | Registration, extension ID, port agreement, permissions |
+| Wiring | `AppWiringTest`, `BrowserExtensionTest`, `BundledAnswerBankTest` | Registration, extension ID, port agreement, permissions, the bundled answer bank |
+| Browser | `shared` `integration/` (`LiveChromeExtensionTest`, `LiveCourseAutomationTest`, `ProgressCollectorBrowserTest`, `DgsCollectorBrowserTest`) | The extension's scripts in a real browser engine |
 
 Two tests are opt-in because they do real things:
 
 ```shell
 # Runs the extension's scripts in headless Chrome, with a throwaway profile.
-AUTOCLICKER_LIVE_CHROME_TEST="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+AUTOPILOT_LIVE_CHROME_TEST="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   ./gradlew :shared:jvmTest --tests '*LiveChromeExtensionTest*' --rerun
 
 # Sends real clicks and a key press to its own window. Keep your hands off the mouse.
-AUTOCLICKER_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInputTest*' --rerun
+AUTOPILOT_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInputTest*' --rerun
 ```
 
 **What the automated tests can't prove:**
 
 - Branded Chrome won't load an extension from the command line, so the live test uses stand-ins for the `chrome.*` APIs and fake video playback.
 - Real autoplay rules, real sound, real players, and the extension loaded through `chrome://extensions` all need a person to try.
-- The Windows code compiles but has never run.
+- Windows is exercised on Legion (install, launch, Smart App Control), but clicking in real Windows apps needs a person at the desktop.
 
 ---
 
@@ -701,16 +711,19 @@ AUTOCLICKER_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveI
 | --- | --- | --- |
 | "Waiting for Chrome" | Chrome is closed, or the extension isn't added or is off | Open Chrome and check `chrome://extensions` |
 | "Can't reach Chrome", port in use | Another copy of the app is running | Quit it and reopen |
-| "Allow access" won't go away | The old permission belongs to an earlier build | Remove AutoClicker from the Accessibility list, add it again, reopen the app |
+| "Allow access" won't go away | The old permission belongs to an earlier build | Remove AutoPilot from the Accessibility list, add it again, reopen the app |
 | Clicks do nothing | Same as above | Same as above |
 | "Reading the page" stays | The tab wasn't refreshed after a reload, or the page can't run extensions (such as `chrome://` pages or the Chrome Web Store) | Refresh, or use another page |
-| "Bring Chrome to the front" | Another app, including AutoClicker, is in front | Click Chrome and leave it there |
+| "Bring Chrome to the front" | Another app, including AutoPilot, is in front | Click Chrome and leave it there |
 | "Press play on the video in Chrome" | Chrome blocked autoplay, or the video was paused | Press play once |
 | Scrolls past a video | The player has no standard video, or its button wasn't recognised | Turn the speed down, or press play yourself |
 | Scrolling, but nothing moves | It chose the wrong scrollable area | Please report the page |
 | Stops soon after a click | The click missed, or the page took over 15 seconds | Pick the spot again |
 | Run ends as soon as you touch the mouse | The pointer-moved stop | Keep your hands off, or turn it off in Settings |
 | F-keys don't work on a Mac | They're acting as media keys | Hold fn, or change the setting in macOS |
+| Windows: "Smart App Control blocked an app" | An older build, or `AutoPilot.exe` opened directly | Install a current build and open AutoPilot from its shortcut ([installer fixes](09_FIX_WINDOWS_INSTALLER.md)) |
+| A course run pauses on a question | The answer bank has no exact match | Answer it in Chrome and approve; the correction is saved to the bank |
+| Settings shows two extension versions | Chrome is still running the old extension | Reload it in `chrome://extensions` and refresh the course tab |
 
 ---
 

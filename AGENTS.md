@@ -266,10 +266,10 @@ private/
   - `Palette.Default` is AutoPilot's default palette (`DEFAULT_COLOR_PALETTE` in `feature:shared`).
 - **App data** lives in `~/.autopilot/` (`%USERPROFILE%\.autopilot\` on Windows), owned by `DesktopDataPaths`:
   - `settings/`, `routines/` and `history/` hold DataStore files.
-  - `databases/course-progress.db` is the Room database with saved course progress.
+  - `databases/autopilot.db` is the Room database (`AppRoomDatabase`) with saved course progress. On its first open it imports the older `course-progress.db`, which is kept as a backup.
   - `answer-banks/` holds the answer banks, `extensions/chrome/` the unpacked extension, and `logs/` the logs.
 
-  Installers and updates never touch this folder. A move between paths renames files, never overwrites an existing one. The course-progress database is real user progress: never delete or reset it as a shortcut. Schema changes follow Part A's version-1 rule, and dropping data needs the owner's explicit approval.
+  Installers and updates never touch this folder. A move between paths renames files, never overwrites an existing one. These databases hold real user progress: never delete or reset them as a shortcut. Schema changes follow Part A's version-1 rule, and dropping data needs the owner's explicit approval.
 - **Answer banks:**
   - Files are named `name-ver-X.Y.json`, for example `sagarmeinyog-ver-1.0.json`, with plain-text `options` and `answer` values.
   - The project's source copy is in `private/answer-banks/`. The bundled copy in `shared/src/jvmMain/resources/answer-banks/` is refreshed from it, and `BundledAnswerBankTest` checks its question count and that every answer is one of its options.
