@@ -1,6 +1,6 @@
 # 26 — Resume Saved Sagar Mein Yog Progress
 
-[All guides](00_INDEX.md) · [Run settings and alerts](24_BROWSER_AND_ALERT_SETTINGS.md)
+[All guides](00_INDEX.md) · [Run settings and alerts](05_BROWSER_AND_ALERT_SETTINGS.md)
 
 ## Normal runs
 

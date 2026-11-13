@@ -17,6 +17,7 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | Fix "Error 1723" or "Smart App Control blocked an app" | [08 · Fix installer errors](08_FIX_WINDOWS_INSTALLER.md) |
 | Fix "already installed" | [08 · H5 Updating an installed copy](08_FIX_WINDOWS_INSTALLER.md#h5-updating-an-installed-copy) |
 | See why a one-command run stopped | [01 · When it stops](01_ONE_COMMAND_BUILDS.md#when-it-stops) |
+| Migrate a project to the CMP standard, or check how a project must be laid out | [29 · CMP project standard and migration](29_CMP_PROJECT_STANDARD_AND_MIGRATION.md) |
 | Debug the Windows app from the Mac | [04 · Debug from the Mac](04_DEBUG_WINDOWS_FROM_MAC.md) |
 | Look up a Git command, or fix a Git problem | [18 · Cheat sheet](18_GIT_GUIDE.md#16-cheat-sheet) · [Recipes](18_GIT_GUIDE.md#14-recipes-for-common-situations) · [Undoing things](18_GIT_GUIDE.md#7-undoing-things) |
 | A pull refused because of local changes | [18 · Recipe 14.7](18_GIT_GUIDE.md#147-a-build-machine-has-local-changes) |
@@ -57,6 +58,12 @@ Use `private/scripts/desktop.sh build server-vm-win` to build the server Windows
 | Server tests and earlier build results | [16_SERVER_BUILD_TESTS_AND_RESULTS.md](16_SERVER_BUILD_TESTS_AND_RESULTS.md) |
 | How SSH and its keys work | [17_UNDERSTAND_SSH_AND_KEYS.md](17_UNDERSTAND_SSH_AND_KEYS.md) |
 | **Git: how it works, every important command, recipes and a cheat sheet** | [18_GIT_GUIDE.md](18_GIT_GUIDE.md) |
+
+## 29 · Project standard
+
+| What | Guide |
+| --- | --- |
+| **The standard for every CMP project:** structure, packages, Gradle setup, the `private/` folder, the migration procedure, and a reusable prompt | [29_CMP_PROJECT_STANDARD_AND_MIGRATION.md](29_CMP_PROJECT_STANDARD_AND_MIGRATION.md) |
 
 ## 19–23, 28 · One-time machine setup
 

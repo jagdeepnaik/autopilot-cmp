@@ -5,6 +5,8 @@ This file has two parts:
 - **Part A — Core CMP instructions:** reusable coding preferences, project structure, and engineering guidelines applicable to all CMP projects using this template.
 - **Part B — Vaulty-specific instructions:** project conventions and constraints that supplement Part A.
 
+**Project standard:** every CMP project follows [the CMP project standard and migration guide](private/docs/29_CMP_PROJECT_STANDARD_AND_MIGRATION.md): module layout, package layout, Gradle setup, the `private/` folder, and the step-by-step migration with a reusable prompt.
+
 **Project guides:** start at [the documentation index](private/docs/00_INDEX.md). It lists every guide in `private/docs/` by how often it is used: one-command builds, installing, debugging, the home server, the Git guide and setup.
 
 All implementation plans, proposals, roadmaps, and project-specific planning decisions belong in `private/plans/`. Keep product requirements, phase tracking, and implementation status out of `AGENTS.md`.
@@ -53,8 +55,13 @@ The app is split the way the current Android Studio Compose Multiplatform templa
 
 ```text
 shared/                     # shared app and composition root (KMP library, all targets)
-  com.jagdeep.<app>/        # App.kt, app services, Platform*.kt actual factories, DesktopApp.kt
+  com.jagdeep.<app>/        # App.kt (all platforms); MainViewController.kt (iosMain)
+    di/                     # AppServices: app-scoped dependency wiring (composition root)
+    data/                   # app-level implementations
+    platform/               # each expect (Xxx.kt) with its actuals (Xxx.android/ios/jvm.kt); AndroidPlatform
     presentation/navigation/  # AppNavHost, decorated back stacks, transitions
+    presentation/shell/     # adaptive scaffold, desktop shell, sidebar
+    desktop/                # jvmMain only: runDesktopApp(), title bar, toolbar, window controls
 androidApp/                 # Android shell: MainActivity, MainApplication, manifest, res, signing
 desktopApp/                 # desktop shell: main(), MSI/DMG/DEB packaging, app-icons/
 iosApp/                     # Xcode project linking the Shared framework
@@ -71,7 +78,7 @@ core/persistence/           # preferences/, room/ (dao/, entity/, per-domain sto
 core/notifications/         # system notifications
 feature/shared/             # com.jagdeep.shared.<capability>: cross-feature contracts
 feature/<name>/             # one concrete feature each (layout below)
-private/                    # docs/, scripts/, plans/, data folders, misc/ (see "Private folder")
+private/                    # docs/, scripts/, reports/, data folders, plans/, signing/, secrets/, misc/ (see "Private folder")
 ```
 
 - New package layout inside a concrete feature is:
@@ -162,7 +169,7 @@ When creating a new project from this template, perform a targeted product clean
 - Database tests must verify DAO queries, constraints, transactions, schema generation, and migrations when migrations are approved. Keep schema exports versioned and review changes as source changes.
 - Add contract tests for every common interface with meaningful platform implementations. The same expectations must run against fakes and, where practical, JVM/Android/iOS implementations.
 - UI tests should verify observable user outcomes: screen state, enabled/disabled actions, empty/loading/error/success states, navigation, semantic labels, keyboard/focus behavior, and accessibility-relevant content. Do not make tests depend on incidental pixel positions, animation timing, or internal composable implementation details.
-- Use stable test data builders/fixtures and descriptive test names in the form “given condition, when action, then outcome.” Keep fixtures local to the module unless truly shared; never encode secrets, real user data, or machine-specific paths.
+- Use stable test data builders/fixtures and descriptive test names in the form “given condition, when action, then outcome.” Kotlin/Native rejects some characters in backtick names, so tests that also compile for iOS must not use `,` `.` `:` `/` `<` `>` `[` `]` or `;` in their names. Keep fixtures local to the module unless truly shared; never encode secrets, real user data, or machine-specific paths.
 - For asynchronous `Flow`/coroutine code, use coroutine test dispatchers and deterministic collection helpers. Ensure every launched test coroutine is completed/cancelled and every resource/socket/file is closed in test teardown.
 - Mark slow, platform-bound, benchmark, and end-to-end tests separately so normal local feedback remains fast. Benchmarks report measurements only; they must not be used to fabricate performance claims or fail unpredictably due to host load.
 - Each module should expose focused Gradle test tasks and keep them runnable independently. Before delivery, run the smallest relevant test set plus compilation for affected targets; before a release/major phase, run the full available test suite and record unavailable platform validation honestly.
@@ -199,16 +206,19 @@ When creating a new project from this template, perform a targeted product clean
 
 ```text
 private/
-  docs/        # tracked: numbered user guides; 00_INDEX.md lists them by how often they're used
-  scripts/     # tracked: build, install and debug scripts (desktop.sh on the Mac, windows/ for Windows)
-  plans/       # git-ignored: implementation plans, proposals, roadmaps, phase tracking
-  <data>/      # tracked: project data the app or build needs, one folder per kind (for example answer-banks/)
-  signing/     # git-ignored: release keys and keystore.properties material; never commit
-  secrets/     # git-ignored: secrets .env files; never commit
-  misc/        # git-ignored: anything temporary or unimportant
+  docs/          # tracked: numbered user guides; 00_INDEX.md lists them by how often they're used
+  scripts/       # tracked: build, install, debug, VM and Git helper scripts (desktop.sh on the Mac, windows/ for Windows)
+  reports/       # tracked: dated investigation and validation reports worth keeping (YYYY-MM-DD-topic.md)
+  <data>/        # tracked: project data the app or build needs, one folder per kind (for example answer-banks/)
+  plans/         # git-ignored: implementation plans, proposals, roadmaps, phase tracking
+  signing/       # git-ignored: release keys and keystore.properties material; never commit
+  secrets/       # git-ignored: .env files and other secrets; never commit
+  misc/          # git-ignored: anything temporary or unimportant
+  zynk-cmp-main/ # git-ignored: read-only reference copy of the template project
+  Test/          # git-ignored: read-only reference copy of the current Android Studio CMP template
 ```
 
-- **`misc/` is the default for anything temporary or unimportant:** backups, screenshots, captures, research notes, reports, scratch files, old copies and one-off helpers. It's git-ignored as a whole, so nothing in it reaches GitHub. Never make the build, the app or a tracked guide depend on a file in `misc/`; move the file to its proper folder first.
+- **`misc/` is the default for anything temporary or unimportant:** backups, screenshots, captures, research notes, throwaway reports, scratch files, old copies and one-off helpers. Reports worth keeping go in `reports/`. It's git-ignored as a whole, so nothing in it reaches GitHub. Never make the build, the app or a tracked guide depend on a file in `misc/`; move the file to its proper folder first.
 - `docs/`: number the guides `NN_TOPIC.md` by how often they're used, keep `00_INDEX.md` current, and update every link when renumbering. Link to a section with GitHub-style heading links (`[text](#heading-text)`, or `file.md#heading-text` for another guide): lowercase, punctuation dropped, spaces as hyphens. Keep a long guide in one file with an "On this page" list. In Android Studio, Cmd+Click a link in the editor to follow it; the Markdown preview follows `#` links only when the IDE runs on JetBrains Runtime with JCEF (see `private/docs/18_GIT_GUIDE.md`).
 - `scripts/` is tracked because the build machines pull it from Git and the build may run scripts from it. Reference scripts by their path under `private/scripts/` from Gradle, CI and the guides.
 - `plans/` follows the planning rule at the top of this file, and stays local.
