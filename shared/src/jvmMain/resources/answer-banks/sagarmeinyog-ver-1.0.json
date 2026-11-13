@@ -619,6 +619,36 @@
                 "Record the conversation for future revenge"
             ],
             "answer": "Pause, reflect on your reaction, and decide how to respond with calm"
+        },
+        {
+            "question": "What is the benefit of using guided questions like “What’s the worst thought you could have?” and reframing it?",
+            "options": [
+                "It helps justify poor performance.",
+                "It trains you to ignore criticism",
+                "It helps break negative thought patterns and builds perspective.",
+                "It increases stress to boost productivity."
+            ],
+            "answer": "It helps break negative thought patterns and builds perspective."
+        },
+        {
+            "question": "What does the “Anger GPS” tool help seafarers recognize?",
+            "options": [
+                "The cause of GPS malfunctions",
+                "Fastest way to solve shipboard arguments",
+                "Three paths: aggressive, passive, and assertive responses to triggers",
+                "Crew ranking in handling conflict"
+            ],
+            "answer": "Three paths: aggressive, passive, and assertive responses to triggers"
+        },
+        {
+            "question": "During role-play, a new crewmember cries after a family video call. How should you respond?",
+            "options": [
+                "Pretend you didn’t notice to avoid awkwardness.",
+                "Tell them to toughen up for sea life.",
+                "Offer quiet support and ask if they want to talk",
+                "Report them as emotionally unfit."
+            ],
+            "answer": "Offer quiet support and ask if they want to talk"
         }
     ],
     "Economic Wellness": [
@@ -1241,6 +1271,26 @@
                 "Manage shipping stock licenses"
             ],
             "answer": "Print currency and regulate forex reserves"
+        },
+        {
+            "question": "What does a balance sheet primarily show?",
+            "options": [
+                "Daily cash flow records",
+                "Total income & expenses of the year",
+                "Assets, liabilities, & equity at a given point in time",
+                "Only fixed assets & profits"
+            ],
+            "answer": "Assets, liabilities, & equity at a given point in time"
+        },
+        {
+            "question": "What makes budgeting especially relevant for merchant navy professionals?",
+            "options": [
+                "They often receive variable or unpredictable incomes",
+                "Their contracts include free investment advice",
+                "They are not required to file taxes",
+                "They can only invest while at sea"
+            ],
+            "answer": "They often receive variable or unpredictable incomes"
         }
     ],
     "Physical Wellness": [
@@ -2073,6 +2123,46 @@
                 "Supports overall recovery"
             ],
             "answer": "Triggers anxiety"
+        },
+        {
+            "question": "A practical way for crew members to meet their daily micronutrient needs is:",
+            "options": [
+                "Eat only packaged food.",
+                "Focus on beige & white-colored foods.",
+                "Drink energy drinks daily",
+                "Eat a variety of colorful whole foods."
+            ],
+            "answer": "Eat a variety of colorful whole foods."
+        },
+        {
+            "question": "One key disadvantage of over-relying on multivitamins is:",
+            "options": [
+                "They are too expensive to use on ships.",
+                "They cannot be stored without refrigeration.",
+                "It may lead to neglecting a balanced diet & whole food.",
+                "They completely replace all nutrient needs."
+            ],
+            "answer": "It may lead to neglecting a balanced diet & whole food."
+        },
+        {
+            "question": "Why are proteins especially important for seafarers?",
+            "options": [
+                "They help regulate heartbeat",
+                "They support tissue repair and immune function",
+                "They provide fiber",
+                "They boost sugar levels"
+            ],
+            "answer": "They support tissue repair and immune function"
+        },
+        {
+            "question": "What is the goal of a cooldown routine after exercise?",
+            "options": [
+                "Boost heart rate",
+                "Calm the body and ease recovery to resting state",
+                "Build more calories",
+                "Increase appetite"
+            ],
+            "answer": "Calm the body and ease recovery to resting state"
         }
     ],
     "Occupational Wellness": [
@@ -2705,6 +2795,16 @@
                 "Organizing leisure activities"
             ],
             "answer": "Managing frustrations & adapting to seafaring realities"
+        },
+        {
+            "question": "What is the key message?",
+            "options": [
+                "“Push harder, finish first”.",
+                "“Career is about luck, not planning”.",
+                "“Your career is a voyage, not a race. Adjust your sails, but never lose sight of the horizon”.",
+                "“Every voyage should be about promotions."
+            ],
+            "answer": "“Your career is a voyage, not a race. Adjust your sails, but never lose sight of the horizon”."
         }
     ],
     "Social Wellness": [
@@ -3477,6 +3577,46 @@
                 "Checking emails during breaks"
             ],
             "answer": "Coffee & conversations with a crewmate"
+        },
+        {
+            "question": "Which of these is an example of a warning level trauma signal?",
+            "options": [
+                "Temporary sadness",
+                "Flashbacks",
+                "Irritability",
+                "Calmness"
+            ],
+            "answer": "Flashbacks"
+        },
+        {
+            "question": "How can music help reduce loneliness at sea?",
+            "options": [
+                "By distracting from work duties",
+                "By creating a shared atmosphere or lifting mood",
+                "By replacing crew meetings",
+                "By blocking emergency alarms"
+            ],
+            "answer": "By creating a shared atmosphere or lifting mood"
+        },
+        {
+            "question": "What is the recommended way to handle notifications in the ‘great notification detox’ ?",
+            "options": [
+                "Ignore them all day",
+                "Turn off non-essential notifications and check messages at set times",
+                "Keep your phone on silent mode permanently",
+                "Respond to all notifications immediately"
+            ],
+            "answer": "Turn off non-essential notifications and check messages at set times"
+        },
+        {
+            "question": "What is the main message about digital detox?",
+            "options": [
+                "It means cutting off all contact with family & friends",
+                "It’s about protecting your mental space & connecting from a place of strength",
+                "It’s abouts pending more time on social media",
+                "It’s only about reducing screen brightness"
+            ],
+            "answer": "It’s about protecting your mental space & connecting from a place of strength"
         }
     ],
     "Environmental Wellness": [
@@ -4139,6 +4279,26 @@
                 "They absorb all noise"
             ],
             "answer": "They enhance mood and offer a sense of calm"
+        },
+        {
+            "question": "What message does the term “Clean corners, calm minds” convey?",
+            "options": [
+                "All corners should be left untouched",
+                "Organization and cleanliness support mental well-being",
+                "Cleaning is only the steward’s job",
+                "Corners should be decorated"
+            ],
+            "answer": "Organization and cleanliness support mental well-being"
+        },
+        {
+            "question": "What is the purpose of the “Wellness Notice Board” onboard?",
+            "options": [
+                "Post technical notices only",
+                "Highlight positive practices and reminders for healthy environments",
+                "Display rank hierarchy",
+                "Track meal menus"
+            ],
+            "answer": "Highlight positive practices and reminders for healthy environments"
         }
     ],
     "Climatic Wellness": [
@@ -4741,6 +4901,66 @@
                 "Improve morale"
             ],
             "answer": "Cause accidents due to poor visibility and slippery surfaces"
+        },
+        {
+            "question": "Which of the following is a scientifically recognized sign of climate change in oceans?",
+            "options": [
+                "Increase in the number of cruises ships",
+                "Boost in beach tourism",
+                "Warmer ocean water and rising acidity",
+                "Rise in underwater photography activities"
+            ],
+            "answer": "Warmer ocean water and rising acidity"
+        },
+        {
+            "question": "Which is a true benefit of adopting sustainable practices on board?",
+            "options": [
+                "They reduce the need for safety drills.",
+                "They help avoid crew rotation.",
+                "They improve emotional well-being and foster pride.",
+                "They eliminate all technical maintenance needs."
+            ],
+            "answer": "They improve emotional well-being and foster pride."
+        },
+        {
+            "question": "Which of the following choices reflects the ripple effect described in System Theory?",
+            "options": [
+                "Isolated weather changes that don’t spread",
+                "A pollution event in one region causing changes across oceans",
+                "A broken system having no global impact",
+                "A ship malfunction limited to onboard crew only"
+            ],
+            "answer": "A pollution event in one region causing changes across oceans"
+        },
+        {
+            "question": "How can seafarers improve sleep when transitioning climates?",
+            "options": [
+                "Block out light entirely with heavy curtains",
+                "Avoid exercise and eat late at night",
+                "Create a sleep-friendly space and adjust rest hours",
+                "Skip rest and work extra hours"
+            ],
+            "answer": "Create a sleep-friendly space and adjust rest hours"
+        },
+        {
+            "question": "What is a physical risk associated with prolonged cold weather on board?",
+            "options": [
+                "Heatstroke",
+                "Hypothermia and reduced blood circulation",
+                "Improved digestion",
+                "Increased metabolism"
+            ],
+            "answer": "Hypothermia and reduced blood circulation"
+        },
+        {
+            "question": "During a 5-minute mindful breathing activity, which of the following is the correct breathing sequence",
+            "options": [
+                "Breathe in quickly, hold for 10 seconds, then exhale through your nose.",
+                "Take random breaths while focusing on thoughts.",
+                "Exhale first, then hold your breath as long as possible",
+                "Breath in slowly through your nose, hold gently, exhale slowly through mouth, pause."
+            ],
+            "answer": "Breath in slowly through your nose, hold gently, exhale slowly through mouth, pause."
         }
     ],
     "Intellectual Wellness": [
@@ -5393,6 +5613,36 @@
                 "Poor signal reception"
             ],
             "answer": "Cultural differences"
+        },
+        {
+            "question": "What cognitive function does visualization specifically support?",
+            "options": [
+                "Motor memory and focus",
+                "Sleep deprivation",
+                "Emotional detachment",
+                "Physical reflexes"
+            ],
+            "answer": "Motor memory and focus"
+        },
+        {
+            "question": "What is the first stage in information processing?",
+            "options": [
+                "Retrieval",
+                "Encoding",
+                "Transformation",
+                "Storage"
+            ],
+            "answer": "Encoding"
+        },
+        {
+            "question": "Which of these is a mindfulness technique?",
+            "options": [
+                "Overthinking",
+                "Visualization",
+                "Sleep deprivation",
+                "Time management"
+            ],
+            "answer": "Visualization"
         }
     ],
     "Cultural Wellness": [
@@ -6647,6 +6897,16 @@
                 "“May the whole world live in happiness.”"
             ],
             "answer": "“Peace lies within only the self.”"
+        },
+        {
+            "question": "What is the main benefit of the Apana Mudra?",
+            "options": [
+                "Increases aggression.",
+                "Improves balance.",
+                "Boots memory",
+                "Helps with detoxification & elimination"
+            ],
+            "answer": "Helps with detoxification & elimination"
         }
     ]
 }
