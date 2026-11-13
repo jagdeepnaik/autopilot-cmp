@@ -43,7 +43,7 @@ class HomeViewModelsTest {
     )
 
     @Test
-    fun `given routines not yet read when shown then it is loading, and then shows the selection`() = test {
+    fun `given routines not yet read when shown then it is loading and then shows the selection`() = test {
         val loading = HomeViewModel(controller(FakeRoutineRepository(null)), FakeRoutineRepository(null))
         runCurrent()
         assertTrue(loading.state.value.isLoading)
@@ -79,7 +79,7 @@ class HomeViewModelsTest {
     }
 
     @Test
-    fun `given a deletion request when cancelled it stays, and when confirmed it goes`() = test {
+    fun `given a deletion request when cancelled it stays and when confirmed it goes`() = test {
         val repository = FakeRoutineRepository(RoutineLibrary(listOf(first, second), "a"))
         val viewModel = HomeViewModel(controller(repository), repository)
         runCurrent()
@@ -149,7 +149,7 @@ class HomeViewModelsTest {
     }
 
     @Test
-    fun `given invalid values when saved then errors show, nothing is saved, and editing clears them`() = test {
+    fun `given invalid values when saved then errors show nothing is saved and editing clears them`() = test {
         val repository = FakeRoutineRepository(RoutineLibrary())
         val viewModel = editor(repository)
         runCurrent()
@@ -191,7 +191,7 @@ class HomeViewModelsTest {
     }
 
     @Test
-    fun `given a new scroll and click routine when steps are picked then each is added, the first clicking at once`() = test {
+    fun `given a new scroll and click routine when steps are picked then each is added the first clicking at once`() = test {
         val repository = FakeRoutineRepository(RoutineLibrary())
         val viewModel = RoutineEditorViewModel(null, controller(repository), repository, newId = { "new-id" }, newKind = RoutineKind.ScrollClick)
         runCurrent()
@@ -249,7 +249,7 @@ class HomeViewModelsTest {
     }
 
     @Test
-    fun `given points when moved up or down then they swap, and the ends don't move further`() = test {
+    fun `given points when moved up or down then they swap and the ends don't move further`() = test {
         val viewModel = editor(FakeRoutineRepository(RoutineLibrary()))
         runCurrent()
         viewModel.updateDraft { it.copy(points = listOf(PointDraft("1", "1"), PointDraft("2", "2"), PointDraft("3", "3"))) }

@@ -86,7 +86,7 @@ class ResumeNegotiatorTest {
 
 class ProgressPublishingTest {
     @Test
-    fun `given rapid progress when publishing then only the first, interval-spaced and final updates pass`() {
+    fun `given rapid progress when publishing then only the first interval-spaced and final updates pass`() {
         val total = 1_000L
         kotlin.test.assertTrue(shouldPublishProgress(null, TransferProgress(16, total, 0)))
         kotlin.test.assertFalse(shouldPublishProgress(0, TransferProgress(32, total, 40)))

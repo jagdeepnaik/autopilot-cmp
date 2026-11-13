@@ -19,7 +19,7 @@ class MemoryLiveLogTest {
     }
 
     @Test
-    fun `given recording when more than fits arrives then only the newest are kept, in order, with rising ids`() {
+    fun `given recording when more than fits arrives then only the newest are kept in order with rising ids`() {
         log.recording = true
         listOf("a", "b", "c", "d").forEach { log.add(LiveSource.Chrome, it) }
         assertEquals(listOf("b", "c", "d"), log.entries.value.map { it.text })

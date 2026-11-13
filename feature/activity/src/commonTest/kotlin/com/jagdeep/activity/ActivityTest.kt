@@ -68,7 +68,7 @@ class ActivityTest {
     }
 
     @Test
-    fun `given runs when clearing is cancelled they stay, and when confirmed they go`() = test {
+    fun `given runs when clearing is cancelled they stay and when confirmed they go`() = test {
         val store = PreferencesRunHistoryStore(InMemoryPreferencesStore(""))
         store.add(record("a"))
         val viewModel = ActivityViewModel(store, now = { 0 })
@@ -108,7 +108,7 @@ class ActivityTest {
     }
 
     @Test
-    fun `given developer mode when off then only runs show, and when on the live log follows, pauses and clears`() = test {
+    fun `given developer mode when off then only runs show and when on the live log follows pauses and clears`() = test {
         val live = object : com.jagdeep.shared.live.LiveLog {
             override val entries = kotlinx.coroutines.flow.MutableStateFlow<List<com.jagdeep.shared.live.LiveEntry>>(emptyList())
             override val isRecording = true

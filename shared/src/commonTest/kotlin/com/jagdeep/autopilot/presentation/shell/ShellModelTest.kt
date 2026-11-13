@@ -111,7 +111,7 @@ class ShellModelTest {
     }
 
     @Test
-    fun `given a next click time when counted down then it reads in tenths, then minutes`() {
+    fun `given a next click time when counted down then it reads in tenths then minutes`() {
         assertEquals("next click in 1.5 s", nextClickLabel(2_500, 1_000))
         assertEquals("next click in 0.1 s", nextClickLabel(1_001, 1_000))
         assertEquals("next click in 0.0 s", nextClickLabel(900, 1_000))

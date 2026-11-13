@@ -360,6 +360,7 @@ Commit the restructure, the package grouping and unrelated fixes **separately**.
 | `expect`/`actual` split across packages | *"expect declaration has no actual"* | Move each set of files together |
 | Names inside string templates and fully qualified references | Unresolved references in tests after a package move | Add the import, or fix the qualified name |
 | Comma or period in a backtick test name | Kotlin/Native test compile: *"Name contains illegal characters"* | Avoid `,` `.` `:` `/` `<` `>` `[` `]` `;` in test names that also compile for iOS |
+| `@Ignore("reason")` in common tests | Kotlin/Native test compile: *"Too many arguments for 'constructor(): Ignore'"* | `// Ignored: reason` above a bare `@Ignore` |
 | `:shared` and `:feature:shared` | Both desktop jars start with `shared-jvm` | Harmless: Compose adds a hash suffix |
 | Android context reached through `MainApplication` | `shared` can't see `androidApp` classes | Hold the context in `AndroidPlatform` in `shared` |
 | `desktop.sh` refuses to run | *"the Mac has uncommitted changes"* while `private/Test` is untracked | Ignore reference copies in `.gitignore` |
@@ -411,6 +412,6 @@ Keep the private/ folder layout from section 5 and update AGENTS.md to match.
 | JVM tests | 113 suites, 568 tests, 13 skipped, 1 failure (answer-bank count) | 113 suites, 568 tests, 13 skipped, 0 failures |
 | Module boundaries | Pass | Pass |
 | Android debug APK | Same identity | `com.jagdeep.autopilot`, label, icon, `MainApplication`, `MainActivity`, 1.0.0 (1): unchanged |
-| iOS | Didn't compile (2 errors, fixed separately) | Framework links; Xcode BUILD SUCCEEDED |
+| iOS | Didn't compile (2 errors, fixed separately) | Framework links; Xcode BUILD SUCCEEDED; iOS tests: 366 run, 11 skipped, 0 failures (after renaming 24 comma test names and 11 `@Ignore` reasons) |
 | macOS app | 239 files, version 1.0.69 | Same files and launcher; window opens, no errors |
 | Windows (Legion) | 1.0.61 installed | 1.0.71 built from Git, updated in place, JVM loaded, 0 Smart App Control blocks |

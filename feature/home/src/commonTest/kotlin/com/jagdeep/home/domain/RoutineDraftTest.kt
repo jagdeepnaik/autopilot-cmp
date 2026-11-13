@@ -37,7 +37,7 @@ class RoutineDraftTest {
     }
 
     @Test
-    fun `given a step's wait in a unit when read then it's in milliseconds, decimals included`() {
+    fun `given a step's wait in a unit when read then it's in milliseconds decimals included`() {
         assertEquals(1_500L, PointDraft(delay = "1.5", delayUnit = IntervalUnit.Seconds).delayMillis)
         assertEquals(120_000L, PointDraft(delay = "2", delayUnit = IntervalUnit.Minutes).delayMillis)
         assertEquals(250L, PointDraft(delay = "250", delayUnit = IntervalUnit.Milliseconds).delayMillis)

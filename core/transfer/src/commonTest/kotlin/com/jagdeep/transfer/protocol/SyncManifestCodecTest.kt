@@ -10,7 +10,7 @@ class SyncManifestCodecTest {
     private val entry = TransferManifestEntry("a.txt", 3, "a".repeat(64))
 
     @Test
-    fun `given an ordinary transfer when encoded then it carries no sync field, so older peers still accept it`() {
+    fun `given an ordinary transfer when encoded then it carries no sync field so older peers still accept it`() {
         val bytes = ControlMessageCodec.encode(ControlMessage.TransferRequest(TransferProtocol.CURRENT_VERSION, "r1", TransferManifest("t1", listOf(entry))))
         assertFalse("sync" in bytes.decodeToString())
     }
@@ -24,7 +24,7 @@ class SyncManifestCodecTest {
     }
 
     @Test
-    fun `given a Mirror sync that only removes files when built then an empty file list is allowed, but not for ordinary transfers`() {
+    fun `given a Mirror sync that only removes files when built then an empty file list is allowed but not for ordinary transfers`() {
         TransferManifest("t1", emptyList(), SyncTarget("pair-1", "Photos", listOf("gone.txt")))
         assertFailsWith<IllegalArgumentException> { TransferManifest("t1", emptyList()) }
     }

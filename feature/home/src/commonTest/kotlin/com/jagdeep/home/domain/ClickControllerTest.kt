@@ -41,7 +41,7 @@ class ClickControllerTest {
     }
 
     @Test
-    fun `given a Chrome routine when started then it's handed to the page runner, not clicked here`() = runTest {
+    fun `given a Chrome routine when started then it's handed to the page runner not clicked here`() = runTest {
         val page = FakePageRunner()
         val controller = controllerWithPage(page)
         controller.start(helper)
@@ -274,7 +274,7 @@ class ClickControllerTest {
     }
 
     @Test
-    fun `given the capture key when idle then it records the pointer, and during a run it doesn't`() = runTest {
+    fun `given the capture key when idle then it records the pointer and during a run it doesn't`() = runTest {
         val controller = controller()
         val captured = mutableListOf<ScreenPoint>()
         backgroundScope.launch { controller.captures.collect { captured += it } }

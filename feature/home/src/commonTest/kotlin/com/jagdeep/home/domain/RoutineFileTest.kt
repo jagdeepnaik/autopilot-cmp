@@ -101,7 +101,7 @@ class RoutineFileTest {
     }
 
     @Test
-    fun `given routines when one is exported then the file holds just it, named after it`() = test {
+    fun `given routines when one is exported then the file holds just it named after it`() = test {
         val files = FakeFiles()
         val viewModel = viewModel(FakeRoutineRepository(RoutineLibrary(every)), files)
         runCurrent()
@@ -113,7 +113,7 @@ class RoutineFileTest {
     }
 
     @Test
-    fun `given a routine file when imported then its routines join the user's own under new ids, and the first is selected`() = test {
+    fun `given a routine file when imported then its routines join the user's own under new ids and the first is selected`() = test {
         val own = ClickRoutine("mine", "Mine")
         val repository = FakeRoutineRepository(RoutineLibrary(listOf(own), "mine"))
         val viewModel = viewModel(repository, FakeFiles(toOpen = RoutineFileCodec.encode(every.take(2))))

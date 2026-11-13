@@ -40,7 +40,7 @@ class TransferAutoAcceptTest {
     }
 
     @Test
-    fun `given a failing policy when a request arrives then it falls back to asking, never accepting`() = runTest {
+    fun `given a failing policy when a request arrives then it falls back to asking never accepting`() = runTest {
         val coordinator = TransferApprovalCoordinator(autoAccept = { error("storage unavailable") })
         val decision = async { coordinator.awaitDecision(request) }
         kotlinx.coroutines.yield()

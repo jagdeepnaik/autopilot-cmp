@@ -118,7 +118,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `given developer mode when switched on then it's saved, and it starts off`() = test {
+    fun `given developer mode when switched on then it's saved and it starts off`() = test {
         val viewModel = SettingsViewModel(store, FakeGate())
         advanceUntilIdle()
         assertFalse(viewModel.state.value.preferences.developerMode)

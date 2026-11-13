@@ -41,7 +41,7 @@ class AppWiringTest {
     }
 
     @Test
-    fun `given the display setting when something runs then the display stays on, and otherwise it sleeps as usual`() {
+    fun `given the display setting when something runs then the display stays on and otherwise it sleeps as usual`() {
         assertTrue(shouldKeepDisplayAwake(enabled = true, routineActive = true, pageHelperActive = false))
         assertTrue(shouldKeepDisplayAwake(enabled = true, routineActive = false, pageHelperActive = true))
         assertFalse(shouldKeepDisplayAwake(enabled = true, routineActive = false, pageHelperActive = false), "Idle")

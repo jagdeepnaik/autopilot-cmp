@@ -35,7 +35,8 @@ private val SPOT = ScreenPoint(640, 880)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PageControllerTest {
-    @Ignore("Website progress verification was intentionally removed; local records are authoritative.")
+    // Ignored: Website progress verification was intentionally removed; local records are authoritative.
+    @Ignore
     @Test fun `final completion waits for its database save and then verifies website history`() = runTest {
         val localBridge=FakeBridge()
         val saveGate=kotlinx.coroutines.CompletableDeferred<Unit>()
@@ -242,7 +243,8 @@ class PageControllerTest {
 
     private fun lastCommand() = json.decodeFromString(HelperCommand.serializer(), bridge.published.last())
 
-    @Ignore("Website progress verification was intentionally removed; local records are authoritative.")
+    // Ignored: Website progress verification was intentionally removed; local records are authoritative.
+    @Ignore
     @Test
     fun `given a completed module then save it locally before selecting another course without another scan`() = runTest {
         var imports = 0
@@ -345,7 +347,8 @@ class PageControllerTest {
         assertNull(lastCommand().courseAutomation)
     }
 
-    @Ignore("Website progress verification was intentionally removed; local records are authoritative.")
+    // Ignored: Website progress verification was intentionally removed; local records are authoritative.
+    @Ignore
     @Test fun `every start verifies website history even when selected profile was previously checked`() = runTest {
         val localBridge=FakeBridge()
         val account=com.jagdeep.persistence.room.learning.LearningAccount("sagarmeinyog:user","User",999)
@@ -757,7 +760,7 @@ class PageControllerTest {
     }
 
     @Test
-    fun `given a run when started then it scrolls and tells the extension, and doesn't click before the bottom`() = runTest {
+    fun `given a run when started then it scrolls and tells the extension and doesn't click before the bottom`() = runTest {
         val controller = startedRun()
         assertTrue(lastCommand().scrolling)
         assertTrue(lastCommand().autoRun)
@@ -801,7 +804,7 @@ class PageControllerTest {
     }
 
     @Test
-    fun `given several steps when the bottom is reached then they're clicked in order, each after its wait and with its button`() = runTest {
+    fun `given several steps when the bottom is reached then they're clicked in order each after its wait and with its button`() = runTest {
         val routine = ScrollClickRoutine(
             "s", "Next pages", rounds = 1,
             points = listOf(
@@ -901,7 +904,7 @@ class PageControllerTest {
     }
 
     @Test
-    fun `given another app in front when at the bottom then it never clicks, and goes on when Chrome returns`() = runTest {
+    fun `given another app in front when at the bottom then it never clicks and goes on when Chrome returns`() = runTest {
         val controller = startedRun()
         page(atBottom = true, focused = false)
         advanceTimeBy(60_000)
@@ -959,7 +962,7 @@ class PageControllerTest {
     }
 
     @Test
-    fun `given a run when asked to stop then it reports there was one, and afterwards that there isn't`() = runTest {
+    fun `given a run when asked to stop then it reports there was one and afterwards that there isn't`() = runTest {
         val controller = startedRun()
         assertTrue(controller.stop())
         runCurrent()
