@@ -32,4 +32,6 @@ keystore.properties
 *.keystore
 # Read-only reference copy of the template
 /private/zynk-cmp-main/
+# Read-only reference copy of the current Android Studio CMP template
+/private/Test/
 /private/secrets/
