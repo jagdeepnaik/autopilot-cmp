@@ -410,8 +410,10 @@ private/scripts/desktop.sh debug mac-vm-linux
 ```
 
 The command runs `:composeApp:run --debug-jvm`, forwards port 5005 to the Mac, and keeps the SSH
-session open until `Control-C`. Install uses `sudo apt-get` inside the VM and may request the
-Linux user's sudo password unless sudo is configured for unattended package installation.
+session open until `Control-C`. Installation uses `sudo apt-get` through an interactive SSH
+terminal. When you run `run mac-vm-linux`, type the Linux user's sudo password when prompted; the
+password is not captured or passed through the Mac. If unattended installs are required, configure
+a narrowly scoped sudo rule inside the VM, never a password in this project or a script.
 
 Build macOS, Windows, and Linux from one Mac command:
 

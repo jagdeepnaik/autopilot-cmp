@@ -271,7 +271,8 @@ local_linux_install() {
     deb=$(ssh "$MAC_LINUX_HOST" "find '$MAC_LINUX_DIR/composeApp/build/compose/binaries/main-release/deb' -maxdepth 1 -type f -name '*.deb' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-" | tr -d '\r') \
         || fail "couldn't find the Mac Linux VM DEB. Build it first."
     [ -n "$deb" ] || fail "no DEB found on the Mac Linux VM. Build it first."
-    ssh "$MAC_LINUX_HOST" "sudo apt-get install -y '$deb'" \
+    # Allocate a terminal so sudo can prompt the Linux VM user for its password.
+    ssh -tt "$MAC_LINUX_HOST" "sudo apt-get install -y '$deb'" \
         || fail "the Mac Linux VM DEB install failed (see above)."
     echo "Installed $deb on the Mac Linux VM."
 }
