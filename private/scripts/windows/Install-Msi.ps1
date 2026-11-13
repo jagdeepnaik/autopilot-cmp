@@ -59,10 +59,13 @@ Write-Output "javaw.exe signature: $signature"
 $shell = New-Object -ComObject WScript.Shell
 $shortcuts = @("$env:PUBLIC\Desktop\AutoPilot.lnk", "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\AutoPilot\AutoPilot.lnk")
 $problems = @()
+$launchArguments = $null
 foreach ($shortcut in $shortcuts) {
-    $target = if (Test-Path $shortcut) { $shell.CreateShortcut($shortcut).TargetPath } else { 'missing' }
+    $shortcutObject = if (Test-Path $shortcut) { $shell.CreateShortcut($shortcut) } else { $null }
+    $target = if ($shortcutObject) { $shortcutObject.TargetPath } else { 'missing' }
     Write-Output "Shortcut $shortcut -> $target"
     if ($target -ne $javaw) { $problems += "$shortcut doesn't start the signed javaw.exe" }
+    if (-not $launchArguments -and $shortcutObject) { $launchArguments = $shortcutObject.Arguments }
 }
 if ($signature -ne 'Valid') { $problems += 'javaw.exe is missing or not validly signed' }
 $unsigned = @(Get-ChildItem (Join-Path $installDir 'runtime\bin') -Recurse -Include *.dll, *.exe | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' })
@@ -70,15 +73,28 @@ Write-Output "Unsigned files in the bundled runtime: $($unsigned.Count)"
 $unsigned | ForEach-Object { Write-Output ('  ' + $_.FullName.Substring($installDir.Length + 1)) }
 
 if ($LaunchCheck) {
-    # Runs in this session, so no window appears on the desktop.
-    Start-Process $shortcuts[0]
-    Start-Sleep 15
-    $app = @(Get-Process javaw -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $javaw })
-    # javaw.exe stays open while it shows a "can't load jvm.dll" error, so check the JVM really loaded.
-    $jvmLoaded = @($app | Where-Object { $_.Modules.ModuleName -contains 'jvm.dll' }).Count -gt 0
-    Write-Output "Running 15 s after opening the shortcut: $($app.Count -gt 0); Java VM loaded: $jvmLoaded"
-    if (-not $jvmLoaded) { $problems += 'The app did not start: its Java VM was not loaded 15 s after opening the shortcut' }
-    $app | Stop-Process
+    # An SSH service session is non-interactive. Launching the shortcut directly there can put the
+    # GUI process in session 0, so it never appears on the signed-in desktop. Use a temporary task
+    # with an interactive principal to exercise the same javaw.exe and shortcut arguments there.
+    $checkTask = "AutoPilot-InstallCheck-$PID"
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $app = @()
+    try {
+        if (-not $launchArguments) { throw 'The desktop shortcut has no launch arguments.' }
+        $action = New-ScheduledTaskAction -Execute $javaw -Argument $launchArguments -WorkingDirectory $installDir
+        $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
+        Register-ScheduledTask -TaskName $checkTask -Action $action -Principal $principal -Force | Out-Null
+        Start-ScheduledTask -TaskName $checkTask
+        Start-Sleep 15
+        $app = @(Get-Process javaw -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $javaw })
+        # javaw.exe stays open while it shows a "can't load jvm.dll" error, so check the JVM really loaded.
+        $jvmLoaded = @($app | Where-Object { $_.Modules.ModuleName -contains 'jvm.dll' }).Count -gt 0
+        Write-Output "Running 15 s after opening the shortcut in the interactive desktop: $($app.Count -gt 0); Java VM loaded: $jvmLoaded"
+        if (-not $jvmLoaded) { $problems += 'The app did not start: its Java VM was not loaded 15 s after opening the shortcut' }
+    } finally {
+        $app | Stop-Process -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName $checkTask -Confirm:$false -ErrorAction SilentlyContinue
+    }
 }
 
 $blocks = @(Get-WinEvent -LogName 'Microsoft-Windows-CodeIntegrity/Operational' -MaxEvents 100 -ErrorAction SilentlyContinue |
