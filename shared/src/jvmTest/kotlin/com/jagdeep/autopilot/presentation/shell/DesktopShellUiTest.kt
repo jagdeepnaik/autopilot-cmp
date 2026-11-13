@@ -96,8 +96,8 @@ class DesktopShellUiTest {
                     onNavigate = {}, now = { 0L }, appVersion = "1.0.0",
                     toolbarStartInset = 0.dp, toolbarHeight = 38.dp, toolbarDragArea = { it() },
                     topBar = { com.jagdeep.ui.components.AppBarTop("Home", RouteTopLevel.Home, {}, {}, {}) },
-                    windowControls = { com.jagdeep.autopilot.WindowsWindowControls(false, {}, {}, {}) },
-                    windowIdentity = { com.jagdeep.autopilot.WindowsWindowIdentity() },
+                    windowControls = { com.jagdeep.autopilot.desktop.WindowsWindowControls(false, {}, {}, {}) },
+                    windowIdentity = { com.jagdeep.autopilot.desktop.WindowsWindowIdentity() },
                 ) { Text("Page content") }
             }
         }

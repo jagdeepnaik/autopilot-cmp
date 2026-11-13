@@ -10,7 +10,7 @@ import com.jagdeep.automation.InputAccessGate
 import com.jagdeep.home.domain.ClickController
 import com.jagdeep.home.domain.RoutineRepository
 import com.jagdeep.home.ui.navigation.homeEntryProvider
-import com.jagdeep.autopilot.installBrowserExtension
+import com.jagdeep.autopilot.platform.installBrowserExtension
 import com.jagdeep.persistence.preferences.PreferencesStore
 import com.jagdeep.settings.ui.navigation.settingsEntryProvider
 import com.jagdeep.shared.history.RunHistoryStore
