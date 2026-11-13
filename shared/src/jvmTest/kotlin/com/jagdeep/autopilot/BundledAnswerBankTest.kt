@@ -13,7 +13,7 @@ class BundledAnswerBankTest {
         assertNotNull(CourseAnswerBank.decode(text), "The production parser must accept the bundled bank")
         val modules = Json.decodeFromString<Map<String, List<CourseAnswer>>>(text)
         assertEquals(10, modules.size)
-        assertEquals(637, modules.values.sumOf { it.size })
+        assertEquals(663, modules.values.sumOf { it.size })
         modules.forEach { (module, questions) ->
             questions.forEach { question ->
                 assertFalse(question.answer.isNullOrBlank(), "$module: missing saved answer")
