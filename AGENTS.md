@@ -290,7 +290,9 @@ private/
 
 ## Desktop distribution
 
-- The desktop version is `<major>.<minor>.<commit count>`, computed once in the root `build.gradle.kts`, so each commit's MSI upgrades the installed app in place.
+- Versioning follows Semantic Versioning plus build identity. `gradle/libs.versions.toml` stores the release version as `MAJOR.MINOR.PATCH` (for example `1.1.0`). The root `build.gradle.kts` adds `+build.<git commit count>.g<short commit SHA>` for desktop runtime display, producing values such as `1.1.0+build.105.ga542753`. The build number identifies the build sequence; the commit SHA identifies the exact source commit.
+- Installer metadata is separate and numeric because MSI/DMG/DEB packaging cannot use SemVer build metadata. It is generated as `<major>.<minor>.<build number>` (for example `1.1.105`) so Windows can detect a newer MSI and upgrade in place. The app About screen and status bar use the full release/build/commit value.
+- Building the same Git commit twice must produce the same version identity. Never build remote machines from uncommitted or copied source; push the Mac commit, pull it on the target, then build.
 - Keep these unchanged, or installed apps stop updating in place: the MSI `upgradeUuid` (`bcdbe1a6-ef5a-4214-a3b6-021a08293966`), `packageName` `AutoPilot`, and the macOS `bundleID` `com.jagdeep.autopilot`.
 - Keep the Windows Smart App Control fixes in `desktopApp/build.gradle.kts`, until a trusted code-signing certificate is in place:
   - the runtime image's native files replaced with the JDK's signed copies
