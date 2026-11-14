@@ -67,7 +67,22 @@ Expected output includes the Legion computer name and a user such as `desktop-v9
 
 ## Use the routed Legion connection
 
-Open a shell:
+From the Mac Terminal, connect directly to an interactive PowerShell session:
+
+```sh
+ssh -tt home-legion-via-server powershell -NoLogo -NoProfile
+```
+
+The prompt should be similar to:
+
+```text
+PS C:\Users\jagde>
+```
+
+Use `home-legion-via-server` for this route. The existing `home-legion` alias is the direct-LAN
+connection and does not use Cloudflare.
+
+Open a normal remote shell:
 
 ```sh
 ssh home-legion-via-server
@@ -88,6 +103,16 @@ scp ./file.txt home-legion-via-server:'C:/Users/jagde/Downloads/file.txt'
 The existing `home-legion` alias remains the direct-LAN route. Use `home-legion-via-server` only
 when direct access is unavailable. This route does not require a private key on the home server;
 the Mac's key is used for the final Legion connection through SSH forwarding.
+
+If the interactive session does not open, run these checks in order:
+
+```sh
+ssh home-server-remote 'hostname; whoami'
+ssh home-legion-via-server powershell -NoProfile -Command "hostname; whoami"
+```
+
+The first command confirms Cloudflare access to the home server. The second confirms the complete
+home-server-to-Legion route without opening an interactive prompt.
 
 ## Troubleshooting
 
