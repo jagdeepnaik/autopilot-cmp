@@ -14,7 +14,7 @@ data class CourseAutomationRoutine(
     val assessmentMode: AssessmentMode = AssessmentMode.Review,
     val learningOrder: LearningOrder = LearningOrder.AssessmentAfterModule,
     val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE,
-    val answerQuizzes: Boolean = false,
+    val answerQuizzes: Boolean = true,
 ) : Routine {
     override val kind: RoutineKind get() = RoutineKind.CourseAutomation
 }
@@ -79,7 +79,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private val assessmentMode: AssessmentMode = AssessmentMode.Review,
     private val learningOrder: LearningOrder = LearningOrder.AssessmentAfterModule,
     private val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE,
-    private val answerQuizzes: Boolean = false) {
+    private val answerQuizzes: Boolean = true) {
     var progressCheckpoint = 0; private set
     var currentModule: String? = null; private set
     private val moduleTitles = mutableMapOf<String, String>()

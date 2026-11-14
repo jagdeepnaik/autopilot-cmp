@@ -81,7 +81,7 @@ data class RoutineDraft(
     val assessmentMode: AssessmentMode = AssessmentMode.Review,
     val learningOrder: LearningOrder = LearningOrder.AssessmentAfterModule,
     val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE,
-    val answerQuizzes: Boolean = false,
+    val answerQuizzes: Boolean = true,
 )
 
 /** Field-level problems; a null field is fine. */

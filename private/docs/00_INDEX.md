@@ -11,6 +11,7 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | I want to… | Go to |
 | --- | --- |
 | Build, install and debug with one command | [01 · Quick reference](01_ONE_COMMAND_BUILDS.md#quick-reference) |
+| Copy AutoPilot progress, settings and certificates from every machine | [31 · Sync machine data](31_SYNC_MACHINE_DATA.md#sync-every-machine) |
 | Go to the scripts folder | [01 · Go to the scripts folder](01_ONE_COMMAND_BUILDS.md#go-to-the-scripts-folder) |
 | Start, stop or test the server VM | [12 · One line with the script](12_START_STOP_WINDOWS_BUILD_VM.md#one-line-with-the-script) · [by hand](12_START_STOP_WINDOWS_BUILD_VM.md#separately-by-hand) |
 | Install or update on Legion over SSH | [03 · Part S](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) |
@@ -27,6 +28,7 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | What you want to do | Guide |
 | --- | --- |
 | **Sync, build, install and debug on any machine with one command** (`private/scripts/desktop.sh`) | [01_ONE_COMMAND_BUILDS.md](01_ONE_COMMAND_BUILDS.md) |
+| Copy AutoPilot data and certificates from all machines to the Mac | [31_SYNC_MACHINE_DATA.md](31_SYNC_MACHINE_DATA.md) |
 | Build the Windows MSI on Legion, step by step | [02_BUILD_WINDOWS_ON_LEGION.md](02_BUILD_WINDOWS_ON_LEGION.md) |
 | Install, update and test AutoPilot on Windows (desktop or over SSH) | [03_INSTALL_AND_TEST_WINDOWS.md](03_INSTALL_AND_TEST_WINDOWS.md) |
 | Debug the Windows app from Android Studio on the Mac | [04_DEBUG_WINDOWS_FROM_MAC.md](04_DEBUG_WINDOWS_FROM_MAC.md) |

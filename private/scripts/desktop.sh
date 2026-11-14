@@ -8,6 +8,7 @@
 #     private/scripts/desktop.sh build all
 #     private/scripts/desktop.sh run all
 #     private/scripts/desktop.sh fetch all
+#     private/scripts/desktop.sh sync-data all
 #
 #   target   mac      this Mac: macOS app in /Applications
 #            legion   Windows laptop (ssh home-legion): MSI, installed on Legion
@@ -19,6 +20,8 @@
 #            all      every configured desktop target: mac, Legion, server and both VM pairs
 #
 #   action   sync     push the Mac's commits and pull them on the target
+#            sync-data copy each machine's ~/.autopilot and ~/Downloads/AutoPilot to the Mac's
+#                     ~/Downloads/AutoPilot/Sync/<machine> folder; it does not change Git or builds
 #            build    sync, focused tests, then build the installer
 #            run      build, then install/check the target
 #            fetch    copy existing installers to ~/Downloads/Builds/AutoPilot   (all, legion); build then copy one installer (server, server-vm-win)
@@ -50,6 +53,12 @@ MAC_WINDOWS_DIR="${MAC_WINDOWS_DIR:-C:\Users\Jagdeep\Projects\AutoPilot}"
 MAC_LINUX_HOST="${MAC_LINUX_HOST:-mac-linux-vm}"
 MAC_LINUX_DIR="${MAC_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
 DOWNLOADS="$HOME/Downloads/Builds/AutoPilot"
+SYNC_DATA_ROOT="$HOME/Downloads/AutoPilot/Sync"
+LEGION_HOME='C:/Users/jagde'
+SERVER_HOME='/home/jagdeep'
+VM_HOME='C:/Users/builduser'
+MAC_WINDOWS_HOME="${MAC_WINDOWS_HOME:-C:\Users\Jagdeep}"
+MAC_LINUX_HOME="${MAC_LINUX_HOME:-/home/jagdeep}"
 DEBUG_PORT=5005
 LOW_MEMORY=(--no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process')
 # The Mac-local Linux VM may have less memory than the home server. Keep Gradle and the Kotlin
@@ -74,7 +83,7 @@ done
 TARGET=''
 ACTIONS=()
 is_target() { case "$1" in mac|legion|server|server-vm-win|mac-vm-win|mac-vm-linux|local-all|all) return 0 ;; *) return 1 ;; esac; }
-is_action() { case "$1" in sync|build|run|fetch|debug) return 0 ;; *) return 1 ;; esac; }
+is_action() { case "$1" in sync|sync-data|build|run|fetch|debug) return 0 ;; *) return 1 ;; esac; }
 
 if [ "${#POSITIONAL[@]}" -eq 2 ] && is_action "${POSITIONAL[0]}" && is_target "${POSITIONAL[1]}"; then
     ACTIONS=("${POSITIONAL[0]}")
@@ -95,6 +104,15 @@ windows_ps() {
     script="\$ErrorActionPreference = 'Stop'; \$ProgressPreference = 'SilentlyContinue'; Set-Location '$dir'
 $body"
     encoded=$(printf '%s' "$script" | iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n')
+    ssh "$host" "powershell -NoProfile -ExecutionPolicy RemoteSigned -EncodedCommand $encoded"
+}
+
+# PowerShell on a Windows machine without assuming the project checkout exists. This is used for
+# copying per-user AutoPilot data, which may still be available when the source checkout is missing.
+windows_ps_raw() {
+    local host="$1" body="$2" encoded
+    encoded=$(printf '%s' "\$ErrorActionPreference = 'Stop'; \$ProgressPreference = 'SilentlyContinue'
+$body" | iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n')
     ssh "$host" "powershell -NoProfile -ExecutionPolicy RemoteSigned -EncodedCommand $encoded"
 }
 
@@ -405,6 +423,82 @@ fetch_legion_builds() {
     fetch_artifact_group Legion "$LEGION_HOST" 'C:/Users/jagde/Projects/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi' msi
 }
 
+# --- Machine data sync --------------------------------------------------------------------------
+# This copies app data, not source code: the hidden .autopilot folder contains local progress and
+# settings, while Downloads/AutoPilot contains downloaded certificates. Existing files in the Mac
+# Sync folder are updated; nothing is deleted.
+copy_local_tree() {
+    local source="$1" destination="$2"
+    [ -d "$source" ] || { echo "Not present: $source (skipped)"; return 0; }
+    mkdir -p "$destination"
+    tar -C "$source" -cf - . | tar -C "$destination" -xf -
+    echo "Copied $source -> $destination"
+}
+
+copy_local_downloads_tree() {
+    local source="$1" destination="$2"
+    [ -d "$source" ] || { echo "Not present: $source (skipped)"; return 0; }
+    mkdir -p "$destination"
+    # The Sync directory lives inside this source. Exclude it so a repeated sync cannot recurse
+    # into its own previous output.
+    tar -C "$source" --exclude='./Sync' -cf - . | tar -C "$destination" -xf -
+    echo "Copied $source (excluding Sync) -> $destination"
+}
+
+copy_unix_tree() {
+    local label="$1" host="$2" source="$3" destination="$4"
+    if ! ssh "$host" "test -d '$source'"; then
+        echo "$label: not present: $source (skipped)"
+        return 0
+    fi
+    mkdir -p "$destination"
+    ssh "$host" "tar -C '$source' -cf - ." | tar -C "$destination" -xf -
+    echo "$label: copied $source -> $destination"
+}
+
+copy_windows_tree() {
+    local label="$1" host="$2" source="$3" destination="$4" parent
+    if ! windows_ps_raw "$host" "if (-not (Test-Path -LiteralPath '$source' -PathType Container)) { exit 3 }" >/dev/null; then
+        echo "$label: not present: $source (skipped)"
+        return 0
+    fi
+    parent=$(dirname "$destination")
+    mkdir -p "$parent"
+    scp -q -r "$host:$source" "$parent/" || fail "$label: couldn't copy $source."
+    echo "$label: copied $source -> $destination"
+}
+
+sync_data_local() {
+    local machine="$1" home="$2" destination="$SYNC_DATA_ROOT/$1"
+    step "$machine: copy AutoPilot data to Mac"
+    copy_local_tree "$home/.autopilot" "$destination/.autopilot"
+    copy_local_downloads_tree "$home/Downloads/AutoPilot" "$destination/Downloads/AutoPilot"
+}
+
+sync_data_windows() {
+    local machine="$1" host="$2" home="$3" destination="$SYNC_DATA_ROOT/$1"
+    step "$machine: copy AutoPilot data to Mac"
+    copy_windows_tree "$machine" "$host" "$home/.autopilot" "$destination/.autopilot"
+    copy_windows_tree "$machine" "$host" "$home/Downloads/AutoPilot" "$destination/Downloads/AutoPilot"
+}
+
+sync_data_linux() {
+    local machine="$1" host="$2" home="$3" destination="$SYNC_DATA_ROOT/$1"
+    step "$machine: copy AutoPilot data to Mac"
+    copy_unix_tree "$machine" "$host" "$home/.autopilot" "$destination/.autopilot"
+    copy_unix_tree "$machine" "$host" "$home/Downloads/AutoPilot" "$destination/Downloads/AutoPilot"
+}
+
+sync_data_all() {
+    sync_data_local mac "$HOME"
+    sync_data_windows legion "$LEGION_HOST" "$LEGION_HOME"
+    sync_data_linux server "$SERVER_HOST" "$SERVER_HOME"
+    sync_data_windows server-vm-win "$VM_HOST" "$VM_HOME"
+    sync_data_windows mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME"
+    sync_data_linux mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME"
+    echo "Machine data is in $SYNC_DATA_ROOT"
+}
+
 # --- Home server Windows VM (MSI) ---------------------------------------------------------------
 vm_build() {
     step "Server VM: check it's running"
@@ -438,13 +532,21 @@ run_action() {
     local action="$1"
     case "$action:$TARGET" in
         sync:mac) mac_sync ;;
+        sync-data:mac) sync_data_local mac "$HOME" ;;
         sync:legion) windows_sync Legion "$LEGION_HOST" "$LEGION_DIR" ;;
+        sync-data:legion) sync_data_windows legion "$LEGION_HOST" "$LEGION_HOME" ;;
         sync:server) server_sync ;;
+        sync-data:server) sync_data_linux server "$SERVER_HOST" "$SERVER_HOME" ;;
         sync:server-vm-win) windows_sync "Server VM" "$VM_HOST" "$VM_DIR" ;;
+        sync-data:server-vm-win) sync_data_windows server-vm-win "$VM_HOST" "$VM_HOME" ;;
         sync:mac-vm-win) windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR" ;;
+        sync-data:mac-vm-win) sync_data_windows mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME" ;;
         sync:mac-vm-linux) linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR" ;;
+        sync-data:mac-vm-linux) sync_data_linux mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME" ;;
         sync:local-all) local_all_sync ;;
+        sync-data:local-all) sync_data_local mac "$HOME"; sync_data_windows mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME"; sync_data_linux mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME" ;;
         sync:all) mac_check_pushed; windows_sync Legion "$LEGION_HOST" "$LEGION_DIR"; server_sync; windows_sync "Server VM" "$VM_HOST" "$VM_DIR"; windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR"; linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR" ;;
+        sync-data:all) sync_data_all ;;
 
         build:mac) mac_build ;;
         build:legion) legion_build ;;
