@@ -77,6 +77,7 @@ Legion, the server, the server VM, and the Mac-local build VMs are already set u
 | Set up protected keys and the macOS Keychain | [21_SET_UP_PASSWORD_FREE_SSH.md](21_SET_UP_PASSWORD_FREE_SSH.md) |
 | Clone AutoPilot on Legion for the first time | [22_CLONE_AUTOPILOT_ON_LEGION.md](22_CLONE_AUTOPILOT_ON_LEGION.md) |
 | Register the `AutoPilot-Debug` launcher on Legion | [23_SET_UP_WINDOWS_DEBUG_LAUNCHER.md](23_SET_UP_WINDOWS_DEBUG_LAUNCHER.md) |
+| Reach Legion through the home server over Cloudflare | [31_SETUP_LEGION_VIA_HOME_SERVER_CLOUDFLARE.md](31_SETUP_LEGION_VIA_HOME_SERVER_CLOUDFLARE.md) |
 | Install the home server and its Windows VM | [24_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md](24_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md) |
 | Set up Windows and Linux build VMs on this Mac | [29_SET_UP_MAC_LOCAL_BUILD_VMS.md](29_SET_UP_MAC_LOCAL_BUILD_VMS.md) |
 
