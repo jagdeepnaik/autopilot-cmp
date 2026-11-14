@@ -6,7 +6,7 @@
 #   private/scripts/server-vm.sh start             # start it; you type the VNC console password
 #   private/scripts/server-vm.sh start --headless  # start it with a random console password (no prompt)
 #   private/scripts/server-vm.sh stop              # shut Windows down cleanly and wait for the VM to end
-#   add --remote to go through Cloudflare (home-server-remote, home-server-build-remote)
+#   add --remote to force Cloudflare; without it, local SSH falls back automatically when needed
 #
 # Only the Windows guest starts or stops; Debian and the websites are never touched. A stop is
 # refused while a Gradle build is running in the VM, and the VM is never force-killed.
@@ -17,6 +17,7 @@ SERVER_HOST=home-server
 VM_HOST=home-server-build
 VM_DIR='/srv/vms/windows-build'
 WINDOWS_CHECKOUT='C:\Build\autopilot-cmp'
+REMOTE_MODE=0
 
 usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$SCRIPT"; }
 ACTION="${1:-}"
@@ -25,10 +26,16 @@ HEADLESS=0
 for arg in "$@"; do
     case "$arg" in
         --headless) HEADLESS=1 ;;
-        --remote) SERVER_HOST=home-server-remote; VM_HOST=home-server-build-remote ;;
+        --remote) REMOTE_MODE=1; SERVER_HOST=home-server-remote; VM_HOST=home-server-build-remote ;;
         *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
     esac
 done
+
+if [ "$REMOTE_MODE" -eq 0 ] && ! ssh -o BatchMode=yes -o ConnectTimeout=8 -o ConnectionAttempts=1 "$SERVER_HOST" true >/dev/null 2>&1; then
+    echo "Home server local SSH is unavailable; using home-server-remote."
+    SERVER_HOST=home-server-remote
+    VM_HOST=home-server-build-remote
+fi
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 fail() { printf '\n\033[31mStopped: %s\033[0m\n' "$*" >&2; exit 1; }

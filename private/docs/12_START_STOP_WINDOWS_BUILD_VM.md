@@ -17,7 +17,7 @@ Run from the project root with `private/scripts/server-vm.sh …`. Changing into
 | `./server-vm.sh start` | Starts the VM. You type an 8-character VNC console password for Screen Sharing. It then waits for Windows and runs `test` |
 | `./server-vm.sh start --headless` | Same, but the console password is random and never shown, so there's no prompt. Use this for builds; the console can't be opened until the next normal `start` |
 | `./server-vm.sh stop` | Refuses while a Gradle build runs in the VM. Otherwise it shuts Windows down cleanly and waits until the VM process has ended |
-| add `--remote` | Go through Cloudflare (`home-server-remote`, `home-server-build-remote`) |
+| add `--remote` | Force the Cloudflare route (`home-server-remote`, `home-server-build-remote`). Without it, the script tests `home-server` first and automatically falls back to the Cloudflare route when the local server SSH connection is unavailable. |
 
 A typical VM build:
 
