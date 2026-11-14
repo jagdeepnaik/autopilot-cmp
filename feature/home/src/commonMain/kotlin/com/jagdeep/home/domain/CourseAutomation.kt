@@ -318,7 +318,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         if (snapshot.top && controls.any { it.expanded != null && isChapter(it) }) return CourseView.Course
         if (segments.size >= 4) return CourseView.Lesson
         if (segments.size == 3) return CourseView.Course
-        if (snapshot.top && controls.any { isSingleCourse(it.context) }) return CourseView.Dashboard
+        if (snapshot.top && controls.any { isSingleCourse(it) }) return CourseView.Dashboard
         return currentView ?: CourseView.Dashboard
     }
 
@@ -384,7 +384,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             it.visible && it.tag == "a" && it.href?.let { href -> Regex("/dashboard/courses/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+").matches(href) } == true
         }?.href
         val pageId = when (view) {
-            CourseView.Dashboard -> "dashboard:" + snapshot.elements.filter { isSingleCourse(it.context) }
+            CourseView.Dashboard -> "dashboard:" + snapshot.elements.filter { isSingleCourse(it) }
                 .map { it.context.replace(Regex("not started|in progress|completed", RegexOption.IGNORE_CASE), "").trim() }.distinct().sorted().joinToString("|").hashCode()
             CourseView.Course -> "course:$path"
             CourseView.Assessment -> "assessment:$path:${assessmentEpochs[path] ?: 0}:" + snapshot.assessment?.questions?.joinToString { it.id + it.text }
@@ -987,7 +987,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             nextActionAt = now + maxOf(10_000L, waitAfterClickMillis.coerceIn(0, 86_400_000))
             return
         }
-        val allCards = elements.filter { !forbidden(it.label) && isSingleCourse(it.context) }
+        val allCards = elements.filter { !forbidden(it.label) && isSingleCourse(it) }
         val finishedTitles = completedCourses.mapNotNull(moduleTitles::get).map(CourseAnswerBank::normalize).toSet()
         fun cachedFinished(card: CourseElement): Boolean {
             val title = card.courseTitle?.let(CourseAnswerBank::normalize)
@@ -1040,11 +1040,20 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
 
     private fun done(text: String) = text.contains("completed", true) && !Regex("not started|in progress|not completed|incomplete", RegexOption.IGNORE_CASE).containsMatchIn(text)
     private fun isChapter(element: CourseElement) = Regex("\\bmaterial\\s*s?\\b|\\bchapter\\b", RegexOption.IGNORE_CASE).containsMatchIn(element.label)
-    // The live page's header controls inherit text from the whole dashboard. Only a single card's
-    // metrics count; page-wide text can otherwise make the notification bell look like a course.
-    private fun isSingleCourse(text: String): Boolean = text.contains("duration", true) &&
-        Regex("min\\.?\\s*pass", RegexOption.IGNORE_CASE).findAll(text).count() == 1 &&
-        Regex("course\\s+id", RegexOption.IGNORE_CASE).findAll(text).count() <= 1
+    // The live page's header controls inherit text from the whole dashboard. Prefer the card's
+    // own duration/pass metadata, but retain a title-backed fallback for layouts where the open
+    // button is wrapped separately and its context contains only the button label.
+    private fun isSingleCourse(element: CourseElement): Boolean {
+        val text = element.context
+        val hasCardMetadata = text.contains("duration", true) &&
+            Regex("min\\.?\\s*pass", RegexOption.IGNORE_CASE).findAll(text).count() == 1 &&
+            Regex("course\\s+id", RegexOption.IGNORE_CASE).findAll(text).count() <= 1
+        if (hasCardMetadata) return true
+        val title = element.courseTitle?.trim().orEmpty()
+        return title.isNotEmpty() && element.tag in setOf("a", "button") &&
+            (text.contains("course id", true) || text.contains("duration", true) ||
+                text.contains(title, true) || element.svg)
+    }
     private fun settled(snapshot: CourseSnapshot, now: Long): Boolean {
         val candidate = snapshot.path + snapshot.elements.joinToString { "${it.id}:${it.context}:${it.enabled}:${it.visible}" }
         if (completionCandidate != candidate) { completionCandidate = candidate; completionSince = now }

@@ -99,6 +99,14 @@ class CourseAutomationTest {
     }
 
     @Test
+    fun `given a wrapped course button with only its title then open the course`() {
+        val runner = CourseAutomationSession("session")
+        val open = CourseElement("open", tag = "button", svg = true, courseTitle = "Emotional Wellness", context = "Open course")
+        runner.read(snapshot("/dashboard", open), 0)
+        assertEquals("open", runner.action?.element)
+    }
+
+    @Test
     fun `given finished dashboard page with more modules then next page is opened instead of stopping`() {
         val runner = CourseAutomationSession("session")
         val done = CourseElement("done-card", svg = true, context = "Completed Min. Pass 75% Duration 20min")
