@@ -19,23 +19,38 @@ plugins {
 }
 
 /**
- * Every desktop build's version: <major>.<minor>.<commit count>, so each commit gets a higher one.
- * Windows Installer only upgrades in place when the version rises (it compares the first three
- * parts), so a new MSI replaces the installed app instead of stopping with "already installed".
- * desktopApp's MSI, DMG and DEB, and the app's About screen (through shared's tests and the
- * launcher's -Dautopilot.version), use the same number. Android and iOS keep versionName.
+ * The app uses Semantic Versioning plus immutable build identity:
+ *   <release>+build.<count>.g<short commit>
+ *
+ * Example: 1.1.0+build.104.g4614d49. The release version is shared by every platform; the build
+ * number and commit identify the exact source used for a desktop build. Windows MSI cannot carry
+ * SemVer build metadata, so its numeric package version is kept separately as <major>.<minor>.<build>.
  */
-val desktopVersion: String = run {
-    val (major, minor) = libs.versions.versionName.get().split('.').map(String::toInt)
+val releaseVersion: String = libs.versions.versionName.get()
+val (major, minor, patch) = releaseVersion.split('.').map(String::toInt).also {
+    check(it.size == 3) { "versionName must be MAJOR.MINOR.PATCH, got $releaseVersion" }
+}
+val buildNumber: Int = run {
     val commits = providers.exec {
         commandLine("git", "rev-list", "--count", "HEAD")
         isIgnoreExitValue = true
     }.standardOutput.asText.get().trim().toIntOrNull()
         ?: error("The desktop version needs the Git history: run the build inside a full Git checkout.")
-    check(major in 0..255 && minor in 0..255 && commits in 1..65535) { "Desktop version $major.$minor.$commits is out of range" }
-    "$major.$minor.$commits"
+    check(commits in 1..65535) { "Desktop build number $commits is out of range" }
+    commits
+}
+val gitCommit: String = providers.exec {
+    commandLine("git", "rev-parse", "--short=12", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.get().trim().takeIf { it.matches(Regex("[0-9a-fA-F]{7,12}")) }
+    ?: error("The desktop version needs the Git commit: run the build inside a full Git checkout.")
+val desktopVersion = "$releaseVersion+build.$buildNumber.g$gitCommit"
+val desktopPackageVersion = "$major.$minor.$buildNumber"
+check(major in 0..255 && minor in 0..255 && buildNumber in 1..65535) {
+    "Desktop package version $desktopPackageVersion is out of range"
 }
 extra["desktopVersion"] = desktopVersion
+extra["desktopPackageVersion"] = desktopPackageVersion
 
 /**
  * core:ui is an exact copy of the template, and its AppIcon imports the generated `Res` from the

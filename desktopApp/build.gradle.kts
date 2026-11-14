@@ -19,6 +19,7 @@ dependencies {
 }
 
 val desktopVersion = rootProject.extra["desktopVersion"] as String
+val desktopPackageVersion = rootProject.extra["desktopPackageVersion"] as String
 
 compose.desktop {
     application {
@@ -34,7 +35,8 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "AutoPilot"
-            packageVersion = desktopVersion
+            // MSI/DMG/DEB package metadata must remain numeric; the app itself shows desktopVersion.
+            packageVersion = desktopPackageVersion
             // JDK modules the packaged runtime must contain (from :desktopApp:suggestRuntimeModules).
             // jdk.unsupported: sun.misc.Unsafe (libraries fail at launch without it).
             modules(

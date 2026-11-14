@@ -417,14 +417,19 @@ The rule for every build machine, including the VMs on this Mac, is **push, pull
 
 The Mac target builds from your working folder and doesn't need a push. If you have uncommitted changes, it says so, because the version number only rises with a commit.
 
-### 2. One version number per commit
+### 2. Semantic version, build number and commit
 
-Every desktop build uses `<major>.<minor>.<commit count>`, for example `1.0.30`. Major and minor come from `versionName` in `gradle/libs.versions.toml`; the third part is `git rev-list --count HEAD`. The same number goes on:
+The release version in `gradle/libs.versions.toml` follows Semantic Versioning (`MAJOR.MINOR.PATCH`), for example `1.1.0`. Desktop builds add immutable build identity:
 
-- the MSI, DMG and DEB (`packageVersion` in `desktopApp/build.gradle.kts`; the number itself is computed once in the root `build.gradle.kts`);
-- the app's About screen and status bar (passed to the app as `-Dautopilot.version`).
+```text
+1.1.0+build.104.g4614d49
+```
 
-Each commit's MSI is therefore newer than the last one, so Windows updates the installed app in place. Building the same commit twice gives the same version: `Install-Msi.ps1 -SkipIfInstalled` then reports *already installed* and moves on, instead of failing. Android and iOS keep `versionName` from the version catalog.
+The build number is `git rev-list --count HEAD`, and the `g…` value is the short Git commit SHA. Together they tell us both the build sequence and the exact source commit. The full value is passed to the app as `-Dautopilot.version`, so it appears in the About screen and status bar.
+
+Windows MSI, DMG and DEB package metadata must remain numeric. The packaging version is therefore derived separately as `<major>.<minor>.<build number>` (for example `1.1.104`) so Windows can detect and upgrade a newer MSI. The app still displays the full SemVer/build/commit value. Android and iOS keep the release `versionName` from the version catalog.
+
+Building the same commit twice produces the same build identity. `Install-Msi.ps1 -SkipIfInstalled` then reports *already installed* and moves on instead of failing.
 
 ### 3. Talking to Windows over SSH
 

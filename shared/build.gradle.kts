@@ -106,7 +106,7 @@ kotlin {
     }
 }
 
-// Tests see the same version property the desktop launchers pass.
+// Tests see the same full SemVer/build/commit value the desktop launchers pass.
 tasks.withType<Test>().matching { it.name == "jvmTest" }.configureEach {
     systemProperty("autopilot.version", desktopVersion)
 }
