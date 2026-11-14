@@ -207,7 +207,7 @@ When creating a new project from this template, perform a targeted product clean
 ```text
 private/
   docs/          # tracked: numbered user guides; 00_INDEX.md lists them by how often they're used
-  scripts/       # tracked: build, install, debug, VM and Git helper scripts (desktop.sh on the Mac, windows/ for Windows)
+  scripts/       # tracked internal implementations: build, install, debug, VM and Git helpers; windows/ contains PowerShell support
   reports/       # tracked: dated investigation and validation reports worth keeping (YYYY-MM-DD-topic.md)
   <data>/        # tracked: project data the app or build needs, one folder per kind (for example answer-banks/)
   plans/         # git-ignored: implementation plans, proposals, roadmaps, phase tracking
@@ -220,7 +220,7 @@ private/
 
 - **`misc/` is the default for anything temporary or unimportant:** backups, screenshots, captures, research notes, throwaway reports, scratch files, old copies and one-off helpers. Reports worth keeping go in `reports/`. It's git-ignored as a whole, so nothing in it reaches GitHub. Never make the build, the app or a tracked guide depend on a file in `misc/`; move the file to its proper folder first.
 - `docs/`: number the guides `NN_TOPIC.md` by how often they're used, keep `00_INDEX.md` current, and update every link when renumbering. Link to a section with GitHub-style heading links (`[text](#heading-text)`, or `file.md#heading-text` for another guide): lowercase, punctuation dropped, spaces as hyphens. Keep a long guide in one file with an "On this page" list. In Android Studio, Cmd+Click a link in the editor to follow it; the Markdown preview follows `#` links only when the IDE runs on JetBrains Runtime with JCEF (see `private/docs/19_GIT_GUIDE.md`).
-- `scripts/` is tracked because the build machines pull it from Git and the build may run scripts from it. Reference scripts by their path under `private/scripts/` from Gradle, CI and the guides.
+- `dev.sh` at the project root is the single user-facing project command. `private/scripts/` is tracked because the build machines pull its internal implementations from Git; Gradle and Windows builds also invoke `private/scripts/windows/` PowerShell support files directly.
 - `plans/` follows the planning rule at the top of this file, and stays local.
 - Keep a data folder only for data that's part of the project. Put temporary exports and captures of it in `misc/`.
 - Don't add other top-level folders under `private/` without a reason. When unsure, use `misc/`.
@@ -298,7 +298,7 @@ private/
   - jpackage's unsigned `JpCaDll` removed from the MSI
 
   See [the installer fix guide](private/docs/09_FIX_WINDOWS_INSTALLER.md).
-- Build and install with `private/scripts/desktop.sh` (for example `run legion`, `run mac`, `run all`). Legion, the home server and the VMs build only from Git; `desktop.sh` pushes and pulls first.
+- Build and install with `./dev.sh` (for example `run legion`, `run mac`, `run all`). Legion, the home server and the VMs build only from Git; `dev.sh` pushes and pulls first.
 
 ## Testing and validation
 

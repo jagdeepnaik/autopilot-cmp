@@ -637,9 +637,9 @@ The log is `LiveLog` in `feature:shared`, implemented by `MemoryLiveLog` in `sha
 One command builds, installs and tests on each machine; see [one-command builds](01_ONE_COMMAND_BUILDS.md):
 
 ```shell
-private/scripts/desktop.sh run mac       # this Mac: build, install to /Applications
-private/scripts/desktop.sh run legion    # Windows laptop: build the MSI from Git, install, check
-private/scripts/desktop.sh run all       # every desktop machine
+./dev.sh run mac       # this Mac: build, install to /Applications
+./dev.sh run legion    # Windows laptop: build the MSI from Git, install, check
+./dev.sh run all       # every desktop machine
 ./gradlew :desktopApp:run                # run from source
 ```
 

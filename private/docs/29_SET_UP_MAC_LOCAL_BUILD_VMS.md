@@ -2,7 +2,7 @@
 
 [All guides](00_INDEX.md) · [One-command builds](01_ONE_COMMAND_BUILDS.md#quick-reference) · [SSH setup](20_SET_UP_WINDOWS_SSH.md) · [Git guide](19_GIT_GUIDE.md)
 
-This guide prepares the Mac to build AutoPilot locally on macOS, Windows 11 in a VM, and Linux in a VM. The build code remains in `private/scripts/desktop.sh`; the local VM targets use SSH.
+This guide prepares the Mac to build AutoPilot locally on macOS, Windows 11 in a VM, and Linux in a VM. The build code remains in `./dev.sh`; the local VM targets use SSH.
 
 ## 0. Components checklist
 
@@ -131,7 +131,7 @@ Create one Windows 11 ARM64 VM and one Debian or Ubuntu ARM64 VM. Give each a st
 
 ## 3. Prepare the Windows VM
 
-The complete Windows installation is in [Windows VM components](#02-windows-vm-components). After completing that section, verify the SSH account that `desktop.sh` will use:
+The complete Windows installation is in [Windows VM components](#02-windows-vm-components). After completing that section, verify the SSH account that `dev.sh` will use:
 
 ```powershell
 git --version
@@ -144,7 +144,7 @@ The JDK must be available in the SSH session, not only in an interactive desktop
 
 ## 4. Prepare the Linux VM
 
-The complete Linux installation is in [Linux VM components](#03-linux-vm-components). After completing that section, verify the SSH account that `desktop.sh` will use:
+The complete Linux installation is in [Linux VM components](#03-linux-vm-components). After completing that section, verify the SSH account that `dev.sh` will use:
 
 ```sh
 git --version
@@ -209,7 +209,7 @@ ssh mac-windows-vm powershell -NoProfile -Command "hostname"
 ssh mac-linux-vm 'hostname && uname -m'
 ```
 
-Use the existing [password-free SSH guide](21_SET_UP_PASSWORD_FREE_SSH.md). Never put passwords or private keys in `desktop.sh`.
+Use the existing [password-free SSH guide](21_SET_UP_PASSWORD_FREE_SSH.md). Never put passwords or private keys in `dev.sh`.
 
 ### 6.1 If the VM addresses in the aliases do not work
 
@@ -336,7 +336,7 @@ Keychain for the current Mac user, run:
 ssh-add --apple-use-keychain ~/.ssh/id_ed25519
 ```
 
-## 7. Configure `desktop.sh`
+## 7. Configure `dev.sh`
 
 In the Mac Terminal, set the aliases and exact checkout paths:
 
@@ -365,16 +365,16 @@ Both `git status --short` outputs should be empty.
 
 ## 9. Build on the Mac-local VMs
 
-The standard command format is `private/scripts/desktop.sh <action> <target>`: action first,
+The standard command format is `./dev.sh <action> <target>`: action first,
 target last. `build` syncs and creates the artifact; `run` builds, then installs/checks it; `debug`
 starts one debug session and its port-5005 tunnel.
 
 Test one VM at a time first:
 
 ```sh
-private/scripts/desktop.sh sync mac-vm-win
-private/scripts/desktop.sh build mac-vm-win
-private/scripts/desktop.sh run mac-vm-win
+./dev.sh sync mac-vm-win
+./dev.sh build mac-vm-win
+./dev.sh run mac-vm-win
 ```
 
 For Windows VM debugging, register the scheduled launcher once from an interactive PowerShell
@@ -389,7 +389,7 @@ Then start the debug run from the Mac. The command waits for port 5005 and keeps
 open until you press `Control-C`:
 
 ```sh
-private/scripts/desktop.sh debug mac-vm-win
+./dev.sh debug mac-vm-win
 ```
 
 Attach Android Studio to `127.0.0.1:5005` using the Windows debug configuration. Close the
@@ -398,15 +398,15 @@ Windows app normally when finished so its local progress is saved.
 Build the Linux DEB in the Linux VM:
 
 ```sh
-private/scripts/desktop.sh sync mac-vm-linux
-private/scripts/desktop.sh build mac-vm-linux
-private/scripts/desktop.sh run mac-vm-linux
+./dev.sh sync mac-vm-linux
+./dev.sh build mac-vm-linux
+./dev.sh run mac-vm-linux
 ```
 
 Linux VM debugging requires a graphical desktop session for the SSH user:
 
 ```sh
-private/scripts/desktop.sh debug mac-vm-linux
+./dev.sh debug mac-vm-linux
 ```
 
 The command runs `:desktopApp:run --debug-jvm`, forwards port 5005 to the Mac, and keeps the SSH
@@ -418,8 +418,8 @@ a narrowly scoped sudo rule inside the VM, never a password in this project or a
 Build macOS, Windows, and Linux from one Mac command:
 
 ```sh
-private/scripts/desktop.sh build local-all
-private/scripts/desktop.sh run local-all
+./dev.sh build local-all
+./dev.sh run local-all
 ```
 
 The script requires committed Mac work, pushes it, and pulls the same commit into both VM checkouts before building. `run local-all` also installs the macOS app, Windows MSI and Linux DEB. Debug one VM at a time with its target above.
@@ -427,8 +427,8 @@ The script requires committed Mac work, pushes it, and pulls the same commit int
 ## 10. Recommended release workflow
 
 1. Commit the Mac changes.
-2. Run `private/scripts/desktop.sh sync local-all`.
-3. Run `private/scripts/desktop.sh build local-all`.
+2. Run `./dev.sh sync local-all`.
+3. Run `./dev.sh build local-all`.
 4. Test the macOS app, MSI, and DEB in their respective environments.
 5. Use Legion for the final x64 Windows MSI unless the local VM’s JDK and MSI architecture have been verified.
 
@@ -438,11 +438,11 @@ The local VMs build from Git. They must not contain uncommitted changes, and the
 
 ### Gradle daemon disappeared in the Linux VM
 
-If `packageReleaseDeb` ends with `Gradle build daemon disappeared unexpectedly`, the Linux VM likely ran out of guest memory while Gradle or the Kotlin compiler was running. `desktop.sh` uses a conservative Mac-local Linux profile: one worker, a 1536 MB Gradle heap and a 512 MB Kotlin daemon heap. Commit and push the script change, then retry:
+If `packageReleaseDeb` ends with `Gradle build daemon disappeared unexpectedly`, the Linux VM likely ran out of guest memory while Gradle or the Kotlin compiler was running. `dev.sh` uses a conservative Mac-local Linux profile: one worker, a 1536 MB Gradle heap and a 512 MB Kotlin daemon heap. Commit and push the script change, then retry:
 
 ```sh
-private/scripts/git.sh push-all "Limit Mac Linux VM build memory"
-private/scripts/desktop.sh build mac-vm-linux
+./dev.sh git push-all "Limit Mac Linux VM build memory"
+./dev.sh build mac-vm-linux
 ```
 
 If it still fails, check the VM's available memory and kernel OOM messages:

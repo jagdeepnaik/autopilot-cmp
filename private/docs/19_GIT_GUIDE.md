@@ -9,13 +9,13 @@ A complete guide to Git as this project uses it: the ideas behind it, every comm
 The preferred shortcut from any Mac Terminal folder is:
 
 ```sh
-/Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts/git.sh push-all
+./dev.sh git push-all
 ```
 
 Pass a commit message when useful:
 
 ```sh
-/Users/jagdeep/Projects/AndroidStudio/AutoPilot/private/scripts/git.sh push-all "Describe the change"
+./dev.sh git push-all "Describe the change"
 ```
 
 The equivalent one-line Git command is:
@@ -46,21 +46,21 @@ The next command runs only if the previous command succeeds. Review `git status`
 [15 Safety](#15-what-can-lose-work) ·
 [16 Cheat sheet](#16-cheat-sheet)
 
-## Project Git script
+## Project Git commands
 
-The project includes a safe daily Git wrapper. Run it from any folder with the absolute path, or use `./git.sh` after changing to `private/scripts`:
+The project includes a safe daily Git wrapper. Run it from the project root with `./dev.sh git`:
 
 | Command | What it does | Changes files? |
 | --- | --- | --- |
-| `private/scripts/git.sh status` | Shows the current branch and changed files. | No |
-| `private/scripts/git.sh check` | Fetches GitHub, then shows whether `main` is ahead, behind or synchronized. | No project files; updates remote-tracking information |
-| `private/scripts/git.sh fetch` | Downloads the latest GitHub history without changing the working files. | No project files |
-| `private/scripts/git.sh pull` | Pulls `origin/main` with fast-forward-only safety. It refuses to run with local changes. | Yes, only by fast-forwarding `main` |
-| `private/scripts/git.sh diff` | Shows both unstaged and staged changes. | No |
-| `private/scripts/git.sh history` | Shows the latest 20 commits. | No |
-| `private/scripts/git.sh branches` | Shows local branches and their tracking state. | No |
-| `private/scripts/git.sh push-all` | Stages all non-ignored changes, commits them, and pushes `main`. | Yes; commits and pushes |
-| `private/scripts/git.sh push-all "Message"` | Same as `push-all`, with a custom commit message. | Yes; commits and pushes |
+| `./dev.sh git status` | Shows the current branch and changed files. | No |
+| `./dev.sh git check` | Fetches GitHub, then shows whether `main` is ahead, behind or synchronized. | No project files; updates remote-tracking information |
+| `./dev.sh git fetch` | Downloads the latest GitHub history without changing the working files. | No project files |
+| `./dev.sh git pull` | Pulls `origin/main` with fast-forward-only safety. It refuses to run with local changes. | Yes, only by fast-forwarding `main` |
+| `./dev.sh git diff` | Shows both unstaged and staged changes. | No |
+| `./dev.sh git history` | Shows the latest 20 commits. | No |
+| `./dev.sh git branches` | Shows local branches and their tracking state. | No |
+| `./dev.sh git push-all` | Stages all non-ignored changes, commits them, and pushes `main`. | Yes; commits and pushes |
+| `./dev.sh git push-all "Message"` | Same as `push-all`, with a custom commit message. | Yes; commits and pushes |
 
 The wrapper intentionally does not include destructive commands such as `reset --hard`, `clean -fd` or force-push. Use those only after reviewing the Git guide and confirming the exact files affected.
 
@@ -115,7 +115,7 @@ Nothing travels between the Mac and Legion directly. That's why the build machin
 | --- | --- |
 | One branch, `main`, pushed to `origin` on GitHub | Simple; every machine builds the same line of history |
 | Build machines (Legion, server, VM) only `git pull --ff-only` | They never create their own commits, so a pull is always a clean fast-forward |
-| Commit and push on the Mac before any remote build | Builds come from Git only. `desktop.sh` refuses uncommitted Mac work, and pushes unpushed commits ([01](01_ONE_COMMAND_BUILDS.md#1-git-is-the-only-way-code-reaches-a-build-machine)) |
+| Commit and push on the Mac before any remote build | Builds come from Git only. `dev.sh` refuses uncommitted Mac work, and pushes unpushed commits ([01](01_ONE_COMMAND_BUILDS.md#1-git-is-the-only-way-code-reaches-a-build-machine)) |
 | Never overwrite uncommitted work on a build machine | If one has local changes, compare them with GitHub, stash as a backup, then pull ([recipe](#147-a-build-machine-has-local-changes)) |
 | The app version is `<major>.<minor>.<commit count>` | `git rev-list --count HEAD` gives the third part, so every commit raises the version ([01](01_ONE_COMMAND_BUILDS.md#2-one-version-number-per-commit)). Clones must have full history (not shallow) for this |
 | `private/misc/`, `private/plans/`, `private/signing/` are git-ignored | Temporary files, working plans and secrets never reach GitHub (see AGENTS.md, "Private folder") |
@@ -535,7 +535,7 @@ git commit -m "What changed and why"
 git push origin main
 ```
 
-`desktop.sh` then pulls it on the build machines ([01](01_ONE_COMMAND_BUILDS.md)).
+`dev.sh` then pulls it on the build machines ([01](01_ONE_COMMAND_BUILDS.md)).
 
 ### 14.2 See what's waiting to be pushed, or pulled
 
@@ -576,7 +576,7 @@ git push origin main
 
 ### 14.7 A build machine has local changes
 
-`git pull --ff-only` stops with *"Your local changes … would be overwritten"*, or `desktop.sh` stops with *"has uncommitted changes"*. Don't reset. Compare first, then keep a backup:
+`git pull --ff-only` stops with *"Your local changes … would be overwritten"*, or `dev.sh` stops with *"has uncommitted changes"*. Don't reset. Compare first, then keep a backup:
 
 ```powershell
 git fetch -q

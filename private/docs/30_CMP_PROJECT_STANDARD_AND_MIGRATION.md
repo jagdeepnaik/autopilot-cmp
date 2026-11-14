@@ -201,7 +201,7 @@ Keep `packageName`, `bundleID`, `upgradeUuid` and the icons unchanged, so instal
 ```text
 private/
   docs/          # tracked: numbered guides NN_TOPIC.md by how often they're used; 00_INDEX.md lists them
-  scripts/       # tracked: build, install, debug, VM and Git helper scripts (desktop.sh on the Mac, windows/ for Windows)
+  scripts/       # tracked: build, install, debug, VM and Git helper scripts (dev.sh on the Mac, windows/ for Windows)
   reports/       # tracked: dated investigation and validation reports worth keeping (YYYY-MM-DD-topic.md)
   <data>/        # tracked: project data the app or build needs, one folder per kind (for example answer-banks/)
   plans/         # git-ignored: implementation plans, proposals, roadmaps, phase tracking
@@ -333,7 +333,7 @@ Update:
 
 ### Step 8 — Verify (section 7), then commit and push
 
-Commit the restructure, the package grouping and unrelated fixes **separately**. Then push, and build and install on every desktop machine from Git, for example `private/scripts/desktop.sh run legion` and `run mac`.
+Commit the restructure, the package grouping and unrelated fixes **separately**. Then push, and build and install on every desktop machine from Git, for example `./dev.sh run legion` and `run mac`.
 
 ## 7. Verification checklist
 
@@ -391,7 +391,7 @@ Android Studio and Gradle without the prefix.
 | iOS app | `xcodebuild … build` (Step 1 command) | BUILD SUCCEEDED |
 | Desktop app | `./gradlew :desktopApp:createReleaseDistributable`, compare the file list and `.cfg` | Same files (the app jar becomes `shared` + `desktopApp`); same main class, JVM options, version, bundle ID |
 | Desktop runtime | Start the built app for 15 s | Window opens, no exceptions |
-| Windows | `desktop.sh run legion` | MSI builds, updates in place, the app's JVM loads, 0 Smart App Control blocks |
+| Windows | `dev.sh run legion` | MSI builds, updates in place, the app's JVM loads, 0 Smart App Control blocks |
 | References | `grep -rn composeApp` | Nothing left |
 
 ## 8. Pitfalls found during the AutoPilot migration
@@ -408,7 +408,7 @@ Android Studio and Gradle without the prefix.
 | `@Ignore("reason")` in common tests | Kotlin/Native test compile: *"Too many arguments for 'constructor(): Ignore'"* | `// Ignored: reason` above a bare `@Ignore` |
 | `:shared` and `:feature:shared` | Both desktop jars start with `shared-jvm` | Harmless: Compose adds a hash suffix |
 | Android context reached through `MainApplication` | `shared` can't see `androidApp` classes | Hold the context in `AndroidPlatform` in `shared` |
-| `desktop.sh` refuses to run | *"the Mac has uncommitted changes"* while `private/Test` is untracked | Ignore reference copies in `.gitignore` |
+| `dev.sh` refuses to run | *"the Mac has uncommitted changes"* while `private/Test` is untracked | Ignore reference copies in `.gitignore` |
 
 ## 9. Reusable prompt for Claude
 
