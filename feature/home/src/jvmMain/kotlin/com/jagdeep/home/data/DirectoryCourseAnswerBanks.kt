@@ -13,7 +13,7 @@ import kotlinx.coroutines.sync.withLock
  * Installed app data, independent of its executable or working directory.
  *
  * [bundled] maps a bank file name to a reader for the copy shipped inside the app. A bundled bank is
- * written to [folder] only when no file of that name exists, so answers the user saved are never replaced.
+ * written to [folder] when missing, or merged when a newer bundled bank contains more questions.
  */
 class DirectoryCourseAnswerBanks(
     private val folder: File,
@@ -41,13 +41,25 @@ class DirectoryCourseAnswerBanks(
     private fun seed(name: String, read: () -> String?) {
         if (answerBankFileName(name) != name) return
         val target = File(folder, name)
-        if (target.exists()) return
         val text = runCatching(read).getOrNull() ?: return
-        if (text.length > MAX_BYTES || CourseAnswerBank.decode(text) == null) return
-        // Written beside the target and moved into place, so a crash never leaves a half-written bank.
-        val partial = File(folder, "$name.tmp")
+        val bundledBank = CourseAnswerBank.decode(text) ?: return
+        if (!target.exists()) {
+            writeAtomically(target, text)
+            return
+        }
+        val existingBank = runCatching {
+            target.takeIf { it.length() <= MAX_BYTES }?.let { CourseAnswerBank.decode(it.readText()) }
+        }.getOrNull() ?: return
+        if (bundledBank.questionCount <= existingBank.questionCount) return
+        val merged = bundledBank.mergedWith(existingBank)
+        writeAtomically(target, merged.encode())
+    }
+
+    private fun writeAtomically(target: File, text: String) {
+        if (text.length > MAX_BYTES) return
+        val partial = File(target.parentFile, "${target.name}.tmp")
         partial.writeText(text)
-        Files.move(partial.toPath(), target.toPath())
+        Files.move(partial.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
     }
     override fun forName(name: String): CourseAnswerBankStore {
         val fileName = resolvedAnswerBankFileName(name) ?: return NoCourseAnswerBankStore

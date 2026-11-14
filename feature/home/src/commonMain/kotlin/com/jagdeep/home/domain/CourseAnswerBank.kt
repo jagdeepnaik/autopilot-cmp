@@ -8,6 +8,32 @@ data class CourseAnswer(val question: String, val options: List<String>, val ans
 
 /** Local supplied answers only. No network lookup, AI inference or fuzzy matching. */
 class CourseAnswerBank private constructor(private val modules: Map<String, List<CourseAnswer>>) {
+    internal val questionCount: Int get() = modules.values.sumOf { it.size }
+    internal fun encode(): String = Json.encodeToString(modules)
+
+    /** Prefer [preferred] on conflicts, while retaining unique entries from [additional]. */
+    internal fun mergedWith(additional: CourseAnswerBank): CourseAnswerBank {
+        val result = preferredModulesCopy()
+        val moduleNames = result.keys.associateBy(::normalize).toMutableMap()
+        additional.modules.forEach { (module, entries) ->
+            val outputModule = moduleNames.getOrPut(normalize(module)) {
+                result[module] = mutableListOf()
+                module
+            }
+            val outputEntries = result.getValue(outputModule)
+            entries.forEach { candidate ->
+                val key = candidate.questionKey()
+                val index = outputEntries.indexOfFirst { it.questionKey() == key }
+                if (index < 0) outputEntries += candidate
+                else if (outputEntries[index].answer == null && candidate.answer != null) outputEntries[index] = candidate
+            }
+        }
+        return CourseAnswerBank(result.mapValues { it.value.toList() })
+    }
+
+    private fun preferredModulesCopy() = modules.mapValues { (_, entries) -> entries.toMutableList() }.toMutableMap()
+    private fun CourseAnswer.questionKey() = normalize(question) to options.map(::optionText).sorted()
+
     internal fun withAnswer(title: String, answer: CourseAnswer): CourseAnswerBank? {
         val name = modules.keys.singleOrNull { normalize(it) == normalize(title) } ?: title
         val key = normalize(answer.question) to answer.options.map(::optionText).sorted()

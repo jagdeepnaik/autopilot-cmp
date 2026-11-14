@@ -83,7 +83,7 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 <tr><td><code>private/scripts/desktop.sh sync mac-vm-win</code></td><td>Push and pull the Windows VM running on this Mac.</td></tr>
 <tr><td><code>private/scripts/desktop.sh sync mac-vm-linux</code></td><td>Push and pull the Linux VM running on this Mac.</td></tr>
 <tr><td><code>private/scripts/desktop.sh sync-data all</code></td><td>Copy each machine's <code>~/.autopilot</code> and <code>~/Downloads/AutoPilot</code> to <code>~/Downloads/AutoPilot/Sync/&lt;machine&gt;</code> on the Mac, with the two folders saved visibly as <code>Database/</code> and <code>AutoPilot/</code>. It does not change Git, build or install. See <a href="#sync-machine-data">Sync machine data</a>.</td></tr>
-<tr><td><code>private/scripts/desktop.sh merge-answer-bank all</code></td><td>Merge every synced <code>answer-banks.sagarmeinyog-ver-1.0.json</code> under <code>Sync/&lt;machine&gt;/Database</code> into one unique answer bank at the project root. It does not change Git, build or install. Run <code>sync-data all</code> first.</td></tr>
+<tr><td><code>private/scripts/desktop.sh merge-answer-bank all</code></td><td>Merge every synced <code>answer-banks.sagarmeinyog-ver-1.0.json</code> under <code>Sync/&lt;machine&gt;/Database</code> into one unique answer bank at <code>~/Downloads/AutoPilot</code>. It does not change Git, build or install. Run <code>sync-data all</code> first.</td></tr>
 <tr><td colspan="2"><strong>Build — sync, test and create an installer</strong></td></tr>
 <tr><td><code>private/scripts/desktop.sh build all</code></td><td><strong>Build only:</strong> syncs first, then builds every configured desktop artifact: macOS app, Legion MSI, server DEB, server Windows VM MSI, Mac-local Windows MSI and Mac-local Linux DEB. It does not install or copy.</td></tr>
 <tr><td><code>private/scripts/desktop.sh build legion</code></td><td>Sync Legion, then build its MSI without installing.</td></tr>
@@ -309,14 +309,21 @@ that has not yet run AutoPilot or downloaded a certificate.
 ## Merge answer banks
 
 After collecting machine data, merge all machine copies of the Sagar Mein Yog answer bank into one
-project-root file:
+shared Mac Downloads file:
 
 ```sh
 private/scripts/desktop.sh sync-data all
 private/scripts/desktop.sh merge-answer-bank all
 ```
 
-The merge reads:
+The merge reads either the requested generated filename or the app's actual stored filename. The
+stored file is normally nested inside the copied database folder:
+
+```text
+~/Downloads/AutoPilot/Sync/<machine>/Database/answer-banks/sagarmeinyog-ver-1.0.json
+```
+
+It also accepts this direct legacy/requested location:
 
 ```text
 ~/Downloads/AutoPilot/Sync/<machine>/Database/answer-banks.sagarmeinyog-ver-1.0.json
@@ -325,7 +332,7 @@ The merge reads:
 and writes:
 
 ```text
-/Users/jagdeep/Projects/AndroidStudio/AutoPilot/answer-banks.sagarmeinyog-ver-1.0.json
+~/Downloads/AutoPilot/answer-banks.sagarmeinyog-ver-1.0.json
 ```
 
 Entries are considered duplicates when their module, question and option set match after whitespace

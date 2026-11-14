@@ -70,6 +70,21 @@ class DirectoryCourseAnswerBanksTest {
             assertEquals(edited,folder.resolve(DEFAULT_ANSWER_BANK_FILE).readText())
         } finally {root.deleteRecursively()}
     }
+    @Test fun `given a larger bundled bank then it merges new questions without losing local questions`() = runTest {
+        val root=Files.createTempDirectory("bundled-bank-update").toFile()
+        try {
+            val folder=root.resolve("banks")
+            val local="""{"Module":[{"question":"Local question?","options":["A","B"],"answer":"B"}]}"""
+            val bundled="""{"Module":[{"question":"Bundled question?","options":["A","B"],"answer":"A"},{"question":"Another bundled question?","options":["A","B"],"answer":"B"}]}"""
+            folder.mkdirs()
+            folder.resolve(DEFAULT_ANSWER_BANK_FILE).writeText(local)
+            val banks=DirectoryCourseAnswerBanks(folder,bundled=mapOf(DEFAULT_ANSWER_BANK_FILE to {bundled}))
+            val merged=assertNotNull(banks.load())
+            assertEquals(3,merged.questionCount)
+            assertTrue(folder.resolve(DEFAULT_ANSWER_BANK_FILE).readText().contains("Local question?"))
+            assertTrue(folder.resolve(DEFAULT_ANSWER_BANK_FILE).readText().contains("Bundled question?"))
+        } finally {root.deleteRecursively()}
+    }
     @Test fun `given an invalid or unsafe bundled bank when preparing then nothing is written`() = runTest {
         val root=Files.createTempDirectory("bundled-banks").toFile()
         try {

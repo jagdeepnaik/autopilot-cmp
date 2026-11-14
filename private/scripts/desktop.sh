@@ -23,7 +23,7 @@
 #   action   sync     push the Mac's commits and pull them on the target
 #            sync-data copy each machine's ~/.autopilot and ~/Downloads/AutoPilot to the Mac's
 #                     ~/Downloads/AutoPilot/<machine> folder; it does not change Git or builds
-#            merge-answer-bank merge every synced answer bank into the project-root answer bank;
+#            merge-answer-bank merge every synced answer bank into ~/Downloads/AutoPilot;
 #                               it does not change Git, build or install
 #            build    sync, focused tests, then build the installer
 #            run      build, then install/check the target
@@ -520,8 +520,9 @@ sync_data_all() {
 merge_answer_bank() {
     [ "$TARGET" = all ] || fail "merge-answer-bank only supports the all target."
     local input_name='answer-banks.sagarmeinyog-ver-1.0.json'
-    local output="${ANSWER_BANK_OUTPUT:-$ROOT/$input_name}"
+    local output="${ANSWER_BANK_OUTPUT:-$HOME/Downloads/AutoPilot/$input_name}"
     step "Merge synced answer banks"
+    mkdir -p "$(dirname "$output")"
 
     SYNC_DATA_ROOT="$SYNC_DATA_ROOT" OUTPUT="$output" INPUT_NAME="$input_name" python3 - <<'PY'
 import json
@@ -533,13 +534,17 @@ from pathlib import Path
 sync_root = Path(os.environ["SYNC_DATA_ROOT"])
 output = Path(os.environ["OUTPUT"])
 input_name = os.environ["INPUT_NAME"]
+stored_names = {input_name, "sagarmeinyog-ver-1.0.json"}
 sources = sorted(
-    path for path in sync_root.glob(f"*/Database/{input_name}")
-    if path.is_file()
+    path for database in sync_root.glob("*/Database")
+    if database.is_dir()
+    for path in database.rglob("*.json")
+    if path.is_file() and path.name in stored_names
 )
 
 if not sources:
-    print(f"No synced answer banks found under {sync_root}/<machine>/Database/{input_name}.", file=sys.stderr)
+    print(f"No synced answer banks found under {sync_root}/<machine>/Database/.", file=sys.stderr)
+    print(f"Expected {input_name} or the app's stored sagarmeinyog-ver-1.0.json file.", file=sys.stderr)
     print("Run: private/scripts/desktop.sh sync-data all", file=sys.stderr)
     raise SystemExit(1)
 

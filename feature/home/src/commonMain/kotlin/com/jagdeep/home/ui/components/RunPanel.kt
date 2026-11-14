@@ -125,6 +125,8 @@ internal fun RunPanel(
         state.selected == null -> "Create a routine to get started."
         else -> state.lastRun?.let(::lastRunLabel) ?: state.selected.name
     }
+    val detailIsError = detail.startsWith("Assessment paused: no exact saved answer") ||
+        detail.startsWith("No local answer bank")
     val isActive = state.isActive
     Column(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -133,7 +135,7 @@ internal fun RunPanel(
             }
             Column(Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }) {
                 Text(statusHeading ?: title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-                Text(detail, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                Text(detail, style = MaterialTheme.typography.bodyMedium, color = if (detailIsError) colors.error else colors.onSurfaceVariant)
             }
         }
         if (activity is PageActivity.Automation && activity.failure != null) {
@@ -153,6 +155,15 @@ internal fun RunPanel(
                     dismissButton = { TextButton(onClick = onStop) { Text("Not now — stop routine") } },
                 )
             }
+            if (activity is PageActivity.Automation && activity.approval?.kind == com.jagdeep.home.domain.CourseApprovalKind.StartAssessment) {
+                AlertDialog(
+                    onDismissRequest = onStop,
+                    title = { Text("Allow assessment attempt?") },
+                    text = { Text("AutoPilot is ready to start the ${activity.approval.module} assessment. This may be timed or consume an attempt. Allow it to continue?") },
+                    confirmButton = { TextButton(onClick = { onApproveAssessment(activity.approval.token) }) { Text("Allow attempt") } },
+                    dismissButton = { TextButton(onClick = onStop) { Text("Stop routine") } },
+                )
+            }
             if (activity is PageActivity.Automation && activity.approval?.kind == com.jagdeep.home.domain.CourseApprovalKind.SubmitAssessment) {
                 AlertDialog(onDismissRequest = {}, title = { Text("Submit assessment?") },
                     text = { Text("All answers for ${activity.approval.module} are selected. Review them in Chrome before approving the final submission.") },
@@ -166,6 +177,8 @@ internal fun RunPanel(
                     dismissButton = { TextButton(onClick = onStop) { Text("Stop for now") } })
             }
             if (activity is PageActivity.Automation && activity.approval != null && activity.approval.kind !in setOf(
+                    com.jagdeep.home.domain.CourseApprovalKind.StartAssessment,
+                    com.jagdeep.home.domain.CourseApprovalKind.StartAssessmentPass,
                     com.jagdeep.home.domain.CourseApprovalKind.SubmitAssessment,
                     com.jagdeep.home.domain.CourseApprovalKind.CertificateDownloaded,
                 )) {
