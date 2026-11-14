@@ -120,6 +120,12 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 
 All artifact copying belongs to this section. The commands copy installers to
 `~/Downloads/Builds/AutoPilot` and verify each copied file against the SHA256 hash of the source.
+The copied filename is normalized to include the release version and build architecture. Linux
+DEBs use `autopilot_<version>_<architecture>.deb` (for example
+`autopilot_1.0.48_amd64.deb`); Windows MSIs use `AutoPilot_<version>_<architecture>.msi` (for
+example `AutoPilot_1.0.48_amd64.msi`). The architecture names are `amd64` for x64/Intel-AMD,
+`arm64` for ARM, and `x86` for 32-bit Intel. The source filename is not trusted or retained, and
+the SHA256 check is performed after copying under the normalized name.
 
 ### Fetch all existing remote artifacts
 
@@ -152,14 +158,14 @@ Use the target-specific command when you only want one machine's artifact:
 
 | Command | What it does |
 |---|---|
-| `private/scripts/desktop.sh fetch legion` | Copies all existing Legion MSIs to `~/Downloads/Builds/AutoPilot` and verifies every SHA256. It does not build or install. |
-| `private/scripts/desktop.sh fetch server` | Syncs and builds the server DEB, then copies the newest DEB to `~/Downloads/Builds/AutoPilot` and verifies its SHA256. |
-| `private/scripts/desktop.sh fetch server-vm-win` | Checks that the server Windows VM is running, syncs and builds its MSI, then copies it to `~/Downloads/Builds/AutoPilot` and verifies its SHA256. |
+| `private/scripts/desktop.sh fetch legion` | Copies all existing Legion MSIs as `AutoPilot_<version>_<architecture>.msi` to `~/Downloads/Builds/AutoPilot` and verifies every SHA256. It does not build or install. |
+| `private/scripts/desktop.sh fetch server` | Syncs and builds the server DEB, then copies the newest DEB with its version and architecture in the filename to `~/Downloads/Builds/AutoPilot` and verifies its SHA256. |
+| `private/scripts/desktop.sh fetch server-vm-win` | Checks that the server Windows VM is running, syncs and builds its MSI, then copies it as `AutoPilot_<version>_<architecture>.msi` to `~/Downloads/Builds/AutoPilot` and verifies its SHA256. |
 | `private/scripts/desktop.sh fetch mac` | Not available: the Mac app is built and installed locally; it is not copied to Downloads. Use `run mac` if you want to install it. |
 | `private/scripts/desktop.sh fetch mac-vm-win` | Not available: the Mac Windows VM is a local build/install target. Use `run mac-vm-win` if you want to install it in the VM. |
 | `private/scripts/desktop.sh fetch mac-vm-linux` | Not available: the Mac Linux VM is a local build/install target. Use `run mac-vm-linux` if you want to install it in the VM. |
 | `private/scripts/desktop.sh fetch local-all` | Not available: local targets are installed where they are built. Use `run local-all` for local installation. |
-| `private/scripts/desktop.sh fetch all` | Copies existing Legion MSIs and server DEBs. It does not build, sync, install, or fetch local-VM artifacts. |
+| `private/scripts/desktop.sh fetch all` | Copies existing Legion MSIs and server DEBs with normalized version/architecture names. It does not build, sync, install, or fetch local-VM artifacts. |
 
 For Legion, the command uses the existing release folder. If it is empty, build the MSI first:
 
@@ -182,10 +188,10 @@ private/scripts/desktop.sh fetch server-vm-win
 private/scripts/server-vm.sh stop
 ```
 
-The copied files are suitable for testing only. Install an MSI on Legion with [03 — Install and test](03_INSTALL_AND_TEST_WINDOWS.md), or install a DEB on a Linux desktop with:
+The copied files are suitable for testing only. Install an MSI on Legion with [03 — Install and test](03_INSTALL_AND_TEST_WINDOWS.md), or install a DEB on a Linux desktop with the normalized filename:
 
 ```sh
-sudo apt install ./autopilot_<version>_amd64.deb
+sudo apt install ./autopilot_<version>_<architecture>.deb
 ```
 
 Do not install the DEB on the production home server.

@@ -382,30 +382,50 @@ server_build() {
 
 server_fetch() {
     step "Server: copy the DEB to the Mac"
-    local deb
+    local deb name metadata package version deb_arch destination_name remote local_hash
     deb=$(ssh "$SERVER_HOST" "ls -t $SERVER_DIR/desktopApp/build/compose/binaries/main-release/deb/*.deb | head -1") || fail "no DEB on the server."
-    mkdir -p "$DOWNLOADS"
-    scp -q "$SERVER_HOST:$deb" "$DOWNLOADS/"
-    local name remote local_hash
     name=$(basename "$deb")
+    metadata=$(ssh "$SERVER_HOST" "dpkg-deb -f '$deb' Package Version Architecture" | tr '\n' '|') \
+        || fail "couldn't read metadata for $name on the server."
+    IFS='|' read -r package version deb_arch _ <<< "$metadata"
+    [ -n "$package" ] && [ -n "$version" ] && [ -n "$deb_arch" ] \
+        || fail "incomplete DEB metadata for $name on the server."
+    destination_name="$(printf '%s' "$package" | tr '[:upper:]' '[:lower:]')_${version}_$(normalize_architecture "$deb_arch").deb"
+    mkdir -p "$DOWNLOADS"
+    scp -q "$SERVER_HOST:$deb" "$DOWNLOADS/$destination_name"
     remote=$(ssh "$SERVER_HOST" "sha256sum '$deb'" | cut -d' ' -f1)
-    local_hash=$(shasum -a 256 "$DOWNLOADS/$name" | cut -d' ' -f1)
-    [ "$remote" = "$local_hash" ] || fail "the copied $name doesn't match the server's (hash mismatch)."
-    echo "Copied $DOWNLOADS/$name (SHA256 $local_hash, matches the server)."
-    echo "Install it on a Linux desktop, not on the server: sudo apt install ./$name"
+    local_hash=$(shasum -a 256 "$DOWNLOADS/$destination_name" | cut -d' ' -f1)
+    [ "$remote" = "$local_hash" ] || fail "the copied $destination_name doesn't match the server's (hash mismatch)."
+    echo "Copied $DOWNLOADS/$destination_name (SHA256 $local_hash, matches the server)."
+    echo "Install it on a Linux desktop, not on the server: sudo apt install ./$destination_name"
 }
 
 # --- Fetch every existing Legion MSI and server DEB ---------------------------------------------
 # This is deliberately separate from a build: it never syncs Git, builds, installs or deletes.
 safe_artifact_name() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.(msi|deb)$ ]]; }
+normalize_architecture() {
+    case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '\r')" in
+        amd64|x86_64|x64) echo amd64 ;;
+        arm64|aarch64) echo arm64 ;;
+        x86|i386|i686) echo x86 ;;
+        *) fail "unsupported build architecture: $1" ;;
+    esac
+}
+normalized_msi_name() {
+    local source="$1" architecture="$2" version
+    version=$(printf '%s' "$source" | sed -nE 's/^AutoPilot[-_]([0-9]+\.[0-9]+\.[0-9]+).*\.msi$/\1/p')
+    [ -n "$version" ] || fail "couldn't read the version from MSI name: $source"
+    echo "AutoPilot_${version}_${architecture}.msi"
+}
 
 fetch_artifact_group() {
     local label="$1" host="$2" remote_dir="$3" extension="$4"
-    local names name remote_hash local_hash copied=0
+    local names name remote_hash local_hash copied=0 destination_name architecture metadata package version deb_arch
     step "$label: find .$extension artifacts"
     if [ "$extension" = msi ]; then
         names=$(ssh "$host" "powershell -NoProfile -Command \"Get-ChildItem -LiteralPath '$remote_dir' -Filter '*.$extension' -File | Sort-Object Name | ForEach-Object { \$_.Name }\"" | tr -d '\r') \
             || fail "$label couldn't be reached."
+        architecture=$(normalize_architecture "$(windows_ps_raw "$host" '$env:PROCESSOR_ARCHITECTURE' | tr -d '\r')")
     else
         names=$(ssh "$host" "find '$remote_dir' -maxdepth 1 -type f -name '*.$extension' -printf '%f\\n' | sort") \
             || fail "$label couldn't be reached."
@@ -416,8 +436,19 @@ fetch_artifact_group() {
     while IFS= read -r name; do
         [ -n "$name" ] || continue
         safe_artifact_name "$name" || fail "$label returned an unsafe artifact name: $name"
-        step "$label: copy $name"
-        scp -q "$host:$remote_dir/$name" "$DOWNLOADS/$name" \
+        if [ "$extension" = msi ]; then
+            destination_name=$(normalized_msi_name "$name" "$architecture")
+        else
+            metadata=$(ssh "$host" "dpkg-deb -f '$remote_dir/$name' Package Version Architecture" | tr '\n' '|') \
+                || fail "couldn't read metadata for $name on $label."
+            IFS='|' read -r package version deb_arch _ <<< "$metadata"
+            [ -n "$package" ] && [ -n "$version" ] && [ -n "$deb_arch" ] \
+                || fail "incomplete DEB metadata for $name on $label."
+            destination_name="$(printf '%s' "$package" | tr '[:upper:]' '[:lower:]')_${version}_$(normalize_architecture "$deb_arch").deb"
+        fi
+        safe_artifact_name "$destination_name" || fail "$label produced an unsafe destination name: $destination_name"
+        step "$label: copy $name as $destination_name"
+        scp -q "$host:$remote_dir/$name" "$DOWNLOADS/$destination_name" \
             || fail "couldn't copy $name from $label."
         if [ "$extension" = msi ]; then
             remote_hash=$(ssh "$host" "powershell -NoProfile -Command \"(Get-FileHash -Algorithm SHA256 -LiteralPath '$remote_dir/$name').Hash\"" | tr -d '\r' | tr 'A-F' 'a-f') \
@@ -426,9 +457,9 @@ fetch_artifact_group() {
             remote_hash=$(ssh "$host" "sha256sum '$remote_dir/$name'" | awk '{print $1}') \
                 || fail "couldn't read the hash for $name on $label."
         fi
-        local_hash=$(shasum -a 256 "$DOWNLOADS/$name" | awk '{print $1}')
-        [ "$remote_hash" = "$local_hash" ] || fail "$name doesn't match $label after copying (hash mismatch)."
-        echo "Copied $DOWNLOADS/$name (SHA256 $local_hash, matches $label)."
+        local_hash=$(shasum -a 256 "$DOWNLOADS/$destination_name" | awk '{print $1}')
+        [ "$remote_hash" = "$local_hash" ] || fail "$destination_name doesn't match $label after copying (hash mismatch)."
+        echo "Copied $DOWNLOADS/$destination_name (SHA256 $local_hash, matches $label)."
         copied=$((copied + 1))
     done <<< "$names"
     echo "$label: copied and verified $copied .$extension file(s)."
@@ -644,17 +675,18 @@ vm_build() {
 
 vm_fetch() {
     step "Server VM: copy the MSI to the Mac"
-    local msi
+    local msi destination_name architecture remote local_hash
     msi=$(windows_ps "$VM_HOST" "$VM_DIR" "(Get-ChildItem .\\desktopApp\\build\\compose\\binaries\\main-release\\msi\\*.msi | Sort-Object LastWriteTime | Select-Object -Last 1).Name" | tr -d '\r') \
         || fail "no MSI in the server VM."
     [ -n "$msi" ] || fail "no MSI in the server VM."
+    architecture=$(normalize_architecture "$(windows_ps_raw "$VM_HOST" '$env:PROCESSOR_ARCHITECTURE' | tr -d '\r')")
+    destination_name=$(normalized_msi_name "$msi" "$architecture")
     mkdir -p "$DOWNLOADS"
-    scp -q "$VM_HOST:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/$msi" "$DOWNLOADS/"
-    local remote local_hash
+    scp -q "$VM_HOST:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/$msi" "$DOWNLOADS/$destination_name"
     remote=$(windows_ps "$VM_HOST" "$VM_DIR" "(Get-FileHash .\\desktopApp\\build\\compose\\binaries\\main-release\\msi\\$msi).Hash" | tr -d '\r' | tr 'A-F' 'a-f')
-    local_hash=$(shasum -a 256 "$DOWNLOADS/$msi" | cut -d' ' -f1)
-    [ "$remote" = "$local_hash" ] || fail "the copied $msi doesn't match the VM's (hash mismatch)."
-    echo "Copied $DOWNLOADS/$msi (SHA256 $local_hash, matches the VM)."
+    local_hash=$(shasum -a 256 "$DOWNLOADS/$destination_name" | cut -d' ' -f1)
+    [ "$remote" = "$local_hash" ] || fail "the copied $destination_name doesn't match the VM's (hash mismatch)."
+    echo "Copied $DOWNLOADS/$destination_name (SHA256 $local_hash, matches the VM)."
 }
 
 # --- Dispatch -----------------------------------------------------------------------------------
