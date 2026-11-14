@@ -342,6 +342,10 @@ class PageController(
     private val savedQuizFeedback = mutableSetOf<String>()
     private var quizLearningProblem: String? = null
     private var quizLearningStatus: String? = null
+    private var quizLearningStatusUntil = 0L
+    private var quizNewQuestions = 0
+    private var quizUpdatedQuestions = 0
+    private var quizSavedAnswers = 0
     private var failedAudioAttention: String? = null
     private var lastCourseInventoryAt = 0L
     private val pageReading = MutableStateFlow<PageReading?>(null)
@@ -453,6 +457,10 @@ class PageController(
                 lastCourseInventoryAt = now()
                 quizLearningProblem = null
                 quizLearningStatus = null
+                quizLearningStatusUntil = 0L
+                quizNewQuestions = 0
+                quizUpdatedQuestions = 0
+                quizSavedAnswers = 0
                 courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode, routine.learningOrder, bankFile, routine.answerQuizzes, routine.autoDownloadCertificates)
                 courseProgress = if (progressRepository.available) CourseProgressSession(progressRepository, courseAutomation!!.session, routine.waitAfterClickMillis) else null
                 courseChunks.clear()
@@ -634,6 +642,11 @@ class PageController(
         } finally {
             withContext(NonCancellable) {
                 val clicks = runner?.clicks ?: 0
+                if (quizSavedAnswers > 0) {
+                    live.log(LiveSource.Routine) {
+                        "Quiz learning session: $quizNewQuestions new, $quizUpdatedQuestions updated, $quizSavedAnswers saved"
+                    }
+                }
                 endActivity()
                 record(routine.name, startedAt, clicks, outcome)
             }
@@ -811,7 +824,8 @@ class PageController(
                         val key = "${runner.session}:${CourseAnswerBank.normalize(module)}:${CourseAnswerBank.normalize(question.text)}:${CourseAnswerBank.optionText(correct.text)}"
                         if (savedQuizFeedback.add(key)) {
                             val currentBank = try { activeAnswerBankStore.load() } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { null }
-                            val previous = currentBank?.entry(module, question)?.answer
+                            val existing = currentBank?.entry(module, question)
+                            val previous = existing?.answer
                             if (previous == null || CourseAnswerBank.optionText(previous) != CourseAnswerBank.optionText(correct.text)) {
                                 val result = try {
                                     activeAnswerBankStore.saveReviewed(module, listOf(ReviewedAnswer(
@@ -822,6 +836,9 @@ class PageController(
                                     runner.configureAnswers(result.bank)
                                     quizLearningProblem = null
                                     quizLearningStatus = "Learned and saved quiz answer for $module: ${question.text.take(120)}"
+                                    quizLearningStatusUntil = now() + 5_000
+                                    if (existing == null) quizNewQuestions++ else quizUpdatedQuestions++
+                                    quizSavedAnswers++
                                     live.log(LiveSource.Routine) { "Saved practice quiz answer for $module: ${question.text.take(120)}" }
                                 } else {
                                     quizLearningProblem = "Quiz answer could not be saved to the answer bank ($result). Check the selected bank file."
@@ -851,7 +868,7 @@ class PageController(
         val activity = state.value.activity as? PageActivity.Automation ?: return true
         val key = runner.attention ?: runner.failure?.token
         val detail = (courseProgress?.takeIf { it.action != null || it.request != null || it.isChecking }?.detail ?: runner.detail) +
-            (quizLearningStatus?.let { " $it" } ?: "") +
+            (quizLearningStatus?.takeIf { now() < quizLearningStatusUntil }?.let { " $it" } ?: "") +
             (quizLearningProblem?.let { " $it" } ?: "") +
             if (key != null && key == failedAudioAttention) " Sound unavailable; check the audio output." else ""
         mutableState.update { it.copy(activity = activity.copy(detail = detail, clicks = runner.clicks, approval = runner.approval,
