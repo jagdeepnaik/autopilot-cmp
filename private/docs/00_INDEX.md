@@ -2,7 +2,7 @@
 
 **Open this file first.** The guides are numbered by how often you'll need them: 01–09 are everyday tasks, 10–13 are the home-server route, 14–19 are background reading and reference (including the Git guide), 20–24 and 29 are one-time machine setup, 25–28 are old shortcut pages, and 30 is the CMP project standard. Each guide links back here. Opening a guide doesn't start any build, installation or connection.
 
-Updated 13 November 2026.
+Updated 14 November 2026.
 
 ## Find it fast
 
@@ -22,6 +22,7 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | Debug the Windows app from the Mac | [04 · Debug from the Mac](04_DEBUG_WINDOWS_FROM_MAC.md) |
 | Look up a Git command, or fix a Git problem | [19 · Cheat sheet](19_GIT_GUIDE.md#16-cheat-sheet) · [Recipes](19_GIT_GUIDE.md#14-recipes-for-common-situations) · [Undoing things](19_GIT_GUIDE.md#7-undoing-things) |
 | A pull refused because of local changes | [19 · Recipe 14.7](19_GIT_GUIDE.md#147-a-build-machine-has-local-changes) |
+| Understand how Chrome is controlled | [32 · Chrome extension architecture](32_CHROME_EXTENSION_ARCHITECTURE.md) |
 
 ## 01–09 · Everyday
 
