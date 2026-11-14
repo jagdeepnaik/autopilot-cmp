@@ -13,6 +13,7 @@
   let session = null;
   let handled = new Set();
   let elements = new Map();
+  const practiceChoices = new Map();
   const originalSpeeds = new Map();
   function restoreSpeeds() {
     for (const [video, speed] of originalSpeeds) {
@@ -48,6 +49,39 @@
   const identify = (node) => { if (!ids.has(node)) ids.set(node, String(++nextId)); elements.set(ids.get(node), node); return ids.get(node); };
   function assessmentInventory() {
     if (window !== window.top || location.origin !== 'https://sagarmeinyog.com') return null;
+    const completedPractice = [...document.querySelectorAll('h1,h2,h3,h4')].some(node =>
+      visible(node) && /^Quiz Completed!$/i.test(safeText(node)));
+    if (completedPractice) {
+      practiceChoices.clear();
+      return { module: '', questions: [], result: 'completed', quiz: true, practice: true };
+    }
+    const practiceHeading = [...document.querySelectorAll('h1,h2,h3,h4')].find(node => visible(node) && /^Practice your learning!$/i.test(safeText(node)));
+    if (practiceHeading) {
+      const root = practiceHeading.closest('main') || document.body;
+      const question = [...root.querySelectorAll('h1,h2,h3,h4')].find(node => visible(node) && /^Question:\s*/i.test(safeText(node)));
+      const text = question ? safeText(question).replace(/^Question:\s*/i, '') : '';
+      const count = safeText(root, 10000).match(/Question\s+(\d+)\s+of\s+(\d+)/i);
+      const buttons = [...root.querySelectorAll('button')].filter(visible);
+      const submit = buttons.find(node => /^Submit$/i.test(label(node)));
+      const next = buttons.find(node => /^(?:Next|Finish)$/i.test(label(node)) && !node.matches(':disabled'));
+      const actionEnd = submit || next;
+      const options = question && actionEnd ? buttons.filter(node =>
+        (question.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        (actionEnd.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_PRECEDING) &&
+        !/^(?:previous|next|submit)$/i.test(label(node))).slice(0, 8) : [];
+      const feedback = options.some(node => /Your Answer\s+(?:Correct|Incorrect)/i.test(safeText(node)));
+      const correct = options.find(node => /\bCorrect Answer\b/i.test(safeText(node))) ||
+        options.find(node => /Your Answer\s+Correct\b/i.test(safeText(node)));
+      const module = [...document.querySelectorAll('a[href]')].find(node => /\/dashboard\/courses\/[A-Za-z0-9_-]+$/.test(node.getAttribute('href') || ''))?.textContent?.trim() || '';
+      return { module, questions: text ? [{ id: text, text, options: options.map(node => ({
+        id: identify(node), text: label(node).replace(/\s+(?:Your Answer\s+(?:Correct|Incorrect)|Correct Answer).*$/i, ''),
+        selected: practiceChoices.get(text) === label(node).replace(/\s+(?:Your Answer\s+(?:Correct|Incorrect)|Correct Answer).*$/i, ''), enabled: !node.matches(':disabled'), visible: true })) }] : [],
+        result: null,
+        quiz: true, practice: true, practiceFeedback: feedback,
+        practiceCorrectAnswer: correct ? label(correct).replace(/\s+(?:Your Answer\s+(?:Correct|Incorrect)|Correct Answer).*$/i, '') : null,
+        totalQuestions: count ? Number(count[2]) : null,
+        submit: submit ? identify(submit) : null, next: next ? identify(next) : null };
+    }
     const radios = [...document.querySelectorAll('input[type="radio"],[role="radio"]')].filter(visible);
     const headings = [...document.querySelectorAll('h1,h2,h3,h4,[role="heading"],[role="status"]')].filter(visible);
     const assessmentHeading = headings.find((node) => /^(?:(?:course|start)\s+)?assessment(?:\s+results?)?$/i.test(safeText(node))) ||
@@ -231,6 +265,8 @@
         // a change that never happened and appear to have answered the question.
         if (action.kind === 'assessmentAnswer') {
           try { node.click(); } catch {}
+          const current = assessmentInventory();
+          if (current?.practice && current.questions[0]) practiceChoices.set(current.questions[0].text, label(node));
           const assessment = assessmentInventory();
           success = assessment?.questions.some((question) => question.options.some((option) =>
             option.id === action.element && option.selected)) === true;
@@ -300,7 +336,7 @@
     try {
       const authorization = await chrome.runtime.sendMessage({ type: 'courseHello' });
       if (authorization?.session) {
-        if (session !== authorization.session) { restoreSpeeds(); session = authorization.session; handled = new Set(); }
+        if (session !== authorization.session) { restoreSpeeds(); session = authorization.session; handled = new Set(); practiceChoices.clear(); }
         const { items, truncated } = inventory();
         const assessment = assessmentInventory();
         const snapshot = { session, document: documentId, path: location.pathname, top: window === window.top,

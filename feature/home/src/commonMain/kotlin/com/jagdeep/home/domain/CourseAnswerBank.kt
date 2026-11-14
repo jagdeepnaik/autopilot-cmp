@@ -112,6 +112,9 @@ internal data class CourseAssessment(
     val confirmSubmit: String? = null,
     val retry: String? = null,
     val quiz: Boolean = false,
+    val practice: Boolean = false,
+    val practiceCorrectAnswer: String? = null,
+    val practiceFeedback: Boolean = false,
 )
 
 enum class CourseApprovalKind { StartAssessment, SubmitAssessment, StartAssessmentPass, CertificateDownloaded }

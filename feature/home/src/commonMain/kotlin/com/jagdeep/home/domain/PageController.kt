@@ -339,6 +339,8 @@ class PageController(
     private val alertedAssessmentFailures = mutableSetOf<String>()
     private val assessmentAlertMutex = Mutex()
     private val courseProgressMutex = Mutex()
+    private val savedQuizFeedback = mutableSetOf<String>()
+    private var quizLearningProblem: String? = null
     private var failedAudioAttention: String? = null
     private var lastCourseInventoryAt = 0L
     private val pageReading = MutableStateFlow<PageReading?>(null)
@@ -592,7 +594,7 @@ class PageController(
                     publish()
                 }
             }
-            if (routine.answerAssessments) {
+            if (routine.answerAssessments || routine.answerQuizzes) {
                 val bank = try { activeAnswerBankStore.load() }
                 catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                 catch (_: Exception) { null }
@@ -794,6 +796,37 @@ class PageController(
             val progressHandled = tracking?.process(snapshot, now(), learningActionPending = runner.action != null) == true
             if (courseAutomation !== runner) return true
             if (!progressHandled) {
+                if (snapshot.assessment?.practice == true && snapshot.assessment.practiceFeedback && snapshot.assessment.practiceCorrectAnswer == null) {
+                    quizLearningProblem = "The quiz showed feedback but did not identify the correct answer. Review this question in Chrome; it was not saved."
+                }
+                snapshot.assessment?.takeIf { it.practice && it.practiceCorrectAnswer != null }?.let { practice ->
+                    val question = practice.questions.singleOrNull()
+                    val correct = question?.options?.singleOrNull { CourseAnswerBank.optionText(it.text) == CourseAnswerBank.optionText(practice.practiceCorrectAnswer.orEmpty()) }
+                    val module = practice.module.ifBlank { runner.currentModule.orEmpty() }
+                    if (question != null && correct != null && module.isNotBlank()) {
+                        quizLearningProblem = null
+                        val key = "${runner.session}:${CourseAnswerBank.normalize(module)}:${CourseAnswerBank.normalize(question.text)}:${CourseAnswerBank.optionText(correct.text)}"
+                        if (savedQuizFeedback.add(key)) {
+                            val currentBank = try { activeAnswerBankStore.load() } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { null }
+                            val previous = currentBank?.entry(module, question)?.answer
+                            if (previous == null || CourseAnswerBank.optionText(previous) != CourseAnswerBank.optionText(correct.text)) {
+                                val result = try {
+                                    activeAnswerBankStore.saveReviewed(module, listOf(ReviewedAnswer(
+                                        CourseAnswer(question.text, question.options.map { it.text }, correct.text), previous)))
+                                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                catch (_: Exception) { AnswerBankSaveResult.Unavailable }
+                                if (result is AnswerBankSaveResult.Saved) {
+                                    runner.configureAnswers(result.bank)
+                                    quizLearningProblem = null
+                                    live.log(LiveSource.Routine) { "Saved practice quiz answer for $module: ${question.text.take(120)}" }
+                                } else {
+                                    quizLearningProblem = "Quiz answer could not be saved to the answer bank ($result). Check the selected bank file."
+                                    live.log(LiveSource.Routine) { "Could not save practice quiz answer for $module: $result" }
+                                }
+                            }
+                        }
+                    }
+                }
                 runner.configureCertificates(courseProgress?.summary?.displayName, certificateStore)
                 runner.configureProgress(tracking?.summary)
                 runner.read(snapshot, now())
@@ -813,7 +846,9 @@ class PageController(
         }
         val activity = state.value.activity as? PageActivity.Automation ?: return true
         val key = runner.attention ?: runner.failure?.token
-        val detail = (courseProgress?.takeIf { it.action != null || it.request != null || it.isChecking }?.detail ?: runner.detail) + if (key != null && key == failedAudioAttention) " Sound unavailable; check the audio output." else ""
+        val detail = (courseProgress?.takeIf { it.action != null || it.request != null || it.isChecking }?.detail ?: runner.detail) +
+            (quizLearningProblem?.let { " $it" } ?: "") +
+            if (key != null && key == failedAudioAttention) " Sound unavailable; check the audio output." else ""
         mutableState.update { it.copy(activity = activity.copy(detail = detail, clicks = runner.clicks, approval = runner.approval,
             context = activity.context.copy(module = runner.currentModule ?: activity.context.module),
             manualAnswer = runner.manualAnswer, failure = runner.failure,

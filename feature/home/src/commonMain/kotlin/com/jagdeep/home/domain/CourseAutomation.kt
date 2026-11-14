@@ -464,7 +464,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     return
                 }
                 detail = "Quiz completed. Returning to the course."
-                val back = elements.firstOrNull { it.href == coursePath } ?: elements.firstOrNull { it.label.equals("Back to Course", true) }
+                val back = elements.firstOrNull { it.label.equals("Go to Next Material", true) }
+                    ?: elements.firstOrNull { it.href == coursePath }
+                    ?: elements.firstOrNull { it.label.equals("Back to Course", true) }
                 if (back != null) issue(back, "assessmentReturn", "Quiz completed. Returning to the course.")
                 return
             }
@@ -485,6 +487,39 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 ?: currentModule
                 ?: moduleTitles[path]
                 ?: "")
+            if (assessment.practice) {
+                if (!answerQuizzes) {
+                    detail = "Quiz handling is disabled. Enable Answer chapter quizzes in the routine options."
+                    return
+                }
+                val question = assessment.questions.singleOrNull()
+                if (question == null || question.options.size < 2) {
+                    detail = "Waiting for the practice quiz question and options."
+                    return
+                }
+                val selected = question.options.singleOrNull { it.selected }
+                val next = elements.firstOrNull { it.id == assessment.next && it.label.trim() in setOf("Next", "Finish") }
+                if (next != null && assessment.practiceFeedback) {
+                    issue(next, "assessmentNext", if (next.label.trim() == "Finish") "Finishing the practice quiz." else "Opening the next practice question.")
+                    return
+                }
+                val answer = answerBank?.answer(assessment.module, question)
+                // A practice quiz is ungraded and reveals the correct answer after Submit.
+                // If the bank has no exact match, try one option and learn only from explicit feedback.
+                val candidate = answer ?: question.options.firstOrNull { it.enabled && it.visible }
+                if (selected == null) {
+                    val option = candidate?.takeIf { it.enabled }
+                    if (option != null) {
+                        automaticAnswerKeys += "${CourseAnswerBank.normalize(assessment.module)}:${CourseAnswerBank.normalize(question.text)}"
+                        issue(CourseElement(option.id, tag = "button", label = option.text), "assessmentAnswer", "Selecting the saved practice quiz answer.")
+                    }
+                    return
+                }
+                val submit = elements.firstOrNull { it.id == assessment.submit && it.label.trim().equals("Submit", true) && it.enabled }
+                if (submit != null) issue(submit, "assessmentSubmit", "Checking the practice quiz answer.")
+                else detail = "Waiting for practice quiz feedback."
+                return
+            }
             // Count the actual question attempt, not time spent waiting on the module's
             // "Start Assessment" page or an approval dialog.
             if (assessment.result == null && assessment.questions.isNotEmpty()) { if (path !in assessmentStartedAt) assessmentStartedAt[path] = now }
@@ -528,7 +563,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 return
             }
             retryStartedAt = null
-            if (answerThisPage && assessmentMode == AssessmentMode.Manual && assessment.result == null) {
+            if (answerThisPage && !isQuiz && assessmentMode == AssessmentMode.Manual && assessment.result == null) {
                 val unknown = assessment.questions.firstOrNull { answerBank?.answer(assessment.module, it) == null }
                 if (unknown != null) {
                     attention = "$path:${CourseAnswerBank.normalize(unknown.text)}:" + unknown.options.map { CourseAnswerBank.optionText(it.text) }.sorted().joinToString("|")
@@ -700,7 +735,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 detail = "Assessment paused: not all assessment questions have been confirmed."; return
             }
             if (submit != null) {
-                if (!requireApproval(CourseApprovalKind.SubmitAssessment, assessment.module, confirmed.entries.sortedBy { it.key }.joinToString() + assessment.questions.toString())) return
+                if (!isQuiz && !requireApproval(CourseApprovalKind.SubmitAssessment, assessment.module, confirmed.entries.sortedBy { it.key }.joinToString() + assessment.questions.toString())) return
                 submittedAssessments.add(path)
                 approvedSubmission = null
                 issue(submit, "assessmentSubmit", "Submitting the fully matched assessment once.")

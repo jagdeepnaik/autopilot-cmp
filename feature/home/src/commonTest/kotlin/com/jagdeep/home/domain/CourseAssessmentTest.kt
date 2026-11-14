@@ -9,6 +9,53 @@ import kotlin.test.assertTrue
 
 class CourseAssessmentTest {
     @Test
+    fun `practice quiz answers and submits each question before advancing`() {
+        val runner = CourseAutomationSession("s", 0, answerQuizzes = true, assessmentMode = AssessmentMode.Review)
+        runner.configureAnswers(bank)
+        val controls = arrayOf(CourseElement("a", tag = "button", label = "1. First"), CourseElement("b", tag = "button", label = "2. Second"), CourseElement("submit", tag = "button", label = "Submit"))
+        runner.read(page(*controls, assessment = CourseAssessment("Wellness", listOf(q), submit = "submit", quiz = true, practice = true, totalQuestions = 2)), 0)
+        assertEquals("assessmentAnswer", runner.action?.kind)
+        assertEquals("b", runner.action?.element)
+        runner.acknowledge(runner.action!!.request, true)
+        runner.read(page(*controls, assessment = CourseAssessment("Wellness", listOf(q.copy(options = q.options.map { it.copy(selected = it.id == "b") })), submit = "submit", quiz = true, practice = true, totalQuestions = 2)), 1)
+        assertEquals("assessmentSubmit", runner.action?.kind)
+        assertNull(runner.approval)
+    }
+
+    @Test
+    fun `practice quiz may try an unknown answer and submit without approval`() {
+        val runner = CourseAutomationSession("s", 0, answerQuizzes = true, assessmentMode = AssessmentMode.Manual)
+        val unknown = q.copy(text = "A new practice question?")
+        val controls = arrayOf(CourseElement("a", tag = "button", label = "1. First"), CourseElement("b", tag = "button", label = "2. Second"), CourseElement("submit", tag = "button", label = "Submit"))
+        runner.read(page(*controls, assessment = CourseAssessment("Wellness", listOf(unknown), submit = "submit", quiz = true, practice = true)), 0)
+        assertEquals("assessmentAnswer", runner.action?.kind)
+        assertEquals("a", runner.action?.element)
+        runner.acknowledge(runner.action!!.request, true)
+        runner.read(page(*controls, assessment = CourseAssessment("Wellness", listOf(unknown.copy(options = unknown.options.map { it.copy(selected = it.id == "a") })), submit = "submit", quiz = true, practice = true)), 1)
+        assertEquals("assessmentSubmit", runner.action?.kind)
+        assertNull(runner.approval)
+    }
+
+    @Test
+    fun `practice quiz finishes last question before recording completion`() {
+        val runner = CourseAutomationSession("s", 0, answerQuizzes = true, assessmentMode = AssessmentMode.Review)
+        val finish = CourseElement("finish", tag = "button", label = "Finish")
+        val answered = q.copy(options = q.options.map { it.copy(enabled = false) })
+        runner.read(page(finish, assessment = CourseAssessment("Wellness", listOf(answered), next = "finish", quiz = true,
+            practice = true, practiceFeedback = true, totalQuestions = 2)), 0)
+        assertEquals("assessmentNext", runner.action?.kind)
+        assertTrue(runner.pendingCompletions.isEmpty())
+
+        runner.acknowledge(runner.action!!.request, true)
+        runner.read(page(CourseElement("continue", tag = "button", label = "Go to Next Material"),
+            assessment = CourseAssessment("Wellness", result = "completed", quiz = true, practice = true)), 1)
+        assertEquals("assessmentReturn", runner.action?.kind)
+        assertEquals("continue", runner.action?.element)
+        assertTrue(runner.pendingCompletions.values.any { it.kind == "quiz" })
+        assertNull(runner.approval)
+    }
+
+    @Test
     fun `quiz start screen uses its own start control`() {
         val runner = CourseAutomationSession("s", 0, answerAssessments = false, answerQuizzes = true, assessmentMode = AssessmentMode.Automatic)
         runner.configureAnswers(bank)
