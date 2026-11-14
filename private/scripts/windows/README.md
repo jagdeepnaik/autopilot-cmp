@@ -24,8 +24,8 @@ AutoPilot's Windows MSI must be built on Windows. GitHub Actions can produce it 
 Use the single action-first command from the project root:
 
 ```bash
-private/scripts/desktop.sh run legion
-private/scripts/desktop.sh debug legion
+./dev.sh run legion
+./dev.sh debug legion
 ```
 
 The commands for the Mac and the home server, and how they work, are in `private/docs/01_ONE_COMMAND_BUILDS.md`.
