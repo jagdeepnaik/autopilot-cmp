@@ -559,13 +559,13 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     detail = "No local answer bank matches this module. Stop and check $answerBankFile."
                     return
                 }
-                if (!requireApproval(CourseApprovalKind.StartAssessment, assessment.module, path)) return
-                val start = elements.firstOrNull { it.id == assessment.start && it.label.trim().equals("Start Assessment", true) }
+                if (!isQuiz && !requireApproval(CourseApprovalKind.StartAssessment, assessment.module, path)) return
+                val start = elements.firstOrNull { it.id == assessment.start && it.label.trim().equals(if (isQuiz) "Start Quiz" else "Start Assessment", true) }
                 if (start != null) {
                     assessmentCourse = path
                     explicitlyStartedAssessments.add(path)
-                    issue(start, "assessmentStart", "Starting the module assessment using this routine’s mode.")
-                } else detail = "Waiting for the recognized Start Assessment control."
+                    issue(start, "assessmentStart", if (isQuiz) "Starting the chapter quiz." else "Starting the module assessment using this routine’s mode.")
+                } else detail = if (isQuiz) "Waiting for the recognized Start Quiz control." else "Waiting for the recognized Start Assessment control."
                 return
             }
             if (!answerThisPage) {
@@ -687,7 +687,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val next = elements.firstOrNull { it.id == assessment.next && it.label.trim().lowercase() in setOf("next", "next question") }
             val expectedCount = assessment.totalQuestions ?: saved?.size ?: 0
             if (next != null && confirmed.size < expectedCount) { issue(next, "assessmentNext", "Opening the next assessment question."); return }
-            val submit = elements.firstOrNull { it.id == assessment.submit && it.label.trim().lowercase() in setOf("submit", "submit assessment", "submit answers", "end test") }
+            val submit = elements.firstOrNull { it.id == assessment.submit && it.label.trim().lowercase() in setOf("submit", "submit assessment", "submit quiz", "submit answers", "end test") }
             // A full known bank must be covered, with every displayed answer observed selected.
             // Never submit based on click acknowledgements or a guessed last-page button. Review
             // mode deliberately hands a resumed, already-selected final page back to the user:
@@ -708,7 +708,14 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             return
         }
         if (view == CourseView.Lesson) {
-            if (lessonPage != null && lessonPage in completedLessonPages && snapshot.top) {
+            val completionScreen = snapshot.top && snapshot.elements.any {
+                it.visible && it.tag in setOf("h1", "h2", "h3", "h4") && it.label.trim().equals("Video Completed!", true)
+            }
+            val quizKey = "${coursePath ?: path}:${lessonPage ?: reportedPath}"
+            val offeredQuiz = if (answerQuizzes && completionScreen && quizKey !in completedQuizzes) snapshot.elements.firstOrNull {
+                it.visible && it.enabled && it.label.trim().matches(Regex("(?:(?:Start|Take|Begin)\\s+)?Quiz", RegexOption.IGNORE_CASE))
+            } else null
+            if (lessonPage != null && lessonPage in completedLessonPages && snapshot.top && offeredQuiz == null) {
                 val back = elements.firstOrNull { it.href == coursePath && it.tag == "a" }
                     ?: elements.firstOrNull { it.label.equals("Back to Course", true) }
                 if (back != null) {
@@ -719,9 +726,6 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             }
             // The live site unmounts the media element immediately when playback ends.
             // Only the explicit completion heading is evidence; a missing player is not.
-            val completionScreen = snapshot.top && elements.any {
-                it.tag in setOf("h1", "h2", "h3", "h4") && it.label.trim().equals("Video Completed!", true)
-            }
             videos.keys.removeAll { it.startsWith("${snapshot.document}:") }
             snapshot.elements.filter { it.tag == "video" && !it.decorative }.forEach { videos["${snapshot.document}:${it.id}"] = it }
             val video = elements.firstOrNull { it.tag == "video" && !it.decorative && !it.ended }
@@ -773,7 +777,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             coursePath?.let(newlyWatchedCourses::add)
             val courseReturn = elements.firstOrNull { it.label.equals("Back to Course", true) }
                 ?: elements.firstOrNull { it.tag == "a" && it.href == coursePath }
-            if (returnToCourseAfterLesson && courseReturn != null && snapshot.top) {
+            if (returnToCourseAfterLesson && courseReturn != null && snapshot.top && offeredQuiz == null) {
                 returnToCourseAfterLesson = false
                 issue(courseReturn, message = "Video finished. Checking module completion before replaying completed lessons.")
                 blockedPath = pageId
@@ -782,13 +786,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             // On the live site, chapter quizzes are offered immediately on the video-completion
             // screen. Handle Start Quiz before Next or Back to Course, otherwise the normal lesson
             // navigation skips the quiz entirely.
-            if (answerQuizzes && completionScreen) {
-                val quiz = elements.firstOrNull { it.label.trim().matches(Regex("(?:(?:Start|Take|Begin)\\s+)?Quiz", RegexOption.IGNORE_CASE)) }
-                if (quiz != null) {
-                    pendingQuizKey = "${coursePath ?: path}:${lessonPage ?: reportedPath}"
-                    issue(quiz, "quizOpen", "Video finished. Opening the chapter quiz before continuing.")
+            if (offeredQuiz != null) {
+                    pendingQuizKey = quizKey
+                    issue(offeredQuiz, "quizOpen", "Video finished. Opening the chapter quiz before continuing.")
                     return
-                }
             }
             val next = elements.firstOrNull { it.tag in setOf("button", "a") && it.label.trim().equals("Next", true) }
             if (next != null && snapshot.top) {

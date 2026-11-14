@@ -98,6 +98,12 @@ fun SettingsScreen(
                 checked = preferences.keepDisplayOn,
                 onChange = viewModel::updateKeepDisplayOn,
             )
+            if (desktop) SwitchRow(
+                title = "Keep the display on while AutoPilot is open",
+                supporting = state.displayWakeProblem ?: "Prevents idle display sleep until you close AutoPilot.",
+                checked = preferences.keepDisplayOnWhileAppOpen,
+                onChange = viewModel::updateKeepDisplayOnWhileAppOpen,
+            )
             SwitchRow(
                 title = "Alert sounds",
                 supporting = "Question reminders repeat every 30 seconds. Different sounds signal failure or five minutes without progress.",

@@ -94,7 +94,7 @@ class SettingsScreenUiTest {
         val viewModel = SettingsViewModel(store, gate)
         setContent { AppTheme(darkTheme = false) { SettingsScreen(viewModel, onBack = {}, appVersion = "1.0.0") } }
         onNodeWithText("Keep the display on while running").performClick()
-        waitUntil(timeoutMillis = 5_000) { runBlocking { !store.data.first().keepDisplayOn } }
+        waitUntil(timeoutMillis = 5_000) { runBlocking { store.data.first().keepDisplayOn } }
     }
 
     @Test

@@ -9,6 +9,15 @@ import kotlin.test.assertTrue
 
 class CourseAssessmentTest {
     @Test
+    fun `quiz start screen uses its own start control`() {
+        val runner = CourseAutomationSession("s", 0, answerAssessments = false, answerQuizzes = true, assessmentMode = AssessmentMode.Automatic)
+        runner.configureAnswers(bank)
+        runner.read(page(CourseElement("start", label = "Start Quiz"), assessment = CourseAssessment("Wellness", start = "start", quiz = true)), 0)
+        assertEquals("assessmentStart", runner.action?.kind)
+        assertEquals("start", runner.action?.element)
+    }
+
+    @Test
     fun `quiz answering uses the saved bank only when quiz setting is enabled`() {
         val disabled = CourseAutomationSession("s", answerAssessments = false, answerQuizzes = false, assessmentMode = AssessmentMode.Automatic)
         disabled.configureAnswers(bank)

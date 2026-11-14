@@ -2,7 +2,7 @@
 
 [All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](10_BUILD_LINUX_ON_SERVER.md)
 
-**On this page:** [Commit and push everything](#commit-and-push-everything) · [Quick reference](#quick-reference) · [Sync machine data](31_SYNC_MACHINE_DATA.md#sync-every-machine) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
+**On this page:** [Commit and push everything](#commit-and-push-everything) · [Quick reference](#quick-reference) · [Sync machine data](#sync-machine-data) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
 
 **Related:** [Git guide](19_GIT_GUIDE.md) · [Fetch and verify build artifacts](#fetch-and-verify-build-artifacts) · [Start/stop/test the server VM](12_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](09_FIX_WINDOWS_INSTALLER.md)
 
@@ -82,7 +82,7 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 <tr><td><code>private/scripts/desktop.sh sync server</code></td><td>Push and pull the home server only.</td></tr>
 <tr><td><code>private/scripts/desktop.sh sync mac-vm-win</code></td><td>Push and pull the Windows VM running on this Mac.</td></tr>
 <tr><td><code>private/scripts/desktop.sh sync mac-vm-linux</code></td><td>Push and pull the Linux VM running on this Mac.</td></tr>
-<tr><td><code>private/scripts/desktop.sh sync-data all</code></td><td>Copy each machine's <code>~/.autopilot</code> and <code>~/Downloads/AutoPilot</code> to <code>~/Downloads/AutoPilot/Sync/&lt;machine&gt;</code> on the Mac. It does not change Git, build or install. See <a href="31_SYNC_MACHINE_DATA.md#sync-every-machine">31 — Sync machine data</a>.</td></tr>
+<tr><td><code>private/scripts/desktop.sh sync-data all</code></td><td>Copy each machine's <code>~/.autopilot</code> and <code>~/Downloads/AutoPilot</code> to <code>~/Downloads/AutoPilot/Sync/&lt;machine&gt;</code> on the Mac, with the two folders saved visibly as <code>Database/</code> and <code>AutoPilot/</code>. It does not change Git, build or install. See <a href="#sync-machine-data">Sync machine data</a>.</td></tr>
 <tr><td colspan="2"><strong>Build — sync, test and create an installer</strong></td></tr>
 <tr><td><code>private/scripts/desktop.sh build all</code></td><td><strong>Build only:</strong> syncs first, then builds every configured desktop artifact: macOS app, Legion MSI, server DEB, server Windows VM MSI, Mac-local Windows MSI and Mac-local Linux DEB. It does not install or copy.</td></tr>
 <tr><td><code>private/scripts/desktop.sh build legion</code></td><td>Sync Legion, then build its MSI without installing.</td></tr>
@@ -215,6 +215,121 @@ shasum -a 256 "$HOME/Downloads/Builds/AutoPilot/"*.deb
 ```
 
 Use `private/scripts/desktop.sh build legion` for Legion builds.
+
+## Sync machine data
+
+This is a data-only operation. It copies each machine's local AutoPilot data to the Mac; it does
+not check Git, push or pull source code, build, install or debug. Each remote machine has a short
+SSH timeout. If a machine is offline or a folder cannot be reached, it is reported as skipped and
+the next machine continues.
+
+### What it copies
+
+| Source on the machine | Saved under the Mac collection folder | Contents |
+|---|---|---|
+| `~/.autopilot` | `<machine>/Database` | AutoPilot settings, progress database and saved routine state. The hidden source folder is saved visibly as `Database`. |
+| `~/Downloads/AutoPilot` | `<machine>/AutoPilot` under `~/Downloads/AutoPilot/Sync` | Downloaded course certificates and other AutoPilot downloads. |
+
+### Sync every machine
+
+Run this from the project root or any Mac Terminal folder:
+
+```sh
+private/scripts/desktop.sh sync-data all
+```
+
+The files are collected in:
+
+```text
+~/Downloads/AutoPilot/Sync/
+```
+
+The command creates or updates these machine folders:
+
+```text
+mac/
+legion/
+server/
+server-vm-win/
+mac-vm-win/
+mac-vm-linux/
+```
+
+For the home server through Cloudflare, use:
+
+```sh
+private/scripts/desktop.sh --remote sync-data all
+```
+
+The `--remote` option changes only the home-server and server-VM connection to their Cloudflare
+SSH aliases. Legion and the Mac-local VMs continue to use their normal SSH aliases.
+
+### Sync one machine
+
+```sh
+private/scripts/desktop.sh sync-data mac
+private/scripts/desktop.sh sync-data legion
+private/scripts/desktop.sh sync-data server
+private/scripts/desktop.sh sync-data server-vm-win
+private/scripts/desktop.sh sync-data mac-vm-win
+private/scripts/desktop.sh sync-data mac-vm-linux
+private/scripts/desktop.sh sync-data local-all
+```
+
+### Folder layout
+
+After a collection, the layout is:
+
+```text
+~/Downloads/AutoPilot/
+├── mac/
+│   ├── Database/
+│   └── AutoPilot/
+├── legion/
+│   ├── Database/
+│   └── AutoPilot/
+├── server/
+│   ├── Database/
+│   └── AutoPilot/
+├── server-vm-win/
+│   ├── Database/
+│   └── AutoPilot/
+├── mac-vm-win/
+│   ├── Database/
+│   └── AutoPilot/
+└── mac-vm-linux/
+    ├── Database/
+    └── AutoPilot/
+```
+
+Missing source folders are reported as skipped. This is expected on a headless server or a machine
+that has not yet run AutoPilot or downloaded a certificate.
+
+### Machine paths and overrides
+
+| Machine | SSH host | AutoPilot data home |
+|---|---|---|
+| Mac | local | `/Users/jagdeep` |
+| Legion | `home-legion` | `C:/Users/jagde` |
+| Home server | `home-server` | `/home/jagdeep` |
+| Server Windows VM | `home-server-build` | `C:/Users/builduser` |
+| Mac Windows VM | `mac-windows-vm` | `C:/Users/Jagdeep` |
+| Mac Linux VM | `mac-linux-vm` | `/home/jagdeep` |
+
+If a local VM uses another account, override its data home for that command:
+
+```sh
+MAC_WINDOWS_HOME='C:\Users\OtherUser' private/scripts/desktop.sh sync-data mac-vm-win
+MAC_LINUX_HOME='/home/otheruser' private/scripts/desktop.sh sync-data mac-vm-linux
+```
+
+### Safety
+
+- Existing files in `~/Downloads/AutoPilot/Sync/<machine>` are updated; the script never deletes old files.
+- A missing source folder is skipped instead of stopping the whole collection.
+- The command uses the existing SSH configuration and never modifies a checkout.
+- Certificate files may contain personal course information. Keep the collection folder private and do
+  not commit it to GitHub.
 
 ## What each machine does
 

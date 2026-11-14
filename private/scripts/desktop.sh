@@ -21,7 +21,7 @@
 #
 #   action   sync     push the Mac's commits and pull them on the target
 #            sync-data copy each machine's ~/.autopilot and ~/Downloads/AutoPilot to the Mac's
-#                     ~/Downloads/AutoPilot/Sync/<machine> folder; it does not change Git or builds
+#                     ~/Downloads/AutoPilot/<machine> folder; it does not change Git or builds
 #            build    sync, focused tests, then build the installer
 #            run      build, then install/check the target
 #            fetch    copy existing installers to ~/Downloads/Builds/AutoPilot   (all, legion); build then copy one installer (server, server-vm-win)
@@ -113,7 +113,7 @@ windows_ps_raw() {
     local host="$1" body="$2" encoded
     encoded=$(printf '%s' "\$ErrorActionPreference = 'Stop'; \$ProgressPreference = 'SilentlyContinue'
 $body" | iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n')
-    ssh "$host" "powershell -NoProfile -ExecutionPolicy RemoteSigned -EncodedCommand $encoded"
+    ssh "${DATA_SSH_OPTS[@]}" "$host" "powershell -NoProfile -ExecutionPolicy RemoteSigned -EncodedCommand $encoded"
 }
 
 # --- Git sync -----------------------------------------------------------------------------------
@@ -426,7 +426,9 @@ fetch_legion_builds() {
 # --- Machine data sync --------------------------------------------------------------------------
 # This copies app data, not source code: the hidden .autopilot folder contains local progress and
 # settings, while Downloads/AutoPilot contains downloaded certificates. Existing files in the Mac
-# Sync folder are updated; nothing is deleted.
+# Sync folder are updated; nothing is deleted. Data collection is best-effort: an offline machine
+# is skipped after a short connection timeout and the next machine is processed.
+DATA_SSH_OPTS=(-o ConnectTimeout=8 -o ConnectionAttempts=1)
 copy_local_tree() {
     local source="$1" destination="$2"
     [ -d "$source" ] || { echo "Not present: $source (skipped)"; return 0; }
@@ -439,20 +441,26 @@ copy_local_downloads_tree() {
     local source="$1" destination="$2"
     [ -d "$source" ] || { echo "Not present: $source (skipped)"; return 0; }
     mkdir -p "$destination"
-    # The Sync directory lives inside this source. Exclude it so a repeated sync cannot recurse
-    # into its own previous output.
-    tar -C "$source" --exclude='./Sync' -cf - . | tar -C "$destination" -xf -
-    echo "Copied $source (excluding Sync) -> $destination"
+    # The per-machine folders live inside this source. Exclude them so a repeated sync cannot
+    # recurse into its own previous output.
+    tar -C "$source" \
+        --exclude='./Sync' --exclude='./mac' --exclude='./legion' --exclude='./server' \
+        --exclude='./server-vm-win' --exclude='./mac-vm-win' --exclude='./mac-vm-linux' \
+        -cf - . | tar -C "$destination" -xf -
+    echo "Copied $source (excluding machine folders) -> $destination"
 }
 
 copy_unix_tree() {
     local label="$1" host="$2" source="$3" destination="$4"
-    if ! ssh "$host" "test -d '$source'"; then
+    if ! ssh "${DATA_SSH_OPTS[@]}" "$host" "test -d '$source'"; then
         echo "$label: not present: $source (skipped)"
         return 0
     fi
     mkdir -p "$destination"
-    ssh "$host" "tar -C '$source' -cf - ." | tar -C "$destination" -xf -
+    if ! ssh "${DATA_SSH_OPTS[@]}" "$host" "tar -C '$source' -cf - ." | tar -C "$destination" -xf -; then
+        echo "$label: couldn't copy $source (skipped)"
+        return 0
+    fi
     echo "$label: copied $source -> $destination"
 }
 
@@ -464,29 +472,32 @@ copy_windows_tree() {
     fi
     parent=$(dirname "$destination")
     mkdir -p "$parent"
-    scp -q -r "$host:$source" "$parent/" || fail "$label: couldn't copy $source."
+    if ! scp "${DATA_SSH_OPTS[@]}" -q -r "$host:$source" "$parent/"; then
+        echo "$label: couldn't copy $source (skipped)"
+        return 0
+    fi
     echo "$label: copied $source -> $destination"
 }
 
 sync_data_local() {
     local machine="$1" home="$2" destination="$SYNC_DATA_ROOT/$1"
     step "$machine: copy AutoPilot data to Mac"
-    copy_local_tree "$home/.autopilot" "$destination/.autopilot"
-    copy_local_downloads_tree "$home/Downloads/AutoPilot" "$destination/Downloads/AutoPilot"
+    copy_local_tree "$home/.autopilot" "$destination/Database"
+    copy_local_downloads_tree "$home/Downloads/AutoPilot" "$destination/AutoPilot"
 }
 
 sync_data_windows() {
     local machine="$1" host="$2" home="$3" destination="$SYNC_DATA_ROOT/$1"
     step "$machine: copy AutoPilot data to Mac"
-    copy_windows_tree "$machine" "$host" "$home/.autopilot" "$destination/.autopilot"
-    copy_windows_tree "$machine" "$host" "$home/Downloads/AutoPilot" "$destination/Downloads/AutoPilot"
+    copy_windows_tree "$machine" "$host" "$home/.autopilot" "$destination/Database"
+    copy_windows_tree "$machine" "$host" "$home/Downloads/AutoPilot" "$destination/AutoPilot"
 }
 
 sync_data_linux() {
     local machine="$1" host="$2" home="$3" destination="$SYNC_DATA_ROOT/$1"
     step "$machine: copy AutoPilot data to Mac"
-    copy_unix_tree "$machine" "$host" "$home/.autopilot" "$destination/.autopilot"
-    copy_unix_tree "$machine" "$host" "$home/Downloads/AutoPilot" "$destination/Downloads/AutoPilot"
+    copy_unix_tree "$machine" "$host" "$home/.autopilot" "$destination/Database"
+    copy_unix_tree "$machine" "$host" "$home/Downloads/AutoPilot" "$destination/AutoPilot"
 }
 
 sync_data_all() {

@@ -29,6 +29,7 @@ private val PAGE_SCROLL_HOT_KEY = stringPreferencesKey("page_scroll_hot_key")
 private val STOP_WHEN_POINTER_MOVES = booleanPreferencesKey("stop_when_pointer_moves")
 private val STOP_AT_SCREEN_CORNER = booleanPreferencesKey("stop_at_screen_corner")
 private val KEEP_DISPLAY_ON = booleanPreferencesKey("keep_display_on")
+private val KEEP_DISPLAY_ON_WHILE_APP_OPEN = booleanPreferencesKey("keep_display_on_while_app_open")
 private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
 private val ASSESSMENT_SOUNDS = booleanPreferencesKey("assessment_sounds_enabled")
 internal val DOCUMENT_KEY = stringPreferencesKey("document")
@@ -46,6 +47,7 @@ internal fun readAppPreferences(stored: Preferences): AppPreferences {
         stopWhenPointerMoves = stored[STOP_WHEN_POINTER_MOVES] ?: defaults.stopWhenPointerMoves,
         stopAtScreenCorner = stored[STOP_AT_SCREEN_CORNER] ?: defaults.stopAtScreenCorner,
         keepDisplayOn = stored[KEEP_DISPLAY_ON] ?: defaults.keepDisplayOn,
+        keepDisplayOnWhileAppOpen = stored[KEEP_DISPLAY_ON_WHILE_APP_OPEN] ?: defaults.keepDisplayOnWhileAppOpen,
         developerMode = stored[DEVELOPER_MODE] ?: defaults.developerMode,
         assessmentSoundsEnabled = stored[ASSESSMENT_SOUNDS] ?: defaults.assessmentSoundsEnabled,
     )
@@ -61,6 +63,7 @@ internal fun writeAppPreferences(value: AppPreferences, stored: MutablePreferenc
     stored[STOP_WHEN_POINTER_MOVES] = value.stopWhenPointerMoves
     stored[STOP_AT_SCREEN_CORNER] = value.stopAtScreenCorner
     stored[KEEP_DISPLAY_ON] = value.keepDisplayOn
+    stored[KEEP_DISPLAY_ON_WHILE_APP_OPEN] = value.keepDisplayOnWhileAppOpen
     stored[DEVELOPER_MODE] = value.developerMode
     stored[ASSESSMENT_SOUNDS] = value.assessmentSoundsEnabled
 }

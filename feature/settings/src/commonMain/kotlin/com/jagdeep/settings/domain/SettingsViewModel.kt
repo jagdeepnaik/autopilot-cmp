@@ -98,6 +98,7 @@ class SettingsViewModel(
     fun updateDeveloperMode(enabled: Boolean) = save(state.value.preferences.copy(developerMode = enabled))
 
     fun updateKeepDisplayOn(enabled: Boolean) = save(state.value.preferences.copy(keepDisplayOn = enabled))
+    fun updateKeepDisplayOnWhileAppOpen(enabled: Boolean) = save(state.value.preferences.copy(keepDisplayOnWhileAppOpen = enabled))
     fun updateAssessmentSounds(enabled: Boolean) = save(state.value.preferences.copy(assessmentSoundsEnabled = enabled))
 
     fun testAssessmentSound() {

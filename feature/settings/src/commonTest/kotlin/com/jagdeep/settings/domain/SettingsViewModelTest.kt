@@ -91,15 +91,20 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `given the display setting when changed then it's on by default and saved`() = test {
+    fun `given the display setting when changed then it's off by default and saved`() = test {
         val viewModel = SettingsViewModel(store, FakeGate())
         advanceUntilIdle()
-        assertTrue(viewModel.state.value.preferences.keepDisplayOn)
-
-        viewModel.updateKeepDisplayOn(false)
-        advanceUntilIdle()
         assertFalse(viewModel.state.value.preferences.keepDisplayOn)
-        assertFalse(store.data.first().keepDisplayOn)
+
+        viewModel.updateKeepDisplayOn(true)
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.preferences.keepDisplayOn)
+        assertTrue(store.data.first().keepDisplayOn)
+        assertFalse(store.data.first().keepDisplayOnWhileAppOpen)
+        viewModel.updateKeepDisplayOnWhileAppOpen(true)
+        advanceUntilIdle()
+        assertTrue(store.data.first().keepDisplayOnWhileAppOpen)
+        assertTrue(store.data.first().keepDisplayOn)
     }
 
     @Test

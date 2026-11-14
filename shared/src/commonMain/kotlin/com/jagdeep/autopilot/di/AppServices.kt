@@ -38,9 +38,9 @@ import com.jagdeep.shared.live.LiveSource
 import com.jagdeep.shared.live.log
 import kotlinx.coroutines.launch
 
-/** The display stays on only when the user asked for that and something is running. */
-internal fun shouldKeepDisplayAwake(enabled: Boolean, routineActive: Boolean, pageHelperActive: Boolean): Boolean =
-    enabled && (routineActive || pageHelperActive)
+/** Either independent preference may hold a single desktop display wake lease. */
+internal fun shouldKeepDisplayAwake(routineEnabled: Boolean, appEnabled: Boolean, routineActive: Boolean, pageHelperActive: Boolean): Boolean =
+    appEnabled || (routineEnabled && (routineActive || pageHelperActive))
 
 /**
  * Process-scoped services: created once, independent of any screen, so the hot keys and a running
@@ -133,7 +133,8 @@ internal class AppServices private constructor() {
         scope.launch {
             combine(preferences.data, controller.state, page.state) { prefs, run, chrome ->
                 shouldKeepDisplayAwake(
-                    enabled = prefs.keepDisplayOn,
+                    routineEnabled = prefs.keepDisplayOn,
+                    appEnabled = prefs.keepDisplayOnWhileAppOpen,
                     routineActive = run != RunState.Idle,
                     pageHelperActive = chrome.activity != null,
                 )

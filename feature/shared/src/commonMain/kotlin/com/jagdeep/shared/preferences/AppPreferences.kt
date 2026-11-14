@@ -19,7 +19,9 @@ data class AppPreferences(
     /** Stops any routine when the pointer reaches a corner of the screen. */
     val stopAtScreenCorner: Boolean = true,
     /** Stops the display sleeping while a routine, auto-scroll or a scroll and click run is going. */
-    val keepDisplayOn: Boolean = true,
+    val keepDisplayOn: Boolean = false,
+    /** Prevents idle display sleep for the entire time AutoPilot is open. */
+    val keepDisplayOnWhileAppOpen: Boolean = false,
     /** Shows a live log of what the app is doing in Activity, in memory only. */
     val developerMode: Boolean = false,
     val assessmentSoundsEnabled: Boolean = true,

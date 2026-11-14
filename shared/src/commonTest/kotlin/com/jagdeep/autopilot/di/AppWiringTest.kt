@@ -32,6 +32,7 @@ class AppWiringTest {
             stopWhenPointerMoves = false,
             stopAtScreenCorner = false,
             keepDisplayOn = true,
+            keepDisplayOnWhileAppOpen = true,
             developerMode = true,
             assessmentSoundsEnabled = false,
         )
@@ -42,10 +43,12 @@ class AppWiringTest {
 
     @Test
     fun `given the display setting when something runs then the display stays on and otherwise it sleeps as usual`() {
-        assertTrue(shouldKeepDisplayAwake(enabled = true, routineActive = true, pageHelperActive = false))
-        assertTrue(shouldKeepDisplayAwake(enabled = true, routineActive = false, pageHelperActive = true))
-        assertFalse(shouldKeepDisplayAwake(enabled = true, routineActive = false, pageHelperActive = false), "Idle")
-        assertFalse(shouldKeepDisplayAwake(enabled = false, routineActive = true, pageHelperActive = true), "Setting off")
+        assertTrue(shouldKeepDisplayAwake(routineEnabled = true, appEnabled = false, routineActive = true, pageHelperActive = false))
+        assertTrue(shouldKeepDisplayAwake(routineEnabled = true, appEnabled = false, routineActive = false, pageHelperActive = true))
+        assertFalse(shouldKeepDisplayAwake(routineEnabled = true, appEnabled = false, routineActive = false, pageHelperActive = false), "Idle")
+        assertFalse(shouldKeepDisplayAwake(routineEnabled = false, appEnabled = false, routineActive = true, pageHelperActive = true), "Both off")
+        assertTrue(shouldKeepDisplayAwake(routineEnabled = false, appEnabled = true, routineActive = false, pageHelperActive = false), "App open")
+        assertTrue(shouldKeepDisplayAwake(routineEnabled = true, appEnabled = true, routineActive = true, pageHelperActive = false), "Both on")
     }
 
     @Test
@@ -59,6 +62,7 @@ class AppWiringTest {
     fun `given nothing saved when read then the defaults apply`() {
         assertEquals(AppPreferences(), readAppPreferences(mutablePreferencesOf()))
         assertTrue(readAppPreferences(mutablePreferencesOf()).assessmentSoundsEnabled)
-        assertTrue(readAppPreferences(mutablePreferencesOf()).keepDisplayOn)
+        assertFalse(readAppPreferences(mutablePreferencesOf()).keepDisplayOn)
+        assertFalse(readAppPreferences(mutablePreferencesOf()).keepDisplayOnWhileAppOpen)
     }
 }
