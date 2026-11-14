@@ -31,7 +31,8 @@
 #            debug    sync, start a debug run waiting on port 5005   (mac, legion, mac-vm-win, mac-vm-linux)
 #
 #   --no-tests  skip the focused tests
-#   --remote    reach the home server through Cloudflare (home-server-remote, home-server-build-remote)
+#   --remote    force the home server through Cloudflare (home-server-remote, home-server-build-remote)
+#               Server targets otherwise try local SSH first and fall back automatically.
 #
 #   Local VM configuration (defaults are examples; set these to your SSH aliases and checkout paths):
 #   MAC_WINDOWS_HOST, MAC_WINDOWS_DIR, MAC_LINUX_HOST, MAC_LINUX_DIR
@@ -74,10 +75,11 @@ usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' 
 
 POSITIONAL=()
 TESTS=1
+REMOTE_MODE=0
 for arg in "$@"; do
     case "$arg" in
         --no-tests) TESTS=0 ;;
-        --remote) SERVER_HOST=home-server-remote; VM_HOST=home-server-build-remote ;;
+        --remote) REMOTE_MODE=1; SERVER_HOST=home-server-remote; VM_HOST=home-server-build-remote ;;
         -h|--help) usage; exit 0 ;;
         *) POSITIONAL+=("$arg") ;;
     esac
@@ -99,6 +101,22 @@ fi
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 fail() { printf '\n\033[31mStopped: %s\033[0m\n' "$*" >&2; exit 1; }
+
+select_server_hosts() {
+    [ "$REMOTE_MODE" -eq 1 ] && return 0
+    if [[ "$TARGET" == server || "$TARGET" == all ]] && ! ssh -o BatchMode=yes -o ConnectTimeout=8 -o ConnectionAttempts=1 "$SERVER_HOST" true >/dev/null 2>&1; then
+        echo "Home server local SSH is unavailable; using home-server-remote."
+        SERVER_HOST=home-server-remote
+    fi
+    if [[ "$TARGET" == server-vm-win || "$TARGET" == all ]] && ! ssh -o BatchMode=yes -o ConnectTimeout=8 -o ConnectionAttempts=1 "$VM_HOST" true >/dev/null 2>&1; then
+        echo "Server VM local SSH is unavailable; using home-server-build-remote."
+        VM_HOST=home-server-build-remote
+    fi
+}
+
+case "$TARGET" in
+    server|server-vm-win|all) select_server_hosts ;;
+esac
 
 # PowerShell on a Windows machine. The script is sent base64-encoded, so no quoting breaks between
 # this shell, ssh, the remote default shell and PowerShell.
