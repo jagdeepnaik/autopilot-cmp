@@ -15,6 +15,7 @@ data class CourseAutomationRoutine(
     val learningOrder: LearningOrder = LearningOrder.AssessmentAfterModule,
     val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE,
     val answerQuizzes: Boolean = true,
+    val autoDownloadCertificates: Boolean = false,
 ) : Routine {
     override val kind: RoutineKind get() = RoutineKind.CourseAutomation
 }
@@ -79,7 +80,8 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private val assessmentMode: AssessmentMode = AssessmentMode.Review,
     private val learningOrder: LearningOrder = LearningOrder.AssessmentAfterModule,
     private val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE,
-    private val answerQuizzes: Boolean = true) {
+    private val answerQuizzes: Boolean = true,
+    private val autoDownloadCertificates: Boolean = false) {
     var progressCheckpoint = 0; private set
     var currentModule: String? = null; private set
     private val moduleTitles = mutableMapOf<String, String>()
@@ -343,7 +345,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         val target = pendingCertificate ?: return
         val token = "$session:certificate:${CourseAnswerBank.normalize(target.module)}:${pendingCertificateAt ?: now}"
         approval = CourseApprovalRequest(token, CourseApprovalKind.CertificateDownloaded, target.module)
-        detail = "AutoPilot could not download the ${target.module} certificate. Download it manually in Chrome, then confirm here to record it and continue."
+        detail = "${target.module} assessment passed. Download the certificate manually in Chrome, then confirm here to record it and continue."
     }
 
     fun read(snapshot: CourseSnapshot, now: Long) {
@@ -589,7 +591,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     detail = "${module.ifBlank { "This module" }} assessment is locked until all of its videos are complete."
                     return
                 }
-                if (assessmentMode != AssessmentMode.Manual && answerBank?.module(assessment.module) == null) {
+                // Chapter practice quizzes can teach the answer bank from the site's feedback,
+                // so they must be allowed to start even when this module has no saved entries.
+                // Graded assessments still require their validated module bank.
+                if (!isQuiz && assessmentMode != AssessmentMode.Manual && answerBank?.module(assessment.module) == null) {
                     attention = "$path:module:${assessment.module}"
                     detail = "No local answer bank matches this module. Stop and check $answerBankFile."
                     return
@@ -632,27 +637,20 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     certificateStore.recordResultUrl(requireNotNull(target), "https://sagarmeinyog.com${snapshot.path}")
                 }
                 if (certificateTrackingActive && !certificateStore.hasCertificate(requireNotNull(target))) {
-                    val certificate = elements.firstOrNull { element ->
-                        element.id == assessment.certificate && element.label.trim() in setOf("View certificate", "Download PDF")
-                    }
-                    if (pendingCertificate == null && certificate != null) {
+                    if (pendingCertificate == null) {
                         pendingCertificate = requireNotNull(target)
                         pendingCertificateAt = now
-                        issue(certificate, "certificateDownload", "Downloading the $module certificate before returning to the dashboard.")
-                    } else if (pendingCertificate != null && certificate?.label?.trim().equals("Download PDF", true)) {
-                        issue(requireNotNull(certificate), "certificateDownload", "Downloading the $module certificate PDF.")
-                    } else {
-                        // Windows can render the certificate preview in a separate window
-                        // that the extension cannot expose as a clickable course element.
-                        // Start the same manual-confirmation fallback even when View
-                        // certificate was never reported, instead of waiting forever.
-                        if (pendingCertificate == null) {
-                            pendingCertificate = requireNotNull(target)
-                            pendingCertificateAt = now
-                        }
-                        if (now - (pendingCertificateAt ?: now) > 20_000) requestManualCertificate(now)
-                        else detail = "Waiting for the $module certificate button. If it does not appear, AutoPilot will ask you to download it manually."
                     }
+                    if (autoDownloadCertificates) {
+                        val certificate = elements.firstOrNull { it.id == assessment.certificate }
+                        if (certificate != null) {
+                            issue(certificate, "certificateDownload", "Assessment passed. Opening the certificate and downloading it automatically.")
+                            return
+                        }
+                        // A missing or stalled certificate control falls back to the same safe
+                        // manual confirmation used when automatic downloading is disabled.
+                    }
+                    if (approval?.kind != CourseApprovalKind.CertificateDownloaded) requestManualCertificate(now)
                     return
                 }
                 val certificateClose = elements.firstOrNull { it.id == assessment.certificateClose && it.label.trim().equals("Close", true) }

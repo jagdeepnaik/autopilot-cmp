@@ -167,6 +167,11 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                         supportingContent = { Text("Skip assessments already passed in Your Progress. Unknown answers always pause for manual help.") },
                         trailingContent = { Switch(checked = draft.answerAssessments, onCheckedChange = { enabled -> update { it.copy(answerAssessments = enabled) } }) },
                     )
+                    ListItem(
+                        headlineContent = { Text("Download certificates automatically") },
+                        supportingContent = { Text("After a pass, open and download the certificate, verify it in the profile folder, then continue. If anything stalls, ask you to download and confirm manually. Disabled by default.") },
+                        trailingContent = { Switch(checked = draft.autoDownloadCertificates, onCheckedChange = { enabled -> update { it.copy(autoDownloadCertificates = enabled) } }) },
+                    )
                     if (draft.answerAssessments) {
                         val modes = listOf(
                             Triple(com.jagdeep.home.domain.AssessmentMode.Manual, "Manual", "Start, answer, navigate questions and submit yourself in Chrome."),

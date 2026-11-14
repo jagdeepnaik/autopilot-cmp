@@ -2,7 +2,7 @@
 
 [All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](10_BUILD_LINUX_ON_SERVER.md)
 
-**On this page:** [Commit and push everything](#commit-and-push-everything) · [Quick reference](#quick-reference) · [Sync machine data](#sync-machine-data) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
+**On this page:** [Commit and push everything](#commit-and-push-everything) · [Quick reference](#quick-reference) · [Sync machine data](#sync-machine-data) · [Merge answer banks](#merge-answer-banks) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
 
 **Related:** [Git guide](19_GIT_GUIDE.md) · [Fetch and verify build artifacts](#fetch-and-verify-build-artifacts) · [Start/stop/test the server VM](12_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](09_FIX_WINDOWS_INSTALLER.md)
 
@@ -83,6 +83,7 @@ From the project root (or replace `private/scripts/desktop.sh` with `./desktop.s
 <tr><td><code>private/scripts/desktop.sh sync mac-vm-win</code></td><td>Push and pull the Windows VM running on this Mac.</td></tr>
 <tr><td><code>private/scripts/desktop.sh sync mac-vm-linux</code></td><td>Push and pull the Linux VM running on this Mac.</td></tr>
 <tr><td><code>private/scripts/desktop.sh sync-data all</code></td><td>Copy each machine's <code>~/.autopilot</code> and <code>~/Downloads/AutoPilot</code> to <code>~/Downloads/AutoPilot/Sync/&lt;machine&gt;</code> on the Mac, with the two folders saved visibly as <code>Database/</code> and <code>AutoPilot/</code>. It does not change Git, build or install. See <a href="#sync-machine-data">Sync machine data</a>.</td></tr>
+<tr><td><code>private/scripts/desktop.sh merge-answer-bank all</code></td><td>Merge every synced <code>answer-banks.sagarmeinyog-ver-1.0.json</code> under <code>Sync/&lt;machine&gt;/Database</code> into one unique answer bank at the project root. It does not change Git, build or install. Run <code>sync-data all</code> first.</td></tr>
 <tr><td colspan="2"><strong>Build — sync, test and create an installer</strong></td></tr>
 <tr><td><code>private/scripts/desktop.sh build all</code></td><td><strong>Build only:</strong> syncs first, then builds every configured desktop artifact: macOS app, Legion MSI, server DEB, server Windows VM MSI, Mac-local Windows MSI and Mac-local Linux DEB. It does not install or copy.</td></tr>
 <tr><td><code>private/scripts/desktop.sh build legion</code></td><td>Sync Legion, then build its MSI without installing.</td></tr>
@@ -304,6 +305,34 @@ After a collection, the layout is:
 
 Missing source folders are reported as skipped. This is expected on a headless server or a machine
 that has not yet run AutoPilot or downloaded a certificate.
+
+## Merge answer banks
+
+After collecting machine data, merge all machine copies of the Sagar Mein Yog answer bank into one
+project-root file:
+
+```sh
+private/scripts/desktop.sh sync-data all
+private/scripts/desktop.sh merge-answer-bank all
+```
+
+The merge reads:
+
+```text
+~/Downloads/AutoPilot/Sync/<machine>/Database/answer-banks.sagarmeinyog-ver-1.0.json
+```
+
+and writes:
+
+```text
+/Users/jagdeep/Projects/AndroidStudio/AutoPilot/answer-banks.sagarmeinyog-ver-1.0.json
+```
+
+Entries are considered duplicates when their module, question and option set match after whitespace
+and case normalization. The first spelling is retained, and identical repeated answers are ignored.
+If the same question/options have conflicting answers, the command stops and names both source files
+so the conflict can be resolved before producing a merged bank. The generated file is deterministic:
+modules and questions are written in stable order.
 
 ### Machine paths and overrides
 

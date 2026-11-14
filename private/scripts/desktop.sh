@@ -9,6 +9,7 @@
 #     private/scripts/desktop.sh run all
 #     private/scripts/desktop.sh fetch all
 #     private/scripts/desktop.sh sync-data all
+#     private/scripts/desktop.sh merge-answer-bank all
 #
 #   target   mac      this Mac: macOS app in /Applications
 #            legion   Windows laptop (ssh home-legion): MSI, installed on Legion
@@ -22,6 +23,8 @@
 #   action   sync     push the Mac's commits and pull them on the target
 #            sync-data copy each machine's ~/.autopilot and ~/Downloads/AutoPilot to the Mac's
 #                     ~/Downloads/AutoPilot/<machine> folder; it does not change Git or builds
+#            merge-answer-bank merge every synced answer bank into the project-root answer bank;
+#                               it does not change Git, build or install
 #            build    sync, focused tests, then build the installer
 #            run      build, then install/check the target
 #            fetch    copy existing installers to ~/Downloads/Builds/AutoPilot   (all, legion); build then copy one installer (server, server-vm-win)
@@ -53,7 +56,7 @@ MAC_WINDOWS_DIR="${MAC_WINDOWS_DIR:-C:\Users\Jagdeep\Projects\AutoPilot}"
 MAC_LINUX_HOST="${MAC_LINUX_HOST:-mac-linux-vm}"
 MAC_LINUX_DIR="${MAC_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
 DOWNLOADS="$HOME/Downloads/Builds/AutoPilot"
-SYNC_DATA_ROOT="$HOME/Downloads/AutoPilot/Sync"
+SYNC_DATA_ROOT="${SYNC_DATA_ROOT:-$HOME/Downloads/AutoPilot/Sync}"
 LEGION_HOME='C:/Users/jagde'
 SERVER_HOME='/home/jagdeep'
 VM_HOME='C:/Users/builduser'
@@ -83,7 +86,7 @@ done
 TARGET=''
 ACTIONS=()
 is_target() { case "$1" in mac|legion|server|server-vm-win|mac-vm-win|mac-vm-linux|local-all|all) return 0 ;; *) return 1 ;; esac; }
-is_action() { case "$1" in sync|sync-data|build|run|fetch|debug) return 0 ;; *) return 1 ;; esac; }
+is_action() { case "$1" in sync|sync-data|merge-answer-bank|build|run|fetch|debug) return 0 ;; *) return 1 ;; esac; }
 
 if [ "${#POSITIONAL[@]}" -eq 2 ] && is_action "${POSITIONAL[0]}" && is_target "${POSITIONAL[1]}"; then
     ACTIONS=("${POSITIONAL[0]}")
@@ -514,6 +517,97 @@ sync_data_all() {
     echo "Machine data is in $SYNC_DATA_ROOT"
 }
 
+merge_answer_bank() {
+    [ "$TARGET" = all ] || fail "merge-answer-bank only supports the all target."
+    local input_name='answer-banks.sagarmeinyog-ver-1.0.json'
+    local output="${ANSWER_BANK_OUTPUT:-$ROOT/$input_name}"
+    step "Merge synced answer banks"
+
+    SYNC_DATA_ROOT="$SYNC_DATA_ROOT" OUTPUT="$output" INPUT_NAME="$input_name" python3 - <<'PY'
+import json
+import os
+import sys
+import unicodedata
+from pathlib import Path
+
+sync_root = Path(os.environ["SYNC_DATA_ROOT"])
+output = Path(os.environ["OUTPUT"])
+input_name = os.environ["INPUT_NAME"]
+sources = sorted(
+    path for path in sync_root.glob(f"*/Database/{input_name}")
+    if path.is_file()
+)
+
+if not sources:
+    print(f"No synced answer banks found under {sync_root}/<machine>/Database/{input_name}.", file=sys.stderr)
+    print("Run: private/scripts/desktop.sh sync-data all", file=sys.stderr)
+    raise SystemExit(1)
+
+def normalize(value):
+    value = unicodedata.normalize("NFKC", str(value))
+    return " ".join(value.split()).casefold()
+
+def option_text(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("text", "label", "value"):
+            if isinstance(value.get(key), str):
+                return value[key]
+    raise ValueError("option is not a string or a supported object")
+
+merged = {}
+seen = {}
+module_names = {}
+for source in sources:
+    try:
+        data = json.loads(source.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise SystemExit(f"Invalid JSON in {source}: {exc}")
+    if not isinstance(data, dict):
+        raise SystemExit(f"Invalid answer bank in {source}: the root must be an object.")
+    for module, entries in data.items():
+        if not isinstance(module, str) or not isinstance(entries, list):
+            raise SystemExit(f"Invalid answer bank in {source}: module values must be arrays.")
+        module_key = normalize(module)
+        output_module = module_names.setdefault(module_key, module)
+        merged.setdefault(output_module, [])
+        for entry in entries:
+            if not isinstance(entry, dict) or not isinstance(entry.get("question"), str):
+                raise SystemExit(f"Invalid answer entry in {source} under module {module!r}.")
+            options = entry.get("options")
+            if not isinstance(options, list):
+                raise SystemExit(f"Invalid options in {source} under module {module!r}.")
+            options = [option_text(option) for option in options]
+            answer = entry.get("answer")
+            if answer is not None and not isinstance(answer, str):
+                raise SystemExit(f"Invalid answer in {source} under module {module!r}.")
+            key = (module_key, normalize(entry["question"]), tuple(sorted(normalize(option) for option in options)))
+            answer_key = normalize(answer) if answer is not None else None
+            previous = seen.get(key)
+            if previous is not None:
+                previous_answer, previous_source = previous
+                if previous_answer != answer_key:
+                    raise SystemExit(
+                        "Conflicting answers for the same question/options:\n"
+                        f"  {previous_source}: {previous_answer!r}\n"
+                        f"  {source}: {answer_key!r}\n"
+                        "Resolve the conflict in the synced files and run the merge again."
+                    )
+                continue
+            seen[key] = (answer_key, source)
+            merged[output_module].append({"question": entry["question"], "options": options, "answer": answer})
+
+def sort_key(entry):
+    return (normalize(entry["question"]), tuple(sorted(normalize(option) for option in entry["options"])))
+
+ordered = {module: sorted(entries, key=sort_key) for module, entries in sorted(merged.items(), key=lambda item: normalize(item[0]))}
+output.write_text(json.dumps(ordered, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+print(f"Read {len(sources)} machine file(s).")
+print(f"Wrote {len(seen)} unique question/option set(s) to {output}.")
+PY
+}
+
 # --- Home server Windows VM (MSI) ---------------------------------------------------------------
 vm_build() {
     step "Server VM: check it's running"
@@ -562,6 +656,7 @@ run_action() {
         sync-data:local-all) sync_data_local mac "$HOME"; sync_data_windows mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME"; sync_data_linux mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME" ;;
         sync:all) mac_check_pushed; windows_sync Legion "$LEGION_HOST" "$LEGION_DIR"; server_sync; windows_sync "Server VM" "$VM_HOST" "$VM_DIR"; windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR"; linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR" ;;
         sync-data:all) sync_data_all ;;
+        merge-answer-bank:all) merge_answer_bank ;;
 
         build:mac) mac_build ;;
         build:legion) legion_build ;;

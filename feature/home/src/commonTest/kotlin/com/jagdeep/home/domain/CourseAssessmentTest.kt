@@ -65,6 +65,17 @@ class CourseAssessmentTest {
     }
 
     @Test
+    fun `quiz start is allowed before its module has learned answers`() {
+        val runner = CourseAutomationSession("s", 0, answerQuizzes = true, assessmentMode = AssessmentMode.Automatic)
+        runner.read(page(CourseElement("start", tag = "button", label = "Start Quiz"),
+            assessment = CourseAssessment("New module", start = "start", quiz = true)), 0)
+        assertEquals("assessmentStart", runner.action?.kind)
+        assertEquals("start", runner.action?.element)
+        assertNull(runner.approval)
+        assertFalse(runner.detail.contains("No local answer bank"))
+    }
+
+    @Test
     fun `quiz answering uses the saved bank only when quiz setting is enabled`() {
         val disabled = CourseAutomationSession("s", answerAssessments = false, answerQuizzes = false, assessmentMode = AssessmentMode.Automatic)
         disabled.configureAnswers(bank)
@@ -628,7 +639,7 @@ class CourseAssessmentTest {
     }
 
     @Test
-    fun `given a passed assessment without a certificate then download it before returning`() {
+    fun `given a passed assessment without a certificate then ask for manual download before returning`() {
         val stored = mutableSetOf<CourseCertificateTarget>()
         val certificates = object : CourseCertificateStore {
             override fun hasCertificate(target: CourseCertificateTarget) = target in stored
@@ -644,13 +655,31 @@ class CourseAssessmentTest {
 
         runner.read(page(certificate, assessment = passed), 0)
 
-        assertEquals("certificateDownload", runner.action?.kind)
-        val target = requireNotNull(runner.certificateDownload)
-        stored += target
-        runner.certificateDownloaded(target)
-        runner.acknowledge(runner.action!!.request, true)
+        assertNull(runner.action)
+        assertEquals(CourseApprovalKind.CertificateDownloaded, runner.approval?.kind)
+        runner.approveAssessment(requireNotNull(runner.approval).token)
+        assertTrue(stored.contains(CourseCertificateTarget("Jagdeep", "Wellness")))
         runner.read(page(home, assessment = passed), 1)
         assertEquals("assessmentReturn", runner.action?.kind)
+    }
+
+    @Test
+    fun `given automatic certificate downloads then click the certificate control before continuing`() {
+        val certificates = object : CourseCertificateStore {
+            override fun hasCertificate(target: CourseCertificateTarget) = false
+            override fun prepareDownload(target: CourseCertificateTarget) = Unit
+            override fun collectDownloaded(target: CourseCertificateTarget) = false
+            override fun confirmDownloaded(target: CourseCertificateTarget) = Unit
+            override fun recordResultUrl(target: CourseCertificateTarget, url: String) = Unit
+        }
+        val runner = CourseAutomationSession("s", answerAssessments = true, autoDownloadCertificates = true)
+        runner.configureCertificates("Jagdeep", certificates)
+        val certificate = CourseElement("certificate", label = "View certificate")
+        runner.read(page(certificate, assessment = CourseAssessment("Wellness", result = "passed", certificate = certificate.id)), 0)
+
+        assertEquals("certificateDownload", runner.action?.kind)
+        assertEquals("certificate", runner.action?.element)
+        assertNull(runner.approval)
     }
 
     @Test
@@ -674,7 +703,7 @@ class CourseAssessmentTest {
     }
 
     @Test
-    fun `given certificate download is refused then user confirmation records completion`() {
+    fun `given passed result keeps one manual certificate confirmation open`() {
         val stored = mutableSetOf<CourseCertificateTarget>()
         val certificates = object : CourseCertificateStore {
             override fun hasCertificate(target: CourseCertificateTarget) = target in stored
@@ -689,9 +718,11 @@ class CourseAssessmentTest {
         val passed = CourseAssessment("Wellness", result = "passed", certificate = certificate.id)
 
         runner.read(page(certificate, assessment = passed), 0)
-        runner.acknowledge(requireNotNull(runner.action).request, false, 1)
-
         assertEquals(CourseApprovalKind.CertificateDownloaded, runner.approval?.kind)
+        val token = requireNotNull(runner.approval).token
+        runner.read(page(certificate, assessment = passed), 1)
+        assertEquals(token, runner.approval?.token)
+        assertNull(runner.action)
         runner.approveAssessment(requireNotNull(runner.approval).token)
         runner.read(page(home, assessment = passed), 2)
         assertEquals("assessmentReturn", runner.action?.kind)
@@ -713,9 +744,6 @@ class CourseAssessmentTest {
         val resultPage = page(assessment = passed)
 
         runner.read(resultPage, 0)
-        assertNull(runner.approval)
-        runner.read(resultPage, 20_001)
-
         assertEquals(CourseApprovalKind.CertificateDownloaded, runner.approval?.kind)
         runner.approveAssessment(requireNotNull(runner.approval).token)
         assertTrue(stored.contains(CourseCertificateTarget("Jagdeep", "Wellness")))

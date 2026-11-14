@@ -161,7 +161,7 @@ internal fun RunPanel(
             }
             if (activity is PageActivity.Automation && activity.approval?.kind == com.jagdeep.home.domain.CourseApprovalKind.CertificateDownloaded) {
                 AlertDialog(onDismissRequest = {}, title = { Text("Download certificate manually") },
-                    text = { Text("AutoPilot could not finish downloading the ${activity.approval.module} certificate. In Chrome, download the certificate now. When it is complete, confirm below so AutoPilot records the assessment and certificate as complete, then continues.") },
+                    text = { Text("${activity.approval.module} assessment passed. In Chrome, download the certificate manually now. When it is complete, confirm below so AutoPilot records the certificate and continues.") },
                     confirmButton = { TextButton(onClick = { onApproveAssessment(activity.approval.token) }) { Text("I downloaded the certificate") } },
                     dismissButton = { TextButton(onClick = onStop) { Text("Stop for now") } })
             }
