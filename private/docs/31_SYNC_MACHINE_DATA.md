@@ -19,6 +19,10 @@ For each machine, the command copies these two folders when they exist:
 The command does not copy the project checkout, Git metadata, passwords, SSH keys or the browser
 profile. It does not change Git, build, install or debug anything.
 
+This command intentionally does not check whether the Mac has uncommitted or unpushed source-code
+changes. Use `private/scripts/desktop.sh sync ...` for source-code synchronization; use
+`sync-data` whenever you only need to collect generated progress, settings or certificates.
+
 ## Sync every machine
 
 Run this from the project root or any Mac Terminal folder:

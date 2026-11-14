@@ -151,6 +151,10 @@ private fun CourseModuleProgress(
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("All ${modules.size} modules are shown. Status is saved locally as videos, assessments and certificates finish.", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (activeAction != null) {
+            Text("The main routine is paused while the selected module action runs. It resumes when you stop or finish it.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+        }
         modules.forEach { module ->
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -161,6 +165,7 @@ private fun CourseModuleProgress(
                     Text(module.module, style = MaterialTheme.typography.titleSmall)
                     Text(
                         "Video: ${if (module.videosComplete) "complete" else "not complete"} · " +
+                            "Quizzes: ${if (module.quizzesTotal > 0) "${module.quizzesCompleted}/${module.quizzesTotal}" else if (module.quizzesComplete) "complete" else "not started"} · " +
                             "Assessment: ${if (module.assessmentPassed) "passed" else "not passed"} · " +
                             "Score: ${module.assessmentScore?.let { "${it.toInt()}%" } ?: "—"}",
                         style = MaterialTheme.typography.bodySmall,
@@ -179,7 +184,8 @@ private fun CourseModuleProgress(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { run(module.module, CourseModuleAction.Videos) }) { Text("Run videos") }
-                        TextButton(onClick = { run(module.module, CourseModuleAction.Assessment) }) { Text("Run assessment") }
+                        TextButton(enabled = module.videosComplete, onClick = { run(module.module, CourseModuleAction.Quizzes) }) { Text("Run quizzes") }
+                        TextButton(enabled = module.videosComplete, onClick = { run(module.module, CourseModuleAction.Assessment) }) { Text("Run assessment") }
                         if (activeAction != null) TextButton(onClick = stop) { Text("Stop selected") }
                     }
                 }

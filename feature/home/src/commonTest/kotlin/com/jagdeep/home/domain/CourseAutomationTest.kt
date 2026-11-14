@@ -270,7 +270,7 @@ class CourseAutomationTest {
 
     @Test
     fun `given player is removed on completion then Next advances and the following lesson plays before advancing again`() {
-        val runner = CourseAutomationSession("session", 5000)
+        val runner = CourseAutomationSession("session", 5000, answerQuizzes = false)
         val title = CourseElement("title", tag = "h1", label = "Part:3")
         val next = CourseElement("next", label = "Next")
         val video = CourseElement("video", tag = "video", paused = false)
@@ -294,6 +294,21 @@ class CourseAutomationTest {
         runner.acknowledge(runner.action!!.request, true, 13000)
         runner.read(page(title.copy(label = "Part:5"), done, CourseElement("course-link", tag = "a", href = course)), 19000)
         assertEquals("course-link", runner.action?.element)
+    }
+
+    @Test
+    fun `given quiz answering is enabled then completed video opens its quiz before Next`() {
+        val runner = CourseAutomationSession("session", 5000, answerQuizzes = true)
+        val title = CourseElement("title", tag = "h1", label = "Part:3")
+        val done = CourseElement("done", tag = "h2", label = "Video Completed!")
+        val next = CourseElement("next", label = "Next")
+        val quiz = CourseElement("quiz", label = "Start Quiz")
+
+        runner.read(snapshot(lesson, title, done, next, quiz, document = "spa"), 1000)
+
+        assertEquals("quizOpen", runner.action?.kind)
+        assertEquals("quiz", runner.action?.element)
+        assertEquals("Start Quiz", runner.action?.expectedLabel)
     }
 
     @Test

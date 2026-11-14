@@ -260,16 +260,41 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         focusedModule = CourseAnswerBank.normalize(module)
         focusedAction = moduleAction
         completed = false
-        detail = "Finding $module to run its ${if (moduleAction == CourseModuleAction.Videos) "videos" else "assessment"}."
         action = null
+        approval = null
+        attention = null
+        manualAnswer = null
+        failure = null
         blockedPath = null
         blockedDocument = null
+        detail = "Pausing the main routine. Finding $module to run its ${when (moduleAction) {
+            CourseModuleAction.Videos -> "videos"
+            CourseModuleAction.Quizzes -> "quizzes"
+            CourseModuleAction.Assessment -> "assessment"
+        }}."
     }
 
     fun stopFocusedModule() {
         if (focusedModule == null) return
-        completed = true
-        detail = "Selected module stopped."
+        focusedModule = null
+        focusedAction = null
+        completed = false
+        action = null
+        approval = null
+        attention = null
+        manualAnswer = null
+        failure = null
+        blockedPath = null
+        detail = "Selected module stopped. The main routine has resumed."
+    }
+
+    private fun finishFocusedModule(message: String) {
+        focusedModule = null
+        focusedAction = null
+        completed = false
+        action = null
+        blockedPath = null
+        detail = "$message The main routine has resumed."
     }
 
     internal val moduleAction: CourseModuleAction? get() = focusedAction
@@ -428,8 +453,16 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val isQuiz = snapshot.assessment?.quiz == true
             val answerThisPage = if (isQuiz) answerQuizzes else answerAssessments
             if (isQuiz && snapshot.assessment?.result != null) {
-                completedQuizzes += (pendingQuizKey ?: path)
+                val quizKey = pendingQuizKey ?: path
+                completedQuizzes += quizKey
+                pendingCompletions["quiz:$quizKey"] = CourseCompletion(
+                    "quiz:$quizKey", snapshot.assessment?.module?.takeIf { it.isNotBlank() } ?: currentModule.orEmpty(), "quiz", "Quiz completed", snapshot.path,
+                )
                 pendingQuizKey = null
+                if (focusedAction == CourseModuleAction.Quizzes && focusedHere) {
+                    finishFocusedModule("Quiz completed.")
+                    return
+                }
                 detail = "Quiz completed. Returning to the course."
                 val back = elements.firstOrNull { it.href == coursePath } ?: elements.firstOrNull { it.label.equals("Back to Course", true) }
                 if (back != null) issue(back, "assessmentReturn", "Quiz completed. Returning to the course.")
@@ -594,8 +627,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 }
                 pendingCertificate = null
                 if (focusedAction == CourseModuleAction.Assessment && focusedHere) {
-                    completed = true
-                    detail = "$module assessment and certificate are complete."
+                    finishFocusedModule("$module assessment and certificate are complete.")
                     return
                 }
                 passedAssessments.add(path)
@@ -747,6 +779,17 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 blockedPath = pageId
                 return
             }
+            // On the live site, chapter quizzes are offered immediately on the video-completion
+            // screen. Handle Start Quiz before Next or Back to Course, otherwise the normal lesson
+            // navigation skips the quiz entirely.
+            if (answerQuizzes && completionScreen) {
+                val quiz = elements.firstOrNull { it.label.trim().matches(Regex("(?:(?:Start|Take|Begin)\\s+)?Quiz", RegexOption.IGNORE_CASE)) }
+                if (quiz != null) {
+                    pendingQuizKey = "${coursePath ?: path}:${lessonPage ?: reportedPath}"
+                    issue(quiz, "quizOpen", "Video finished. Opening the chapter quiz before continuing.")
+                    return
+                }
+            }
             val next = elements.firstOrNull { it.tag in setOf("button", "a") && it.label.trim().equals("Next", true) }
             if (next != null && snapshot.top) {
                 issue(next, message = "Video finished. Opening the next video.")
@@ -764,6 +807,14 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         }
         if (!snapshot.top) return
         if (view == CourseView.Course) {
+            if (focusedAction == CourseModuleAction.Quizzes && focusedHere && answerQuizzes) {
+                val quiz = elements.firstOrNull { it.label.trim().matches(Regex("(?:(?:Start|Take|Begin)\\s+)?Quiz", RegexOption.IGNORE_CASE)) }
+                if (quiz != null) {
+                    pendingQuizKey = "$path:focused"
+                    issue(quiz, "quizOpen", "Opening the selected $currentModule quiz.")
+                    return
+                }
+            }
             if (focusedAction == CourseModuleAction.Assessment && focusedHere) {
                 val assessment = elements.firstOrNull { it.label.trim().equals("Assessment", true) }
                 if (assessment == null) {
@@ -837,8 +888,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             }
             val moduleTitle = moduleTitles[path] ?: currentModule
             if (focusedAction == CourseModuleAction.Videos && focusedHere) {
-                completed = true
-                detail = "$moduleTitle videos are complete."
+                finishFocusedModule("$moduleTitle videos are complete.")
                 return
             }
             if (moduleTitle != null && CourseAnswerBank.normalize(moduleTitle) in savedPassedTitles) passedAssessments.add(path)

@@ -490,6 +490,10 @@ sync_data_linux() {
 }
 
 sync_data_all() {
+    # Deliberately data-only: do not call mac_check_pushed or any source/Git sync helper here.
+    # Progress databases, settings and certificates are local machine state and do not require
+    # the project checkout to be committed or pushed.
+    step "Copy AutoPilot data only (no Git sync)"
     sync_data_local mac "$HOME"
     sync_data_windows legion "$LEGION_HOST" "$LEGION_HOME"
     sync_data_linux server "$SERVER_HOST" "$SERVER_HOME"

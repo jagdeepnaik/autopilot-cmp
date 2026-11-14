@@ -840,8 +840,11 @@ class PageController(
             fun metric(name: String) = Regex("(?:^|\\n)$name=([0-9]+)").find(details)?.groupValues?.get(1)?.toIntOrNull() ?: 0
             val video = records.filter { it.kind == "module-videos" && CourseAnswerBank.normalize(it.course) == normalized }
                 .maxByOrNull { it.observedAt }
+            val quizzes = records.filter { it.kind == "quiz" && CourseAnswerBank.normalize(it.course) == normalized }
+            val completedQuizzes = quizzes.count { it.status in setOf("completed", "passed") }
             CourseModuleStatus(module, videos, passed, certificate, assessment?.score, metric("automaticAnswers"), metric("manualAnswers"),
-                detailMetric(video?.details.orEmpty(), "durationMillis"), detailMetric(details, "durationMillis"))
+                detailMetric(video?.details.orEmpty(), "durationMillis"), detailMetric(details, "durationMillis"),
+                quizzes.isNotEmpty() && completedQuizzes == quizzes.size, completedQuizzes, quizzes.size)
         }
     }
 

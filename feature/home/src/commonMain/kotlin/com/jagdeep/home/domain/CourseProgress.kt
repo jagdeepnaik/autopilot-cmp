@@ -34,7 +34,7 @@ val SAGAR_MEIN_YOG_MODULES = listOf(
     "Environmental Wellness", "Climatic Wellness", "Intellectual Wellness", "Cultural Wellness", "Spiritual Wellness",
 )
 
-enum class CourseModuleAction { Videos, Assessment }
+enum class CourseModuleAction { Videos, Quizzes, Assessment }
 data class CourseModuleStatus(
     val module: String,
     val videosComplete: Boolean,
@@ -45,6 +45,9 @@ data class CourseModuleStatus(
     val manualAnswers: Int = 0,
     val videoDurationMillis: Long = 0,
     val assessmentDurationMillis: Long = 0,
+    val quizzesComplete: Boolean = false,
+    val quizzesCompleted: Int = 0,
+    val quizzesTotal: Int = 0,
 )
 
 internal fun detailMetric(details: String, name: String): Long =
