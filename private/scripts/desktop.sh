@@ -110,6 +110,7 @@ select_server_hosts() {
     fi
     if [[ "$TARGET" == server-vm-win || "$TARGET" == all ]] && ! ssh -o BatchMode=yes -o ConnectTimeout=8 -o ConnectionAttempts=1 "$VM_HOST" true >/dev/null 2>&1; then
         echo "Server VM local SSH is unavailable; using home-server-build-remote."
+        SERVER_HOST=home-server-remote
         VM_HOST=home-server-build-remote
     fi
 }
