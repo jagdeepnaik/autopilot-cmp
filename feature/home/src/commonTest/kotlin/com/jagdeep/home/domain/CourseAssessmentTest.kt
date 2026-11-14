@@ -9,6 +9,21 @@ import kotlin.test.assertTrue
 
 class CourseAssessmentTest {
     @Test
+    fun `quiz answering uses the saved bank only when quiz setting is enabled`() {
+        val disabled = CourseAutomationSession("s", answerAssessments = false, answerQuizzes = false, assessmentMode = AssessmentMode.Automatic)
+        disabled.configureAnswers(bank)
+        disabled.read(page(assessment = CourseAssessment("Wellness", listOf(q), quiz = true)), 0)
+        assertNull(disabled.action)
+        assertTrue(disabled.detail.contains("Quiz handling is disabled"))
+
+        val enabled = CourseAutomationSession("s", answerAssessments = false, answerQuizzes = true, assessmentMode = AssessmentMode.Automatic)
+        enabled.configureAnswers(bank)
+        enabled.read(page(assessment = CourseAssessment("Wellness", listOf(q), quiz = true)), 0)
+        assertEquals("assessmentAnswer", enabled.action?.kind)
+        assertEquals("b", enabled.action?.element)
+    }
+
+    @Test
     fun `automatic mode resumes existing questions without starting another attempt`() {
         val runner = CourseAutomationSession("s", answerAssessments = true, assessmentMode = AssessmentMode.Automatic)
         runner.configureAnswers(bank)
@@ -62,7 +77,8 @@ class CourseAssessmentTest {
         val runner = CourseAutomationSession("s",0,answerAssessments=true,assessmentMode=AssessmentMode.Automatic,learningOrder=LearningOrder.VideosFirst)
         runner.configureAnswers(bank)
         runner.configureProgress(CourseProgressSummary("user","User",1,listOf(
-            com.jagdeep.persistence.room.learning.LearningRecord("user","passed","Passed module","assessment","Course Assessment","passed",90.0,observedAt=1))))
+            com.jagdeep.persistence.room.learning.LearningRecord("user","passed","Passed module","assessment","Course Assessment","passed",90.0,observedAt=1),
+            com.jagdeep.persistence.room.learning.LearningRecord("user","passed-videos","Passed module","module-videos","All module videos","completed",details="/dashboard/courses/passed",observedAt=1))))
         val done = page(home,CourseElement("module",tag="a",href=course,label="Wellness"),CourseElement("done",label="Rewatch video",context="Part:1 Completed"),CourseElement("assessment",label="Assessment"))
         runner.read(done,0); runner.read(done,2000)
         assertEquals("home",runner.action?.element)
@@ -100,6 +116,28 @@ class CourseAssessmentTest {
         runner.read(page(home,assessment=CourseAssessment("Wellness",start="start")),3000)
         assertNull(runner.action)
         assertNull(runner.approval)
+    }
+
+    @Test
+    fun `videos first does not skip the last course card when its context says completed`() {
+        val runner = CourseAutomationSession("s", 0, answerAssessments = true, learningOrder = LearningOrder.VideosFirst)
+        val records = (1..9).map { index ->
+            com.jagdeep.persistence.room.learning.LearningRecord(
+                "user", "videos-$index", "Module $index", "module-videos", "All module videos", "completed",
+                details = "/dashboard/courses/module-$index", observedAt = index.toLong()
+            )
+        }
+        runner.configureProgress(CourseProgressSummary("user", "User", 1, records))
+        val cards = (1..10).map { index ->
+            CourseElement(
+                "module-$index", tag = "a", label = "Module $index", href = "/dashboard/courses/module-$index",
+                courseTitle = "Module $index",
+                context = "Module $index Completed Min. Pass 75% Duration 20min"
+            )
+        }
+        runner.read(CourseSnapshot("s", "dashboard", "/dashboard", elements = cards), 0)
+        assertEquals("module-10", runner.action?.element)
+        assertEquals("Module 10", runner.currentModule)
     }
 
     @Test
@@ -279,7 +317,9 @@ class CourseAssessmentTest {
         val complete = CourseElement("rewatch", label = "Rewatch video", context = "Part:1 Completed")
         runner.read(page(complete, CourseElement("assessment", label = "Assessment")), 0)
         runner.read(page(complete, CourseElement("assessment", label = "Assessment")), 2000)
-        assertNull(runner.approval)
+        assertEquals(CourseApprovalKind.StartAssessment, runner.approval?.kind)
+        runner.approveAssessment(runner.approval!!.token)
+        runner.read(page(complete, CourseElement("assessment", label = "Assessment")), 2000)
         assertEquals("assessmentOpen", runner.action?.kind)
         runner.acknowledge(runner.action!!.request, true, 2000)
         return runner
@@ -354,11 +394,16 @@ class CourseAssessmentTest {
     }
 
     @Test
-    fun `review starts an open assessment once and answers without start approval`() {
+    fun `review asks before starting an open assessment and then answers`() {
         val runner = CourseAutomationSession("s", answerAssessments = true).apply { configureAnswers(bank) }
+        runner.configureProgress(CourseProgressSummary("user", "User", 1, listOf(
+            com.jagdeep.persistence.room.learning.LearningRecord("user", "videos", "Wellness", "module-videos", "All module videos", "completed", details = course, observedAt = 1)
+        )))
         val modal = page(CourseElement("start", label = "Start Assessment"), assessment = CourseAssessment("Wellness", start = "start"))
         runner.read(modal, 0)
-        assertNull(runner.approval)
+        assertEquals(CourseApprovalKind.StartAssessment, runner.approval?.kind)
+        runner.approveAssessment(runner.approval!!.token)
+        runner.read(modal, 0)
         assertEquals("assessmentStart", runner.action?.kind)
         runner.acknowledge(runner.action!!.request, true, 0)
         runner.read(page(assessment = CourseAssessment("Wellness", listOf(q))).copy(path = "$course/test/test1"), 2000)
@@ -386,6 +431,15 @@ class CourseAssessmentTest {
         val runner = CourseAutomationSession("s", answerAssessments = true).apply { configureAnswers(bank) }
         runner.read(page(CourseElement("watch", label = "Watch video", context = "Part:1 Not Started"), CourseElement("assessment", label = "Assessment")), 0)
         assertEquals("watch", runner.action?.element)
+    }
+
+    @Test
+    fun `review blocks a direct assessment start until that modules videos are complete`() {
+        val runner = CourseAutomationSession("s", answerAssessments = true, assessmentMode = AssessmentMode.Review).apply { configureAnswers(bank) }
+        runner.read(page(CourseElement("start", label = "Start Assessment"), assessment = CourseAssessment("Wellness", start = "start")), 0)
+        assertNull(runner.action)
+        assertNull(runner.approval)
+        assertTrue(runner.detail.contains("videos are complete"))
     }
 
     @Test
@@ -512,6 +566,7 @@ class CourseAssessmentTest {
         val runner = ready()
         val start = CourseElement("start", label = "Start Assessment")
         runner.read(page(start, assessment = CourseAssessment("Wellness", start = "start")), 3000)
+        assertNull(runner.approval, "The approval was already required before opening this module's assessment")
         assertEquals("assessmentStart", runner.action?.kind)
         assertEquals("start", runner.action?.element)
     }

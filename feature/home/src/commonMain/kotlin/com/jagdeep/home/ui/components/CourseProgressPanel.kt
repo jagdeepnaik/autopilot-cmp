@@ -52,25 +52,16 @@ internal fun CourseProgressHistory(accounts: List<LearningAccount>, summary: Cou
             allSummaries.forEach { history ->
                 HorizontalDivider()
                 Text(history.displayName, style = MaterialTheme.typography.titleMedium)
-                val modules = SAGAR_MEIN_YOG_MODULES.map { module ->
-                    val normalized = CourseAnswerBank.normalize(module)
-                    val video = history.records.filter { it.kind == "module-videos" && CourseAnswerBank.normalize(it.course) == normalized }.maxByOrNull { it.observedAt }
-                    val assessment = history.records.filter { it.kind == "assessment" && CourseAnswerBank.normalize(it.course) == normalized }.maxByOrNull { it.observedAt }
-                    val videoDone = video?.status == "completed"
-                    val passed = assessment?.status == "passed"
-                    val videoMillis = detailMetric(video?.details.orEmpty(), "durationMillis")
-                    val assessmentMillis = detailMetric(assessment?.details.orEmpty(), "durationMillis")
-                    Triple(module, videoDone, passed to (videoMillis + assessmentMillis))
-                }
-                Text("${modules.count { it.second && it.third.first }} / ${modules.size} modules complete · " +
-                    formatDuration(modules.sumOf { it.third.second }), style = MaterialTheme.typography.bodySmall)
-                modules.filter { it.second || it.third.first }.forEach { (module, videoDone, result) ->
-                    Text("$module · video ${if (videoDone) "complete" else "incomplete"} · assessment ${if (result.first) "passed" else "not passed"}", style = MaterialTheme.typography.bodySmall)
-                }
+                ProgressModuleOverview(history)
             }
             accounts.forEach { profile -> TextButton(onClick = { selected = profile.key; load(profile.key) }) { Text(if(profile.key.startsWith("dgs:")) profile.displayName else profile.displayName + " · " + profile.key.removePrefix("sagarmeinyog:")) } }
             error?.let { Text(it) }
             summary?.takeIf { it.account == selected }?.let { history ->
+                HorizontalDivider()
+                Text("Module overview", style = MaterialTheme.typography.titleMedium)
+                ProgressModuleOverview(history)
+                HorizontalDivider()
+                Text("Details", style = MaterialTheme.typography.titleMedium)
                 Text(history.displayName, style = MaterialTheme.typography.titleMedium)
                 Text("Last progress check: ${com.jagdeep.home.ui.util.progressCheckedLabel(history.checkedAt)}")
                 history.records.groupBy { it.course }.forEach { (course, rows) ->
@@ -91,6 +82,35 @@ internal fun CourseProgressHistory(accounts: List<LearningAccount>, summary: Cou
         }
     }, confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } })
 }
+
+@Composable
+private fun ProgressModuleOverview(history: CourseProgressSummary) {
+    val modules = SAGAR_MEIN_YOG_MODULES.map { module ->
+        val normalized = CourseAnswerBank.normalize(module)
+        val video = history.records.filter { it.kind == "module-videos" && CourseAnswerBank.normalize(it.course) == normalized }.maxByOrNull { it.observedAt }
+        val assessment = history.records.filter { it.kind == "assessment" && CourseAnswerBank.normalize(it.course) == normalized }.maxByOrNull { it.observedAt }
+        ModuleOverview(
+            name = module,
+            videos = video?.status == "completed",
+            assessment = assessment?.status == "passed",
+            durationMillis = detailMetric(video?.details.orEmpty(), "durationMillis") + detailMetric(assessment?.details.orEmpty(), "durationMillis"),
+        )
+    }
+    Text(
+        "${modules.count { it.videos && it.assessment }} / ${modules.size} modules complete · ${formatDuration(modules.sumOf { it.durationMillis })}",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        modules.forEach { module ->
+            Text(
+                "${module.name} · videos ${if (module.videos) "complete" else "incomplete"} · assessment ${if (module.assessment) "passed" else "not passed"}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+private data class ModuleOverview(val name: String, val videos: Boolean, val assessment: Boolean, val durationMillis: Long)
 
 private fun formatDuration(millis: Long): String {
     val totalSeconds = millis / 1000

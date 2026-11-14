@@ -526,7 +526,11 @@ class PageControllerTest {
         send(course)
         advanceTimeBy(2000)
         send(course)
-        assertNull((controller.state.value.activity as PageActivity.Automation).approval)
+        val startApproval = (controller.state.value.activity as PageActivity.Automation).approval
+        assertEquals(CourseApprovalKind.StartAssessment, startApproval?.kind)
+        controller.approveAssessment(requireNotNull(startApproval).token)
+        runCurrent()
+        send(course)
         val action = lastCommand().courseAutomation!!.action!!
         bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("courseAction", session, request = action.request, success = true)))
         runCurrent()

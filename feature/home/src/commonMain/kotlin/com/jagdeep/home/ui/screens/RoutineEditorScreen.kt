@@ -158,6 +158,11 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                     )
                     Group("Assessment")
                     ListItem(
+                        headlineContent = { Text("Answer chapter quizzes") },
+                        supportingContent = { Text("After the videos for a chapter finish, open and answer its quiz using the selected answer mode and bank.") },
+                        trailingContent = { Switch(checked = draft.answerQuizzes, onCheckedChange = { enabled -> update { it.copy(answerQuizzes = enabled) } }) },
+                    )
+                    ListItem(
                         headlineContent = { Text("Handle module assessments") },
                         supportingContent = { Text("Skip assessments already passed in Your Progress. Unknown answers always pause for manual help.") },
                         trailingContent = { Switch(checked = draft.answerAssessments, onCheckedChange = { enabled -> update { it.copy(answerAssessments = enabled) } }) },

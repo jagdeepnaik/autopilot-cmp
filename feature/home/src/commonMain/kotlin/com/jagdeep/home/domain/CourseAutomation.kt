@@ -14,6 +14,7 @@ data class CourseAutomationRoutine(
     val assessmentMode: AssessmentMode = AssessmentMode.Review,
     val learningOrder: LearningOrder = LearningOrder.AssessmentAfterModule,
     val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE,
+    val answerQuizzes: Boolean = false,
 ) : Routine {
     override val kind: RoutineKind get() = RoutineKind.CourseAutomation
 }
@@ -77,7 +78,8 @@ internal data class AssessmentAnswerStats(val automatic: Int, val manual: Int)
 internal class CourseAutomationSession(val session: String, private val waitAfterClickMillis: Long = 0, playbackSpeed: Double = 1.0, private val answerAssessments: Boolean = false,
     private val assessmentMode: AssessmentMode = AssessmentMode.Review,
     private val learningOrder: LearningOrder = LearningOrder.AssessmentAfterModule,
-    private val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE) {
+    private val answerBankFile: String = com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE,
+    private val answerQuizzes: Boolean = false) {
     var progressCheckpoint = 0; private set
     var currentModule: String? = null; private set
     private val moduleTitles = mutableMapOf<String, String>()
@@ -141,6 +143,8 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         private set
     private val assessmentEpochs = mutableMapOf<String, Int>()
     private val approvedRetryCourses = mutableSetOf<String>()
+    private val completedQuizzes = mutableSetOf<String>()
+    private var pendingQuizKey: String? = null
     private var authorizedRetryToken: String? = null
     private var retryStartedAt: Long? = null
     private val observedQuestions = mutableMapOf<String, MutableMap<String, CourseQuestion>>()
@@ -396,14 +400,17 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val key = "$pageId:${snapshot.document}:${element.id}:$kind"
             if (!repeat && !attempted.add(key)) { detail = "Waiting for the page to change. Stop and start again if it stays here."; return }
             action = CourseAction(++sequence, snapshot.document, element.id, kind, element.label.takeIf {
-                kind.startsWith("assessment") || kind in setOf("certificateDownload", "certificateClose")
+                kind.startsWith("assessment") || kind == "quizOpen" || kind in setOf("certificateDownload", "certificateClose")
             })
             pendingAt = now
             detail = message
         }
         fun requireApproval(kind: CourseApprovalKind, module: String, signature: String): Boolean {
             val failedRetry = kind == CourseApprovalKind.StartAssessment && CourseAnswerBank.normalize(module) in savedFailedTitles
-            if (kind == CourseApprovalKind.StartAssessment && !failedRetry) return true
+            // Automatic mode may start a normal assessment without a prompt. Review mode must
+            // pause before every new module attempt; a failed retry is always explicit in every
+            // mode because it consumes another attempt.
+            if (kind == CourseApprovalKind.StartAssessment && assessmentMode == AssessmentMode.Automatic && !failedRetry) return true
             if (assessmentMode == AssessmentMode.Automatic && !failedRetry) return true
             val token = "$pageId:$kind:$signature"
             if (kind == CourseApprovalKind.StartAssessment && path in approvedStarts) return true
@@ -418,12 +425,22 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         }
         if (view == CourseView.Assessment) {
             if (!snapshot.top) return
+            val isQuiz = snapshot.assessment?.quiz == true
+            val answerThisPage = if (isQuiz) answerQuizzes else answerAssessments
+            if (isQuiz && snapshot.assessment?.result != null) {
+                completedQuizzes += (pendingQuizKey ?: path)
+                pendingQuizKey = null
+                detail = "Quiz completed. Returning to the course."
+                val back = elements.firstOrNull { it.href == coursePath } ?: elements.firstOrNull { it.label.equals("Back to Course", true) }
+                if (back != null) issue(back, "assessmentReturn", "Quiz completed. Returning to the course.")
+                return
+            }
             // An already active attempt must not be stranded by the video's-first run setting.
-            if (learningOrder == LearningOrder.VideosFirst && snapshot.assessment?.questions?.isNotEmpty() == true) assessmentPass = true
+            if (!isQuiz && learningOrder == LearningOrder.VideosFirst && snapshot.assessment?.questions?.isNotEmpty() == true) assessmentPass = true
             // A finished result page is a safe post-assessment handoff, not a new assessment.
             // It must remain reachable in a videos-first run so a passed certificate can be
             // collected (and a failed result can be reported) before returning to the course.
-            if (learningOrder == LearningOrder.VideosFirst && !assessmentPass && snapshot.assessment?.result == null) {
+            if (!isQuiz && learningOrder == LearningOrder.VideosFirst && !assessmentPass && snapshot.assessment?.result == null) {
                 detail = "This run watches videos only. Assessments are left for a later run. Return to the course in Chrome to continue videos."
                 return
             }
@@ -478,7 +495,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 return
             }
             retryStartedAt = null
-            if (answerAssessments && assessmentMode == AssessmentMode.Manual && assessment.result == null) {
+            if (answerThisPage && assessmentMode == AssessmentMode.Manual && assessment.result == null) {
                 val unknown = assessment.questions.firstOrNull { answerBank?.answer(assessment.module, it) == null }
                 if (unknown != null) {
                     attention = "$path:${CourseAnswerBank.normalize(unknown.text)}:" + unknown.options.map { CourseAnswerBank.optionText(it.text) }.sorted().joinToString("|")
@@ -493,9 +510,15 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     else "Manual mode: start, answer, move between questions and submit in Chrome. The app will not click assessment controls."
                 return
             }
-            if (answerAssessments && assessment.start != null) {
+            if (answerThisPage && assessment.start != null) {
                 if (path in explicitlyStartedAssessments || path in submittedAssessments) {
                     detail = "This assessment was already started in this run. No additional attempt will be started."
+                    return
+                }
+                val module = assessment.module.takeIf { it.isNotBlank() } ?: currentModule.orEmpty()
+                val videosComplete = isQuiz || path in videoFinishedCourses || CourseAnswerBank.normalize(module) in savedVideoTitles
+                if (!videosComplete) {
+                    detail = "${module.ifBlank { "This module" }} assessment is locked until all of its videos are complete."
                     return
                 }
                 if (assessmentMode != AssessmentMode.Manual && answerBank?.module(assessment.module) == null) {
@@ -512,8 +535,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 } else detail = "Waiting for the recognized Start Assessment control."
                 return
             }
-            if (!answerAssessments) {
-                detail = "Assessment handling is disabled. Enable Handle module assessments in this routine's options."
+            if (!answerThisPage) {
+                detail = if (isQuiz) "Quiz handling is disabled. Enable Answer chapter quizzes in this routine's options." else
+                    "Assessment handling is disabled. Enable Handle module assessments in this routine's options."
                 return
             }
             // An existing attempt can outlive the app session. Resume its questions without
@@ -773,6 +797,14 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             chapterLessons.forEach { (id, knownLessons) ->
                 if (knownLessons.isNotEmpty() && completedLessons.containsAll(knownLessons)) completedChapters.add(id)
             }
+            if (answerQuizzes && chapter != null && chapter in completedChapters && "$path:$chapter" !in completedQuizzes) {
+                val quiz = elements.firstOrNull { it.label.trim().matches(Regex("(?:(?:Start|Take|Begin)\\s+)?Quiz", RegexOption.IGNORE_CASE)) }
+                if (quiz != null) {
+                    pendingQuizKey = "$path:$chapter"
+                    issue(quiz, "quizOpen", "Chapter videos finished. Opening the quiz.")
+                    return
+                }
+            }
             val next = lessons.firstOrNull { !finished(it) }
             if (next != null) {
                 videoFinishedCourses.remove(path)
@@ -810,6 +842,14 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 return
             }
             if (moduleTitle != null && CourseAnswerBank.normalize(moduleTitle) in savedPassedTitles) passedAssessments.add(path)
+            if (answerQuizzes) {
+                val quiz = elements.firstOrNull { it.label.trim().matches(Regex("(?:(?:Start|Take|Begin)\\s+)?Quiz", RegexOption.IGNORE_CASE)) &&
+                    it.label.trim().isNotEmpty() && path !in completedQuizzes }
+                if (quiz != null) {
+                    issue(quiz, "quizOpen", "All videos finished. Opening the chapter quiz.")
+                    return
+                }
+            }
             if (answerAssessments && (learningOrder == LearningOrder.AssessmentAfterModule || assessmentPass) && path !in passedAssessments) {
                 if (assessmentMode != AssessmentMode.Manual && answerBank == null) { detail = "Videos finished. Validate $answerBankFile in the routine options before starting the assessment."; return }
                 val assessment = elements.firstOrNull { it.label.trim().equals("Assessment", true) }
@@ -855,7 +895,12 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val assessmentDone = card.href in passedAssessments || title in savedPassedTitles
             return videosDone && (!answerAssessments || (learningOrder == LearningOrder.VideosFirst && !assessmentPass) || assessmentDone)
         }
-        val cards = allCards.filter { !cachedFinished(it) && (!done(it.context) || assessmentPass) && it.context !in completedCards &&
+        // A course card can contain aggregate/page-wide text such as "Completed" even while its
+        // own last lesson is still unfinished. For cards with a real course href, trust the
+        // per-course completion records instead of filtering on that noisy context string. This
+        // prevents the final module from being skipped in Videos First mode.
+        val cards = allCards.filter { !cachedFinished(it) &&
+            (it.href != null || !done(it.context) || assessmentPass) && it.context !in completedCards &&
             (it.courseTitle == null || CourseAnswerBank.normalize(it.courseTitle) !in finishedTitles) &&
             (!assessmentPass || it.courseTitle?.let { title -> CourseAnswerBank.normalize(title) !in savedPassedTitles } != false) &&
             (focusedModule == null || it.courseTitle?.let(CourseAnswerBank::normalize) == focusedModule) }
