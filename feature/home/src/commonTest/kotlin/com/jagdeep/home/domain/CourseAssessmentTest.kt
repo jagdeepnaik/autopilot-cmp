@@ -76,6 +76,15 @@ class CourseAssessmentTest {
     }
 
     @Test
+    fun `quiz start recognizes a take quiz control when the extension has no start id`() {
+        val runner = CourseAutomationSession("s", 0, answerQuizzes = true, assessmentMode = AssessmentMode.Automatic)
+        runner.read(page(CourseElement("take", tag = "button", label = "Take Quiz"),
+            assessment = CourseAssessment("New module", quiz = true)), 0)
+        assertEquals("assessmentStart", runner.action?.kind)
+        assertEquals("take", runner.action?.element)
+    }
+
+    @Test
     fun `quiz answering uses the saved bank only when quiz setting is enabled`() {
         val disabled = CourseAutomationSession("s", answerAssessments = false, answerQuizzes = false, assessmentMode = AssessmentMode.Automatic)
         disabled.configureAnswers(bank)

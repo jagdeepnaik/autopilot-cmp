@@ -331,6 +331,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         if (success) nextActionAt = maxOf(nextActionAt, now + waitAfterClickMillis.coerceIn(0, 86_400_000))
         if (!success && pending.kind == "certificateDownload") {
             requestManualCertificate(now)
+        } else if (!success && pending.kind in setOf("assessmentStart", "quizOpen")) {
+            attempted.removeAll { it.endsWith(":${pending.element}:${pending.kind}") }
+            blockedDocument = null
+            detail = "Chrome did not confirm opening the ${if (pending.kind == "quizOpen") "quiz" else "assessment"}. Retrying when the start control is available."
         } else if (!success && pending.kind != "play") {
             detail = if (pending.kind == "assessmentAnswer") {
                 attention = "${pending.document}:answer:${pending.element}"
@@ -404,6 +408,11 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         if (action != null) {
             if (now - pendingAt > 15_000) {
                 if (action?.kind == "certificateDownload") requestManualCertificate(now)
+                else if (action?.kind in setOf("assessmentStart", "quizOpen")) {
+                    attempted.removeAll { it.endsWith(":${action?.element}:${action?.kind}") }
+                    detail = "Chrome did not confirm opening the ${if (action?.kind == "quizOpen") "quiz" else "assessment"}. Retrying when the start control is available."
+                    blockedDocument = null
+                }
                 else {
                     detail = "Chrome did not confirm the action. Stop and start again to retry."
                     blockedDocument = action?.document
@@ -580,7 +589,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     else "Manual mode: start, answer, move between questions and submit in Chrome. The app will not click assessment controls."
                 return
             }
-            if (answerThisPage && assessment.start != null) {
+            val hasQuizStartControl = isQuiz && elements.any {
+                it.label.trim().matches(Regex("(?:(?:Start|Take|Begin)\\s+)?Quiz", RegexOption.IGNORE_CASE))
+            }
+            if (answerThisPage && (assessment.start != null || hasQuizStartControl)) {
                 if (path in explicitlyStartedAssessments || path in submittedAssessments) {
                     detail = "This assessment was already started in this run. No additional attempt will be started."
                     return
@@ -600,7 +612,13 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     return
                 }
                 if (!isQuiz && !requireApproval(CourseApprovalKind.StartAssessment, assessment.module, path)) return
-                val start = elements.firstOrNull { it.id == assessment.start && it.label.trim().equals(if (isQuiz) "Start Quiz" else "Start Assessment", true) }
+                val start = elements.firstOrNull {
+                    val label = it.label.trim()
+                    val matches = if (isQuiz) {
+                        label.matches(Regex("(?:(?:Start|Take|Begin)\\s+)?Quiz", RegexOption.IGNORE_CASE))
+                    } else label.matches(Regex("(?:(?:Start|Take|Begin)\\s+)?Assessment", RegexOption.IGNORE_CASE))
+                    matches && (assessment.start == null || it.id == assessment.start)
+                }
                 if (start != null) {
                     assessmentCourse = path
                     explicitlyStartedAssessments.add(path)
