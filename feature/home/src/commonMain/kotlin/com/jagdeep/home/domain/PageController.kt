@@ -58,6 +58,8 @@ sealed interface PageActivity {
         val savingAnswer: Boolean = false,
         val answerSaveError: String? = null,
     ) : PageActivity
+
+    data class Ocean(override val routine: OceanTGRoutine, val progress: OceanProgress) : PageActivity
 }
 
 data class PageState(
@@ -136,6 +138,7 @@ internal data class HelperCommand(
     val course: Boolean = false,
     val courseAutomation: CourseCommand? = null,
     val dgs: DgsCommand? = null,
+    val oceanTG: OceanCommand? = null,
 )
 
 @Serializable
@@ -360,6 +363,7 @@ class PageController(
     private var textRequest = 0L
     private var pendingText: String? = null
     private var courseAutomation: CourseAutomationSession? = null
+    private var oceanTG: OceanTGSession? = null
     private var activeAnswerBankStore: CourseAnswerBankStore = answerBankStore
     private var courseProgress: CourseProgressSession? = null
     private val courseChunks = CourseSnapshotAssembler()
@@ -478,6 +482,17 @@ class PageController(
                 if (courseProgress == null) automation.apps.bringToFront(BROWSER_APP_NAME)
                 null
             }
+            is OceanTGRoutine -> {
+                val bankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(routine.answerBankFile) ?: routine.answerBankFile
+                activeAnswerBankStore = answerBankStore.forName(bankFile)
+                val runner = OceanTGSession("${newId()}:${now()}", routine.answerPracticeQuestions)
+                oceanTG = runner
+                launchActivity(PageActivity.Ocean(routine.copy(answerBankFile = bankFile), runner.progress), scrolling = false) {
+                    performOceanTG(routine, runner)
+                }
+                automation.apps.bringToFront(BROWSER_APP_NAME)
+                null
+            }
             is ScrollClickRoutine -> {
                 if (automation.access.access() != InputAccess.Granted) return "Allow Accessibility access so clicks can reach Chrome."
                 pageReading.value = null
@@ -504,6 +519,7 @@ class PageController(
             courseChunks.clear()
             publish()
         }
+        if (state.value.activity is PageActivity.Ocean) { oceanTG = null; publish() }
         if (active) job?.cancel()
         return active
     }
@@ -515,7 +531,7 @@ class PageController(
                 live.log(LiveSource.Keys) { "Scroll key: stopping scroll and click" }
                 stop()
             }
-            is PageActivity.Automation, is PageActivity.Dgs, null -> Unit
+            is PageActivity.Automation, is PageActivity.Ocean, is PageActivity.Dgs, null -> Unit
         }
     }
 
@@ -653,6 +669,21 @@ class PageController(
         }
     }
 
+    private suspend fun performOceanTG(routine: OceanTGRoutine, runner: OceanTGSession) {
+        val startedAt = now()
+        var outcome = RunOutcome.StoppedByUser
+        try {
+            runner.configureAnswers(try { activeAnswerBankStore.load() } catch (_: Exception) { null })
+            while (true) {
+                if (!state.value.isConnected) { outcome = RunOutcome.BrowserDisconnected; break }
+                if (runner.progress.completed) { outcome = RunOutcome.Completed; break }
+                kotlinx.coroutines.delay(200)
+            }
+        } finally {
+            withContext(NonCancellable) { endActivity(); record(routine.name, startedAt, 0, outcome) }
+        }
+    }
+
     private suspend fun record(name: String, startedAt: Long, clicks: Long, outcome: RunOutcome) {
         val record = RunRecord(newId(), name, startedAt, now(), clicks, outcome)
         live.log(LiveSource.Routine) { "Ended $name: ${outcome.label}, $clicks clicks" }
@@ -670,6 +701,7 @@ class PageController(
         dgsSession=null
         dgsStudy=null
         courseAutomation = null
+        oceanTG = null
         courseProgress = null
         courseChunks.clear()
         questionAlertKey = null
@@ -718,6 +750,7 @@ class PageController(
                 mutableState.update { it.copy(activity=activity.copy(progress=runner.progress)) }; publish(); return
             }
         }
+        if (handleOceanMessage(raw)) return
         if (handleCourseMessage(raw)) return
         live.log(LiveSource.Chrome) { "← ${raw.take(MAX_LOGGED_MESSAGE)}" }
         val event = try {
@@ -749,6 +782,33 @@ class PageController(
         else -> PageVideo.None
     }
 
+    private suspend fun handleOceanMessage(raw: String): Boolean {
+        val action = runCatching { json.decodeFromString(OceanActionAck.serializer(), raw) }.getOrNull()
+        if (action?.type == "oceanAction") {
+            oceanTG?.takeIf { it.session == action.session }?.acknowledge(action.request, action.success)
+            publish()
+            return true
+        }
+        val reading = runCatching { json.decodeFromString(OceanReading.serializer(), raw) }.getOrNull() ?: return false
+        if (reading.type != "oceanReading") return false
+        val runner = oceanTG ?: return true
+        if (reading.session != runner.session) return true
+        if (reading.practice?.correctAnswer != null && reading.chapterTitle != null) {
+            val question = reading.practice
+            val correct = question.options.singleOrNull { CourseAnswerBank.optionText(it.text) == CourseAnswerBank.optionText(question.correctAnswer) }
+            if (correct != null) {
+                val current = try { activeAnswerBankStore.load() } catch (_: Exception) { null }
+                val saved = activeAnswerBankStore.save(reading.chapterTitle, CourseAnswer(question.text, question.options.map { it.text }, correct.text))
+                if (saved is AnswerBankSaveResult.Saved) runner.configureAnswers(saved.bank)
+            }
+        }
+        runner.read(reading)
+        val activity = state.value.activity as? PageActivity.Ocean ?: return true
+        mutableState.update { it.copy(activity = activity.copy(progress = runner.progress)) }
+        publish()
+        return true
+    }
+
     private fun publish() {
         val current = state.value
         val activity = current.activity
@@ -758,7 +818,7 @@ class PageController(
             pixelsPerSecond = when (activity) {
                 is PageActivity.ScrollClick -> activity.routine.pixelsPerSecond
                 null -> DEFAULT_PIXELS_PER_SECOND
-                is PageActivity.Automation, is PageActivity.Dgs -> DEFAULT_PIXELS_PER_SECOND
+                is PageActivity.Automation, is PageActivity.Ocean, is PageActivity.Dgs -> DEFAULT_PIXELS_PER_SECOND
             },
             words = emptyList(),
             advance = 0,
@@ -769,6 +829,7 @@ class PageController(
             course = false,
             dgs = dgsSession?.command,
             courseAutomation = courseAutomation?.let { CourseCommand(it.session, if (courseProgress?.blocksActions == true) null else courseProgress?.action ?: it.action, it.playbackSpeed) },
+            oceanTG = oceanTG?.let { OceanCommand(it.session, it.action) },
         )
         val encoded = json.encodeToString(HelperCommand.serializer(), command)
         if (encoded != lastPublished) live.log(LiveSource.Chrome) { "→ $encoded" }

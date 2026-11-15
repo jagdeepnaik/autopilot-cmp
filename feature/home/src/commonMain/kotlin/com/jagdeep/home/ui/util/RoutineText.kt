@@ -23,6 +23,7 @@ internal fun routineSummary(routine: Routine): String = "${routine.kind.label} �
     }.joinToString(" · ")
     is com.jagdeep.home.domain.DgsELearningRoutine -> "DGS e-book · ${routine.requiredHours} hours required · videos before Next"
     is CourseAutomationRoutine -> "sagarmeinyog.com · automatically watches unfinished video lessons"
+    is com.jagdeep.home.domain.OceanTGRoutine -> "app1.oceantg.com · completes learning chapters and stops before the assessment"
 }
 
 /** "Left click every 1 s · at the pointer · in Google Chrome", or "3 points, top to bottom · once". */

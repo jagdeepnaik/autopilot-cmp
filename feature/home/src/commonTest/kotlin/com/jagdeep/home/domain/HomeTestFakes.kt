@@ -113,6 +113,7 @@ internal class FakePageRunner : PageRunner {
         val activity = when (routine) {
             is DgsELearningRoutine -> PageActivity.Dgs(routine,DgsProgress())
             is CourseAutomationRoutine -> PageActivity.Automation(routine, "Waiting for Chrome")
+            is OceanTGRoutine -> PageActivity.Ocean(routine, OceanProgress())
             is ScrollClickRoutine -> PageActivity.ScrollClick(routine, ScrollClickProgress(1, routine.rounds, 0, ScrollClickPhase.ReadingPage))
             is ClickRoutine -> return "not a page routine"
         }

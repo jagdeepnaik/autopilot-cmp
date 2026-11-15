@@ -30,7 +30,7 @@ class RoutineFileTest {
         assertEquals(2.0, yoga.playbackSpeed)
         assertEquals(LearningOrder.AssessmentAfterModule, yoga.learningOrder, "Old files keep their existing order")
         assertEquals("Sagar Mein Yog automation", yoga.kind.label)
-        assertEquals(setOf(RoutineKind.Click, RoutineKind.Sequence, RoutineKind.ScrollClick, RoutineKind.CourseAutomation, RoutineKind.DgsELearning), RoutineKind.entries.toSet())
+        assertEquals(setOf(RoutineKind.Click, RoutineKind.Sequence, RoutineKind.ScrollClick, RoutineKind.CourseAutomation, RoutineKind.DgsELearning, RoutineKind.OceanTG), RoutineKind.entries.toSet())
     }
 
     private val sequence = ClickRoutine(
@@ -44,6 +44,7 @@ class RoutineFileTest {
         ScrollClickRoutine("s", "Next pages", ClickPoint(640, 880), rounds = 7),
         CourseAutomationRoutine("h", "Course", playbackSpeed = 1.5, learningOrder = LearningOrder.VideosFirst, answerBankFile = "my-answers.json"),
         DgsELearningRoutine("dgs", "DGS", requiredHours=28.0, creditedHours=2.5, playbackSpeed=2.0),
+        OceanTGRoutine("ocean", "Ocean", answerPracticeQuestions=true),
     )
 
     @Test

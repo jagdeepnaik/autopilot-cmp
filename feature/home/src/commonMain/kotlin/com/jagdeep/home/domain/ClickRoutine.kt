@@ -12,6 +12,7 @@ enum class RoutineKind(val label: String, val description: String) {
     ScrollClick("Scroll and click", "Scrolls a Chrome page to the bottom, plays any videos, clicks your spot, and repeats."),
     DgsELearning("DGS E-Learning", "Reads DGS e-book pages, watches videos and reviews until your active study-time target."),
     CourseAutomation("Sagar Mein Yog automation", "Automatically opens unfinished courses and video lessons on sagarmeinyog.com, watches videos, and follows the selected assessment mode."),
+    OceanTG("OceanTG learning", "Works through Ocean Learning Platform chapters in order, watches media and answers saved practice questions. It stops before the final assessment."),
 }
 
 /** Something the Routines page can save and run. Only one routine runs at a time. */

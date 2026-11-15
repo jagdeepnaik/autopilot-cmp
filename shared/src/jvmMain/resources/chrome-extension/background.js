@@ -2,6 +2,7 @@
 // text click once. Sagar Mein Yog automation uses a separate inventory/action channel below.
 const BASE = "http://127.0.0.1:47613";
 const STALE_MILLIS = 3000;
+importScripts("course-automation-background.js", "dgs-elearning-background.js", "dgs-browser-clicks.js", "oceantg-background.js");
 
 let command = null;
 let polling = false;

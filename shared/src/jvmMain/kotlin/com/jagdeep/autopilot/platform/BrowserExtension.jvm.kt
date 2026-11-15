@@ -14,7 +14,7 @@ import com.jagdeep.shared.browser.BrowserExtensionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal val BROWSER_EXTENSION_FILES = listOf("manifest.json", "background.js", "content.js", "course-automation.js", "course-automation-background.js", "dgs-elearning.js", "dgs-elearning-background.js", "dgs-browser-clicks.js")
+internal val BROWSER_EXTENSION_FILES = listOf("manifest.json", "background.js", "content.js", "course-automation.js", "course-automation-background.js", "dgs-elearning.js", "dgs-elearning-background.js", "dgs-browser-clicks.js", "oceantg.js", "oceantg-background.js")
 
 internal fun bundledBrowserExtensionVersion(): String = object {}.javaClass
     .getResourceAsStream("/chrome-extension/manifest.json")!!.use {
