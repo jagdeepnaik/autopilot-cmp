@@ -364,6 +364,7 @@ class PageController(
     private var pendingText: String? = null
     private var courseAutomation: CourseAutomationSession? = null
     private var oceanTG: OceanTGSession? = null
+    private val oceanProgressMutex = Mutex()
     private var activeAnswerBankStore: CourseAnswerBankStore = answerBankStore
     private var courseProgress: CourseProgressSession? = null
     private val courseChunks = CourseSnapshotAssembler()
@@ -802,7 +803,22 @@ class PageController(
                 if (saved is AnswerBankSaveResult.Saved) runner.configureAnswers(saved.bank)
             }
         }
+        reading.profileName?.let { name ->
+            val key = "olp:" + CourseAnswerBank.normalize(name)
+            val saved = try { progressRepository.records(key).filter { it.kind == "olp-chapter" && it.status == "completed" }.map { it.key } } catch (_: Exception) { emptyList() }
+            runner.configureProfile(name, saved)
+        }
         runner.read(reading)
+        oceanProgressMutex.withLock {
+            val account = runner.account
+            if (account != null && runner.pendingRecords.isNotEmpty()) try {
+                val rows = runner.pendingRecords.values.map { value ->
+                    com.jagdeep.persistence.room.learning.LearningRecord(account.key, value.key, value.course, "olp-chapter", value.chapter, "completed", details = "courseCode=${value.course.substringBefore(" · ")}", observedAt = now())
+                }
+                progressRepository.save(account.copy(checkedAt = now()), rows)
+                runner.pendingRecords.clear()
+            } catch (_: Exception) { /* Retry after the next OLP page update. */ }
+        }
         val activity = state.value.activity as? PageActivity.Ocean ?: return true
         mutableState.update { it.copy(activity = activity.copy(progress = runner.progress)) }
         publish()

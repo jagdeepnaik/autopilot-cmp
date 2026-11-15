@@ -42,6 +42,7 @@ internal data class OceanReading(
     val top: Boolean,
     val courseTitle: String = "",
     val courseCode: String? = null,
+    val profileName: String? = null,
     val path: String = "",
     val results: List<OceanChapter> = emptyList(),
     val chapters: List<OceanChapter> = emptyList(),
@@ -69,10 +70,21 @@ internal class OceanTGSession(val session: String, private val answerPracticeQue
     private var request = 0L
     private var pending: OceanAction? = null
     private var answers: CourseAnswerBank? = null
+    private var profile: com.jagdeep.persistence.room.learning.LearningAccount? = null
+    private var currentCode: String? = null
+    private var currentCourse: String = ""
+    private val savedRecordKeys = mutableSetOf<String>()
+    internal val pendingRecords = linkedMapOf<String, OceanCompletion>()
     var progress = OceanProgress(); private set
     val action: OceanAction? get() = pending
 
     fun configureAnswers(bank: CourseAnswerBank?) { answers = bank }
+    fun configureProfile(name: String?, saved: Collection<String>) {
+        val value = name?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        profile = com.jagdeep.persistence.room.learning.LearningAccount("olp:" + CourseAnswerBank.normalize(value), value, 0)
+        savedRecordKeys += saved
+    }
+    internal val account get() = profile
     fun acknowledge(request: Long, success: Boolean) { if (pending?.request == request && success) pending = null }
 
     fun read(reading: OceanReading) {
@@ -85,6 +97,7 @@ internal class OceanTGSession(val session: String, private val answerPracticeQue
             return
         }
         if (reading.top) {
+            configureProfile(reading.profileName, emptySet())
             val currentCode = courseCodes.firstOrNull { it == reading.courseCode }
             if (reading.path.startsWith("/OLP/search")) {
                 val expected = courseCodes.firstOrNull { it !in completedCodes }
@@ -99,7 +112,14 @@ internal class OceanTGSession(val session: String, private val answerPracticeQue
                 issue(reading, "searchCourse", expected)
                 return
             }
-            val next = reading.chapters.firstOrNull { it.title.trim().lowercase() != "assessment" && !it.status.contains("completed", true) }
+            this.currentCode = currentCode
+            currentCourse = reading.courseTitle
+            reading.chapters.filter { it.title.trim().lowercase() != "assessment" && it.status.contains("completed", true) }.forEach { saveChapter(it.title) }
+            val next = reading.chapters.firstOrNull { chapter ->
+                chapter.title.trim().lowercase() != "assessment" &&
+                    !chapter.status.contains("completed", true) &&
+                    "olp:${currentCode}:chapter:${CourseAnswerBank.normalize(chapter.title)}" !in savedRecordKeys
+            }
             if (next == null) {
                 currentCode?.let(completedCodes::add)
                 val nextCode = courseCodes.firstOrNull { it !in completedCodes }
@@ -114,7 +134,7 @@ internal class OceanTGSession(val session: String, private val answerPracticeQue
             reading.chapterTitle, reading.slide, reading.slideCount,
         )
         when {
-            reading.finished -> issue(reading, "returnToMenu")
+            reading.finished -> { reading.chapterTitle?.let(::saveChapter); issue(reading, "returnToMenu") }
             reading.media == "playing" -> Unit
             else -> issue(reading, "next")
         }
@@ -122,9 +142,19 @@ internal class OceanTGSession(val session: String, private val answerPracticeQue
 
     private val completedCodes = mutableSetOf<String>()
 
+    private fun saveChapter(chapter: String) {
+        val account = profile ?: return
+        val code = currentCode ?: return
+        val key = "olp:$code:chapter:${CourseAnswerBank.normalize(chapter)}"
+        if (!savedRecordKeys.add(key)) return
+        pendingRecords[key] = OceanCompletion(key, "$code · $currentCourse", chapter)
+    }
+
     private fun issue(reading: OceanReading, kind: String, target: String? = null) {
         val old = pending
         if (old != null && old.document == reading.document && old.kind == kind && old.target == target) return
         pending = OceanAction(++request, reading.document, kind, target)
     }
 }
+
+internal data class OceanCompletion(val key: String, val course: String, val chapter: String)

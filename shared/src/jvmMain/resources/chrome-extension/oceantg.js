@@ -9,17 +9,19 @@
   const text = node => clean(node?.innerText || node?.textContent);
   const button = title => [...document.querySelectorAll('[title],button,a')].find(n => visible(n) && (n.getAttribute('title')===title || text(n)===title));
   function reading() {
+    const profileName = [...document.querySelectorAll('h1,h2,h3')].map(text).find(value => /^[A-Z][A-Z .'-]{3,}$/.test(value) && !/^(WELCOME|SEARCH|SCHEDULE|CONTINUE|UPDATED|POPULAR|COMPLETION)$/i.test(value)) || null;
+    if (window === window.top && location.pathname === '/OLP/home') return {type:'oceanReading',session,document:documentId,top:true,path:location.pathname,profileName};
     const top = location.pathname.startsWith('/OLP/elearning/details/');
     if (window === window.top && location.pathname.startsWith('/OLP/search')) {
       const links = [...document.querySelectorAll('a[href*="/OLP/elearning/details/"]')].filter(visible);
       const results = links.map(node => { const value=text(node); const code=(value.match(/(?:No\.\s*)?(\d{3,5})\b/)||[])[1] || ''; return {id:code,title:id(node),status:value}; });
-      return {type:'oceanReading',session,document:documentId,top:true,path:location.pathname,results};
+      return {type:'oceanReading',session,document:documentId,top:true,path:location.pathname,profileName,results};
     }
     if (top && window === window.top) {
       const heads = [...document.querySelectorAll('h3')].filter(visible);
       const chapters = heads.map(node => { let parent=node; for(let i=0;i<5&&parent;i++,parent=parent.parentElement) { const t=text(parent); if (/Completed|Not attempted|In progress/i.test(t)) return {id:id(node),title:text(node),status:(t.match(/Completed|Not attempted|In progress/i)||['Not attempted'])[0]}; } return {id:id(node),title:text(node),status:'Not attempted'}; });
       const body=text(document.body); const code=(body.match(/Activity number\s*(\d{3,5})/i)||[])[1] || null;
-      return {type:'oceanReading',session,document:documentId,top:true,path:location.pathname,courseTitle:text(document.querySelector('h1')),courseCode:code,chapters};
+      return {type:'oceanReading',session,document:documentId,top:true,path:location.pathname,profileName,courseTitle:text(document.querySelector('h1')),courseCode:code,chapters};
     }
     const finish = [...document.querySelectorAll('body *')].some(n => visible(n) && /You have now finished this chapter/i.test(text(n)));
     const heading = text(document.querySelector('h1')) || null;
