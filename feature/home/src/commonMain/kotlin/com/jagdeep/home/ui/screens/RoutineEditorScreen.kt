@@ -191,6 +191,7 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                 RoutineKind.OceanTG -> {
                     Group("Ocean Learning Platform")
                     Text("Open an Ocean Learning Platform (OLP) activity in Chrome, then start this routine. It completes learning chapters in order, waits for videos, and stops before the final Assessment.", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
+                    OutlinedTextField(value = draft.oceanCourseCodes, onValueChange = { codes -> update { it.copy(oceanCourseCodes = codes) } }, label = { Text("OLP activity code(s)") }, supportingText = { Text(errors.points ?: "Enter one or more codes, separated by commas or new lines. For example: 1108, 0047") }, isError = errors.points != null, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                     NumberField("Wait after every click (seconds)", draft.waitAfterClickSeconds, errors.waitAfterClick, { value -> update { it.copy(waitAfterClickSeconds = value) } }, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                     ListItem(
                         headlineContent = { Text("Answer practice questions") },

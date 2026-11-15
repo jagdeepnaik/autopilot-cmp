@@ -10,10 +10,16 @@
   const button = title => [...document.querySelectorAll('[title],button,a')].find(n => visible(n) && (n.getAttribute('title')===title || text(n)===title));
   function reading() {
     const top = location.pathname.startsWith('/OLP/elearning/details/');
+    if (window === window.top && location.pathname.startsWith('/OLP/search')) {
+      const links = [...document.querySelectorAll('a[href*="/OLP/elearning/details/"]')].filter(visible);
+      const results = links.map(node => { const value=text(node); const code=(value.match(/(?:No\.\s*)?(\d{3,5})\b/)||[])[1] || ''; return {id:code,title:id(node),status:value}; });
+      return {type:'oceanReading',session,document:documentId,top:true,path:location.pathname,results};
+    }
     if (top && window === window.top) {
       const heads = [...document.querySelectorAll('h3')].filter(visible);
       const chapters = heads.map(node => { let parent=node; for(let i=0;i<5&&parent;i++,parent=parent.parentElement) { const t=text(parent); if (/Completed|Not attempted|In progress/i.test(t)) return {id:id(node),title:text(node),status:(t.match(/Completed|Not attempted|In progress/i)||['Not attempted'])[0]}; } return {id:id(node),title:text(node),status:'Not attempted'}; });
-      return {type:'oceanReading',session,document:documentId,top:true,courseTitle:text(document.querySelector('h1')),chapters};
+      const body=text(document.body); const code=(body.match(/Activity number\s*(\d{3,5})/i)||[])[1] || null;
+      return {type:'oceanReading',session,document:documentId,top:true,path:location.pathname,courseTitle:text(document.querySelector('h1')),courseCode:code,chapters};
     }
     const finish = [...document.querySelectorAll('body *')].some(n => visible(n) && /You have now finished this chapter/i.test(text(n)));
     const heading = text(document.querySelector('h1')) || null;
@@ -29,7 +35,9 @@
   function execute(action) {
     if (!action || action.document!==documentId || handled.has(action.request)) return;
     handled.add(action.request); let node=null;
-    if (action.kind==='openChapter') node=[...document.querySelectorAll('h3')].find(n=>id(n)===action.target);
+    if (action.kind==='searchCourse') { location.assign('/OLP/search/library?query='+encodeURIComponent(action.target)); return; }
+    if (action.kind==='openCourse') node=[...document.querySelectorAll('a[href*="/OLP/elearning/details/"]')].find(n=>id(n)===action.target);
+    else if (action.kind==='openChapter') node=[...document.querySelectorAll('h3')].find(n=>id(n)===action.target);
     else if (action.kind==='answerPractice') node=[...document.querySelectorAll('input[type=radio], [role=radio], label, button')].find(n=>id(n)===action.target);
     else if (action.kind==='returnToMenu') node=[...document.querySelectorAll('button,a')].find(n=>visible(n)&&/Return to the Menu/i.test(text(n)));
     else if (action.kind==='next') node=button('Next page');

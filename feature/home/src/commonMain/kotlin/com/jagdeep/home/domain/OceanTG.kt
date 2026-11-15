@@ -14,6 +14,7 @@ data class OceanTGRoutine(
     val waitAfterClickMillis: Long = 2_000,
     val answerPracticeQuestions: Boolean = true,
     val answerBankFile: String = OCEANTG_ANSWER_BANK,
+    val courseCodes: List<String> = emptyList(),
 ) : Routine {
     override val kind: RoutineKind get() = RoutineKind.OceanTG
 }
@@ -40,6 +41,9 @@ internal data class OceanReading(
     val document: String,
     val top: Boolean,
     val courseTitle: String = "",
+    val courseCode: String? = null,
+    val path: String = "",
+    val results: List<OceanChapter> = emptyList(),
     val chapters: List<OceanChapter> = emptyList(),
     val chapterTitle: String? = null,
     val slide: Int? = null,
@@ -61,7 +65,7 @@ internal data class OceanCommand(val session: String, val action: OceanAction? =
 data class OceanProgress(val detail: String = "Waiting for Ocean Learning Platform", val chapter: String? = null, val slide: Int? = null, val slideCount: Int? = null, val completed: Boolean = false)
 
 /** Makes decisions only from the semantic reading sent by the page helper. */
-internal class OceanTGSession(val session: String, private val answerPracticeQuestions: Boolean) {
+internal class OceanTGSession(val session: String, private val answerPracticeQuestions: Boolean, private val courseCodes: List<String>) {
     private var request = 0L
     private var pending: OceanAction? = null
     private var answers: CourseAnswerBank? = null
@@ -81,8 +85,27 @@ internal class OceanTGSession(val session: String, private val answerPracticeQue
             return
         }
         if (reading.top) {
+            val currentCode = courseCodes.firstOrNull { it == reading.courseCode }
+            if (reading.path.startsWith("/OLP/search")) {
+                val expected = courseCodes.firstOrNull { it !in completedCodes }
+                val found = reading.results.firstOrNull { it.id == expected }
+                progress = if (found == null) OceanProgress("No OLP activity was found for code $expected.") else OceanProgress("Opening OLP course $expected")
+                if (found != null) issue(reading, "openCourse", found.title)
+                return
+            }
+            if (currentCode == null && courseCodes.isNotEmpty()) {
+                val expected = courseCodes.firstOrNull { it !in completedCodes } ?: return
+                progress = OceanProgress("Searching OLP for course code $expected")
+                issue(reading, "searchCourse", expected)
+                return
+            }
             val next = reading.chapters.firstOrNull { it.title.trim().lowercase() != "assessment" && !it.status.contains("completed", true) }
-            progress = if (next == null) OceanProgress("Learning chapters complete. Assessment is left for you to start manually.", completed = true) else OceanProgress("Opening ${next.title}", next.title)
+            if (next == null) {
+                currentCode?.let(completedCodes::add)
+                val nextCode = courseCodes.firstOrNull { it !in completedCodes }
+                progress = if (nextCode == null) OceanProgress("Learning chapters complete. Assessments are left for you to start manually.", completed = true) else OceanProgress("Searching OLP for course code $nextCode")
+                if (nextCode != null) issue(reading, "searchCourse", nextCode)
+            } else progress = OceanProgress("Opening ${next.title}", next.title)
             if (next != null) issue(reading, "openChapter", next.id)
             return
         }
@@ -96,6 +119,8 @@ internal class OceanTGSession(val session: String, private val answerPracticeQue
             else -> issue(reading, "next")
         }
     }
+
+    private val completedCodes = mutableSetOf<String>()
 
     private fun issue(reading: OceanReading, kind: String, target: String? = null) {
         val old = pending

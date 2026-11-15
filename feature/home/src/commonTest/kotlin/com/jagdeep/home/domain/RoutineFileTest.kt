@@ -44,7 +44,7 @@ class RoutineFileTest {
         ScrollClickRoutine("s", "Next pages", ClickPoint(640, 880), rounds = 7),
         CourseAutomationRoutine("h", "Course", playbackSpeed = 1.5, learningOrder = LearningOrder.VideosFirst, answerBankFile = "my-answers.json"),
         DgsELearningRoutine("dgs", "DGS", requiredHours=28.0, creditedHours=2.5, playbackSpeed=2.0),
-        OceanTGRoutine("ocean", "Ocean", answerPracticeQuestions=true),
+        OceanTGRoutine("ocean", "Ocean", answerPracticeQuestions=true, courseCodes=listOf("1108")),
     )
 
     @Test

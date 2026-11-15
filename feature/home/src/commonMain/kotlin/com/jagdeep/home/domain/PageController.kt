@@ -485,7 +485,7 @@ class PageController(
             is OceanTGRoutine -> {
                 val bankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(routine.answerBankFile) ?: routine.answerBankFile
                 activeAnswerBankStore = answerBankStore.forName(bankFile)
-                val runner = OceanTGSession("${newId()}:${now()}", routine.answerPracticeQuestions)
+                val runner = OceanTGSession("${newId()}:${now()}", routine.answerPracticeQuestions, routine.courseCodes)
                 oceanTG = runner
                 launchActivity(PageActivity.Ocean(routine.copy(answerBankFile = bankFile), runner.progress), scrolling = false) {
                     performOceanTG(routine, runner)
