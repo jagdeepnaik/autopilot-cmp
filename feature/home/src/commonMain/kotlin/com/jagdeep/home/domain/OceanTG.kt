@@ -4,6 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 const val OCEANTG_ANSWER_BANK = "oceantg-ver-1.0.json"
+val OLP_BUNDLED_ANSWER_BANKS = (1..6).map { "olp-apk-${it.toString().padStart(2, '0')}-ver-1.0.json" }
 
 /** Ocean Learning Platform routine. It deliberately stops before the final assessment. */
 @Serializable
@@ -91,7 +92,8 @@ internal class OceanTGSession(val session: String, private val answerPracticeQue
         if (reading.session != session) return
         val practice = reading.practice
         if (practice != null) {
-            val answer = answers?.answer(reading.chapterTitle.orEmpty(), CourseQuestion(practice.text, practice.text, practice.options.map { CourseOption(it.id, it.text) }))
+            val question = CourseQuestion(practice.text, practice.text, practice.options.map { CourseOption(it.id, it.text) })
+            val answer = answers?.answer(reading.chapterTitle.orEmpty(), question) ?: answers?.answerAny(question)
             progress = OceanProgress(if (answer == null) "Practice question needs an answer in the answer bank." else "Answering practice question", reading.chapterTitle, reading.slide, reading.slideCount)
             if (answer != null && answer.id != practice.options.firstOrNull { it.selected }?.id && answerPracticeQuestions) issue(reading, "answerPractice", answer.id)
             return

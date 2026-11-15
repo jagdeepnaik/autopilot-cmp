@@ -52,6 +52,17 @@ class CourseAnswerBank private constructor(private val modules: Map<String, List
         return question.options.singleOrNull { optionText(it.text) == optionText(answer) && it.enabled && it.visible }
     }
 
+    /** OLP's lesson title is not the APK course name, so use one unambiguous exact match across its bundled banks. */
+    internal fun answerAny(question: CourseQuestion): CourseOption? {
+        val actual = question.options.map { optionText(it.text) }
+        if (actual.toSet().size != actual.size) return null
+        val answers = modules.values.flatten().filter {
+            normalize(it.question) == normalize(question.text) && it.options.size == actual.size && it.options.map(::optionText).toSet() == actual.toSet()
+        }.mapNotNull { it.answer }.map(::optionText).toSet()
+        val answer = answers.singleOrNull() ?: return null
+        return question.options.singleOrNull { optionText(it.text) == answer && it.enabled && it.visible }
+    }
+
     internal fun entry(title: String, question: CourseQuestion): CourseAnswer? {
         val actual = question.options.map { optionText(it.text) }
         if (actual.toSet().size != actual.size) return null
@@ -116,6 +127,15 @@ interface CourseAnswerBankStore : com.jagdeep.shared.answers.AnswerBankFiles {
     suspend fun load(): CourseAnswerBank?
     suspend fun save(module: String, answer: CourseAnswer): AnswerBankSaveResult = AnswerBankSaveResult.Unavailable
     suspend fun saveReviewed(module: String, answers: List<ReviewedAnswer>): AnswerBankSaveResult = AnswerBankSaveResult.Unavailable
+    /** Combines independent, size-limited bank files without weakening per-file validation. */
+    suspend fun loadAll(names: List<String>): CourseAnswerBank? {
+        var merged: CourseAnswerBank? = null
+        for (name in names.distinct()) {
+            val bank = forName(name).load() ?: continue
+            merged = merged?.mergedWith(bank) ?: bank
+        }
+        return merged
+    }
 }
 object NoCourseAnswerBankStore : CourseAnswerBankStore { override suspend fun load(): CourseAnswerBank? = null }
 

@@ -674,7 +674,7 @@ class PageController(
         val startedAt = now()
         var outcome = RunOutcome.StoppedByUser
         try {
-            runner.configureAnswers(try { activeAnswerBankStore.load() } catch (_: Exception) { null })
+            runner.configureAnswers(try { activeAnswerBankStore.loadAll(OLP_BUNDLED_ANSWER_BANKS + routine.answerBankFile) } catch (_: Exception) { null })
             while (true) {
                 if (!state.value.isConnected) { outcome = RunOutcome.BrowserDisconnected; break }
                 if (runner.progress.completed) { outcome = RunOutcome.Completed; break }
