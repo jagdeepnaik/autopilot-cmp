@@ -190,15 +190,15 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                 }
                 RoutineKind.OceanTG -> {
                     Group("Ocean Learning Platform")
-                    Text("Open an OceanTG activity in Chrome, then start this routine. It completes learning chapters in order, waits for videos, and stops before the final Assessment.", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
+                    Text("Open an Ocean Learning Platform (OLP) activity in Chrome, then start this routine. It completes learning chapters in order, waits for videos, and stops before the final Assessment.", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
                     NumberField("Wait after every click (seconds)", draft.waitAfterClickSeconds, errors.waitAfterClick, { value -> update { it.copy(waitAfterClickSeconds = value) } }, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                     ListItem(
                         headlineContent = { Text("Answer practice questions") },
-                        supportingContent = { Text("Use matching saved answers and learn the correct answer shown by OceanTG feedback.") },
+                        supportingContent = { Text("Use matching saved answers and learn the correct answer shown by OLP feedback.") },
                         trailingContent = { Switch(checked = draft.answerQuizzes, onCheckedChange = { enabled -> update { it.copy(answerQuizzes = enabled) } }) },
                     )
                     AnswerBankOptions(state, viewModel)
-                    Text("The final Assessment stays manual in this first OceanTG routine.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
+                    Text("The final Assessment stays manual in this first OLP routine.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
                 }
             }
 
