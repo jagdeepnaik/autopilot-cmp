@@ -40,26 +40,27 @@ class SqliteQuestionAnswerStore(
     private val driver = BundledSQLiteDriver()
 
     suspend fun bankNames(): List<String> = read { db ->
-        db.prepare("SELECT DISTINCT bank_name FROM qa_questions ORDER BY bank_name").use { row ->
+        db.prepare("SELECT DISTINCT bank_name FROM qa_question_sources ORDER BY bank_name").use { row ->
             buildList { while (row.step()) add(row.getText(0)) }
         }
     }.orEmpty()
 
     suspend fun entries(bankName: String): List<StoredQuestionAnswer>? = read { db ->
-        db.prepare("SELECT id,module,question_text,source FROM qa_questions WHERE bank_name=? ORDER BY id").use { rows ->
+        db.prepare("SELECT q.id,s.id,s.module,q.question_text,s.source FROM qa_question_sources s JOIN qa_questions q ON q.id=s.question_id WHERE s.bank_name=? ORDER BY s.id").use { rows ->
             rows.bindText(1, bankName)
             buildList {
                 while (rows.step()) {
                     val id = rows.getLong(0)
+                    val sourceId = rows.getLong(1)
                     val options = db.prepare("SELECT option_text FROM qa_options WHERE question_id=? ORDER BY position").use { options ->
                         options.bindLong(1, id)
                         buildList { while (options.step()) add(options.getText(0)) }
                     }
-                    val answers = db.prepare("SELECT answer_text FROM qa_answers WHERE question_id=? ORDER BY answer_normalized").use { answers ->
-                        answers.bindLong(1, id)
+                    val answers = db.prepare("SELECT answer_text FROM qa_source_answers WHERE source_id=? ORDER BY answer_normalized").use { answers ->
+                        answers.bindLong(1, sourceId)
                         buildList { while (answers.step()) add(answers.getText(0)) }
                     }
-                    add(StoredQuestionAnswer(rows.getText(1), rows.getText(2), options, answers, rows.getText(3)))
+                    add(StoredQuestionAnswer(rows.getText(2), rows.getText(3), options, answers, rows.getText(4)))
                 }
             }
         }
@@ -96,41 +97,48 @@ class SqliteQuestionAnswerStore(
     private fun saveOne(db: androidx.sqlite.SQLiteConnection, bank: String, value: LearnedQuestionAnswer, reviewed: Boolean) {
         val questionKey = normalize(value.question)
         val optionKeys = value.options.map(::normalize).sorted()
-        val candidates = db.prepare("SELECT id FROM qa_questions WHERE bank_name=? AND module=? AND question_normalized=?").use { rows ->
-            rows.bindText(1, bank); rows.bindText(2, value.module); rows.bindText(3, questionKey)
+        val candidates = db.prepare("SELECT id FROM qa_questions WHERE question_normalized=?").use { rows ->
+            rows.bindText(1, questionKey)
             buildList { while (rows.step()) add(rows.getLong(0)) }
         }
         val existingId = candidates.singleOrNull { id -> optionsFor(db, id).map(::normalize).sorted() == optionKeys }
         val answerKey = normalize(value.answer)
         val now = System.currentTimeMillis()
         val id = existingId ?: run {
-            db.prepare("INSERT INTO qa_questions(routine,bank_name,module,question_text,question_normalized,source,source_reference) VALUES (?,?,?,?,?,'learned',NULL)").use { row ->
-                row.bindText(1, "learned"); row.bindText(2, bank); row.bindText(3, value.module); row.bindText(4, value.question); row.bindText(5, questionKey); row.step()
+            db.prepare("INSERT INTO qa_questions(question_text,question_normalized) VALUES (?,?)").use { row ->
+                row.bindText(1, value.question); row.bindText(2, questionKey); row.step()
             }
             val inserted = db.prepare("SELECT last_insert_rowid()").use { row -> row.step(); row.getLong(0) }
             value.options.forEachIndexed { index, option ->
-                db.prepare("INSERT INTO qa_options(question_id,position,option_text,option_normalized,is_correct) VALUES (?,?,?,?,0)").use { row ->
+                db.prepare("INSERT INTO qa_options(question_id,position,option_text,option_normalized) VALUES (?,?,?,?)").use { row ->
                     row.bindLong(1, inserted); row.bindLong(2, (index + 1).toLong()); row.bindText(3, option); row.bindText(4, normalize(option)); row.step()
                 }
             }
             inserted
         }
-        val existing = answersFor(db, id).map(::normalize).toSet()
+        val sourceId = db.prepare("SELECT id FROM qa_question_sources WHERE question_id=? AND bank_name=? AND module=? ORDER BY id LIMIT 1").use { row ->
+            row.bindLong(1, id); row.bindText(2, bank); row.bindText(3, value.module)
+            if (row.step()) row.getLong(0) else {
+                db.prepare("INSERT INTO qa_question_sources(question_id,routine,bank_name,module,source,source_reference,imported_at) VALUES (?,'learned',?,?, 'learned',NULL,CURRENT_TIMESTAMP)").use { insert ->
+                    insert.bindLong(1, id); insert.bindText(2, bank); insert.bindText(3, value.module); insert.step()
+                }
+                db.prepare("SELECT last_insert_rowid()").use { inserted -> inserted.step(); inserted.getLong(0) }
+            }
+        }
+        val existing = answersFor(db, sourceId).map(::normalize).toSet()
         val previous = value.previousAnswer?.let(::normalize)
         if (reviewed && ((previous != null && existing != setOf(previous)) || (previous == null && existing.isNotEmpty() && existing != setOf(answerKey)))) throw WriteConflict()
         if (!reviewed && existing.isNotEmpty() && existing != setOf(answerKey)) throw WriteConflict()
-        db.prepare("DELETE FROM qa_answers WHERE question_id=?").use { row -> row.bindLong(1, id); row.step() }
-        db.prepare("UPDATE qa_options SET is_correct=CASE WHEN option_normalized=? THEN 1 ELSE 0 END WHERE question_id=?").use { row -> row.bindText(1, answerKey); row.bindLong(2, id); row.step() }
-        db.prepare("INSERT INTO qa_answers(question_id,answer_text,answer_normalized,source,learned_at,reviewed_at) VALUES (?,?,?,'learned',?,?)").use { row ->
-            row.bindLong(1, id); row.bindText(2, value.answer); row.bindText(3, answerKey); row.bindLong(4, now); if (reviewed) row.bindLong(5, now) else row.bindNull(5); row.step()
+        db.prepare("DELETE FROM qa_source_answers WHERE source_id=?").use { row -> row.bindLong(1, sourceId); row.step() }
+        db.prepare("INSERT INTO qa_source_answers(source_id,answer_text,answer_normalized,learned_at,reviewed_at) VALUES (?,?,?,?,?)").use { row ->
+            row.bindLong(1, sourceId); row.bindText(2, value.answer); row.bindText(3, answerKey); row.bindLong(4, now); if (reviewed) row.bindLong(5, now) else row.bindNull(5); row.step()
         }
-        db.prepare("UPDATE qa_questions SET source='learned' WHERE id=?").use { row -> row.bindLong(1, id); row.step() }
     }
 
     private fun optionsFor(db: androidx.sqlite.SQLiteConnection, id: Long): List<String> = db.prepare("SELECT option_text FROM qa_options WHERE question_id=? ORDER BY position").use { row ->
         row.bindLong(1, id); buildList { while (row.step()) add(row.getText(0)) }
     }
-    private fun answersFor(db: androidx.sqlite.SQLiteConnection, id: Long): List<String> = db.prepare("SELECT answer_text FROM qa_answers WHERE question_id=?").use { row ->
+    private fun answersFor(db: androidx.sqlite.SQLiteConnection, id: Long): List<String> = db.prepare("SELECT answer_text FROM qa_source_answers WHERE source_id=?").use { row ->
         row.bindLong(1, id); buildList { while (row.step()) add(row.getText(0)) }
     }
     private suspend fun <T> read(block: (androidx.sqlite.SQLiteConnection) -> T): T? = withContext(Dispatchers.IO) {

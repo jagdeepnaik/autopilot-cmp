@@ -9,6 +9,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 import sqlite3
 from pathlib import Path
 
@@ -176,7 +177,67 @@ def main() -> None:
     db.commit()
     db.execute("VACUUM")
     db.close()
+    compact_database(OUT)
     print(OUT)
+
+
+def compact_database(raw_path: Path) -> None:
+    """Normalize repeated question/option sets while retaining one source link per original record."""
+    compact_path = raw_path.with_suffix(".compact.db")
+    if compact_path.exists():
+        compact_path.unlink()
+    source = sqlite3.connect(raw_path)
+    target = sqlite3.connect(compact_path)
+    target.execute("PRAGMA foreign_keys = ON")
+    target.executescript(
+        """
+        CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE source_documents (name TEXT PRIMARY KEY, kind TEXT NOT NULL, sha256 TEXT NOT NULL, bytes INTEGER NOT NULL, imported_at TEXT NOT NULL);
+        CREATE TABLE source_cbt (course_code TEXT PRIMARY KEY, course_name TEXT NOT NULL, course_version TEXT NOT NULL);
+        CREATE TABLE qa_questions (id INTEGER PRIMARY KEY, question_text TEXT NOT NULL, question_normalized TEXT NOT NULL);
+        CREATE TABLE qa_options (question_id INTEGER NOT NULL REFERENCES qa_questions(id) ON DELETE CASCADE, position INTEGER NOT NULL, option_text TEXT NOT NULL, option_normalized TEXT NOT NULL, PRIMARY KEY(question_id, position));
+        CREATE TABLE qa_question_sources (
+          id INTEGER PRIMARY KEY, question_id INTEGER NOT NULL REFERENCES qa_questions(id) ON DELETE CASCADE,
+          routine TEXT NOT NULL, bank_name TEXT NOT NULL, module TEXT NOT NULL, source TEXT NOT NULL,
+          source_reference TEXT, imported_at TEXT NOT NULL
+        );
+        CREATE TABLE qa_source_answers (
+          source_id INTEGER NOT NULL REFERENCES qa_question_sources(id) ON DELETE CASCADE,
+          answer_text TEXT NOT NULL, answer_normalized TEXT NOT NULL,
+          learned_at INTEGER, reviewed_at INTEGER, PRIMARY KEY(source_id, answer_normalized)
+        );
+        CREATE INDEX qa_question_lookup ON qa_questions(question_normalized);
+        CREATE INDEX qa_source_bank_lookup ON qa_question_sources(bank_name, module, question_id);
+        CREATE INDEX qa_source_question_lookup ON qa_question_sources(question_id, bank_name);
+        """
+    )
+    target.executemany("INSERT INTO metadata VALUES (?,?)", source.execute("SELECT key,value FROM metadata"))
+    target.executemany("INSERT INTO source_documents VALUES (?,?,?,?,?)", source.execute("SELECT name,kind,sha256,bytes,imported_at FROM source_documents"))
+    target.executemany("INSERT INTO source_cbt VALUES (?,?,?)", source.execute("SELECT course_code,course_name,course_version FROM source_cbt"))
+    question_ids: dict[tuple[str, tuple[str, ...]], int] = {}
+    for row in source.execute("SELECT id,routine,bank_name,module,question_text,question_normalized,source,source_reference,imported_at FROM qa_questions ORDER BY id"):
+        original_id, routine, bank, module, question, question_key, provenance, reference, imported = row
+        options = list(source.execute("SELECT option_text,option_normalized FROM qa_options WHERE question_id=? ORDER BY position", (original_id,)))
+        fingerprint = (question_key, tuple(sorted(option[1] for option in options)))
+        question_id = question_ids.get(fingerprint)
+        if question_id is None:
+            cursor = target.execute("INSERT INTO qa_questions(question_text,question_normalized) VALUES (?,?)", (question, question_key))
+            question_id = cursor.lastrowid
+            question_ids[fingerprint] = question_id
+            target.executemany("INSERT INTO qa_options(question_id,position,option_text,option_normalized) VALUES (?,?,?,?)",
+                               ((question_id, position, option, option_key) for position, (option, option_key) in enumerate(options, 1)))
+        source_id = target.execute("INSERT INTO qa_question_sources(question_id,routine,bank_name,module,source,source_reference,imported_at) VALUES (?,?,?,?,?,?,?)",
+                                   (question_id, routine, bank, module, provenance, reference, imported)).lastrowid
+        answers = source.execute("SELECT answer_text,answer_normalized,learned_at,reviewed_at FROM qa_answers WHERE question_id=?", (original_id,))
+        target.executemany("INSERT INTO qa_source_answers(source_id,answer_text,answer_normalized,learned_at,reviewed_at) VALUES (?,?,?,?,?)",
+                           ((source_id, answer, answer_key, learned, reviewed) for answer, answer_key, learned, reviewed in answers))
+    target.execute("INSERT OR REPLACE INTO metadata VALUES (?,?)", ("source_question_records", str(source.execute("SELECT count(*) FROM qa_questions").fetchone()[0])))
+    target.execute("INSERT OR REPLACE INTO metadata VALUES (?,?)", ("unique_question_sets", str(len(question_ids))))
+    target.commit()
+    target.execute("VACUUM")
+    target.close()
+    source.close()
+    os.replace(compact_path, raw_path)
 
 
 if __name__ == "__main__":
