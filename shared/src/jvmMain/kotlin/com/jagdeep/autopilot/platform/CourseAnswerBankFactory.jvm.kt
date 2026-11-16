@@ -9,8 +9,8 @@ import kotlinx.coroutines.swing.Swing
 internal actual fun createCourseAnswerBankStore(): CourseAnswerBankStore = DirectoryCourseAnswerBanks(
     folder = File(System.getProperty("user.home"), ".autopilot/answer-banks"),
     legacy = listOf(
-    File("private/answer-banks/$DEFAULT_ANSWER_BANK_FILE"),
-    File("../private/answer-banks/$DEFAULT_ANSWER_BANK_FILE"),
+    File("private/qa/$DEFAULT_ANSWER_BANK_FILE"),
+    File("../private/qa/$DEFAULT_ANSWER_BANK_FILE"),
     ),
     bundled = BUNDLED_ANSWER_BANKS.associateWith { name -> { bundledAnswerBank(name) } },
     chooseFile = { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Swing) {

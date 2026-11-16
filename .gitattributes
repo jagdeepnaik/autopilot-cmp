@@ -1,0 +1,2 @@
+# SQLCipher CSV exports can legitimately contain trailing spaces within quoted fields.
+private/qa/apk-inspection/*.csv whitespace=-trailing-space

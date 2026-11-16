@@ -209,7 +209,7 @@ private/
   docs/          # tracked: numbered user guides; 00_INDEX.md lists them by how often they're used
   scripts/       # tracked internal implementations: build, install, debug, VM and Git helpers; windows/ contains PowerShell support
   reports/       # tracked: dated investigation and validation reports worth keeping (YYYY-MM-DD-topic.md)
-  <data>/        # tracked: project data the app or build needs, one folder per kind (for example answer-banks/)
+  qa/            # tracked: project question-and-answer banks and reviewed extraction exports
   plans/         # git-ignored: implementation plans, proposals, roadmaps, phase tracking
   signing/       # git-ignored: release keys and keystore.properties material; never commit
   secrets/       # git-ignored: .env files and other secrets; never commit
@@ -272,7 +272,7 @@ private/
   Installers and updates never touch this folder. A move between paths renames files, never overwrites an existing one. These databases hold real user progress: never delete or reset them as a shortcut. Schema changes follow Part A's version-1 rule, and dropping data needs the owner's explicit approval.
 - **Answer banks:**
   - Files are named `name-ver-X.Y.json`, for example `sagarmeinyog-ver-1.0.json`, with plain-text `options` and `answer` values.
-  - The project's source copy is in `private/answer-banks/`. The bundled copy in `shared/src/jvmMain/resources/answer-banks/` is refreshed from it, and `BundledAnswerBankTest` checks its question count and that every answer is one of its options.
+  - The project's source copy is in `private/qa/`. The bundled copy in `shared/src/jvmMain/resources/answer-banks/` is refreshed from it, and `BundledAnswerBankTest` checks its question count and that every answer is one of its options.
   - The app copies a bundled bank to the user's folder only when no file of that name exists. To update installed banks, merge them: keep every question, and stop to ask if two banks give different answers for the same question.
 - **The Chrome extension's source** is `shared/src/jvmMain/resources/chrome-extension/`. Raise the manifest version when it changes. The app writes it to `~/.autopilot/extensions/chrome/` at every start; the user reloads it in Chrome.
 

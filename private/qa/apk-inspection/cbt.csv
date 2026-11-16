@@ -1,0 +1,463 @@
+_id,CBT_NAME,CBT_VER
+CD0001,"Personal Safety",8
+CD0002,"Ship General Safety",5.0.5016
+CD0004,SOPEP,8
+CD0005,"ISM Code",8
+CD0006,"OPA 90",8
+CD0007,"Inert Gas Generator",2.0.2713
+CD0008,"Flue Gas Plant",2.1.2237
+CD0009,"Fuel Oil System",2.1.2235
+CD0010,"Marine fuel handling",8
+CD0012,"Tanker operation I",8
+CD0013,"Tanker operation II",8
+CD0014,"Vessel Struct. Cond.",3.0.1447
+CD0015,"Corrosion Protection I",2.0
+CD0016,"Corrosion Protection II",2.0
+CD0017,"Steering gear, Operation",8
+CD0018,"Cooling Systems",2.0.3071
+CD0019,"Remote Ctrl. Sys. (AC4)",2.0.2656
+CD0020,"Search and Rescue",6
+CD0021,GMDSS,4.0.2047
+CD0022,"Maritime English, Ship Familiarisation",8
+CD0024,"Operating Auxilary Diesel Engines",2.0.3054
+CD0026,"Voyage Planning",2.0
+CD0027,"Ballast Water Management",6
+CD0028,"Protection and indemnity",8
+CD0029,"Hull and Machinery",3.0.881
+CD0030,"Marine Lubricants",2.0.2514
+CD0031,"Pusnes ETS",4.0.1220
+CD0032,"Cargo Properties",3.0.980
+CD0033,Stability,6
+CD0034,"AC4, Digital Governor System",2.0.1532
+CD0035,Inspections,3.0.39
+CD0036,"Medical First Aid",2.2.4263
+CD0040,"Maritime English, Pilot on the Bridge",2.0.298
+CD0041,Generator,2.1.5419
+CD0043,"Bilge water separator",6
+CD0045,"Container Lashings - Basic",6
+CD0046,"Auxiliary boiler plant",2.0.3717
+CD0047,"Fuel Combustion Efficiency",2.0.1032
+CD0048,"Gas Measurement",2.0.2820
+CD0049,"Radar Observation and plotting",2.0
+CD0050,"ARPA Theory",2.0
+CD0051,"Introduction to Navigation",2.0.238
+CD0053,"HAZMAT - IMDG Code, Basic",6
+CD0054,COW,2.0.699
+CD0055,ODME,3.0.99
+CD0056,"Assessor Training",2.0.2293
+CD0057,"Doppler log",4.0.153
+CD0058,COLREG,4.0.5265
+CD0059,DGPS,3.0.1361
+CD0060,"Navigation in Ice",1.1
+CD0061,"Stability 2",2.0.1965
+CD0063,Mooring,3.0.63
+CD0064,"Electronic Chart Display",2.0
+CD0066,"Basic Ship Handling",3.0.603
+CD0068,"BC Code",3.0.7320
+CD0069,"Basic Refrigeration Theory",2.0.3
+CD0070,"Food Handling",1.0
+CD0072,"Basic Hydraulics",1.2.81
+CD0073,"Crisis Management",8
+CD0074,"Sultzer Medium Speed Diesel Engine",2.0.894
+CD0078,"Pumps and Pumping Operations",4.0.966
+CD0082,"Crowd Management",8
+CD0083,Automation,2.0
+CD0087,"Personal Survival and Survival Craft",6
+CD0088,"Human relations",8
+CD0089,"Medical Care",2.0
+CD0091,"Incinerators, TeamTec Incinerator operation and maintenance",8
+CD0092,"Introduction to MARPOL",8
+CD0093,"Wall Wash",2.0
+CD0094,"Flexinert Gas Generator, Standard",3.0.8
+CD0095,"English Language Test, Marlins",3.0.2070
+CD0096,"Cargo Compatibility",2.0
+CD0097,"Ship Energy Efficiency",6
+CD0098,"Fresh Water Generator",3.0.1321
+CD0099,"Low Temperature Insulation on Gas Carriers",2.0
+CD0101,"IALA Buoyage",1.2.2560
+CD0102,"Safe Cargo Handling - FRAMO",1.1
+CD0103,"INS - Integrated Navigation System",1.1
+CD0104,"Use of Nitrogen (Chemical tanker)",2.0
+CD0109,"AIS - Automatic Identification System",2.0
+CD0110,"AC4 - SULZER - DENIS 1",2.0
+CD0111,"Heavy Weather Damage - Container Vessel",2.0.1434
+CD0112,"Zero Damage",1.1
+CD0115,"Security awareness",8
+CD0116,"AC4 - MAN B and W",2.0
+CD0117,"Integrated Survey Programme - ISP",2.0
+CD0118,"Steering Gear, RAM type",5.0.1813
+CD0121,"Ship Security Officer Training System",3.0.296
+CD0122,"ISO 14001 Environmental Management",8
+CD0123,"Risk assessment and management",8
+CD0124,"Greasing Mooring Winches and Windlasses",1.2
+CD0125,"Hot work",2.0.2256
+CD0127,"Enclosed Space Entry",3.0.300
+CD0130,"LRM - IHI GTC",1.2
+CD0131,"LRM - MILLS -TITAN-",1.2
+CD0132,"LRM - SHIGI S2",1.2
+CD0133,"LRM - FASSMER",1.2
+CD0134,"LRM - HARDING FF",1.2
+CD0139,"Awareness of LRRS",1.0.1614
+CD0142,"Learning MS Word",1.0
+CD0143,"Learning MS Power Point and Outlook",1.0
+CD0144,"Learning MS Excel",1.0
+CD0145,"SMCP - Distress Urgency and Safety",1.1
+CD0146,"SMCP - Navigation and Cargo Handling",3.0.58
+CD0147,"Maritime English, Introduction",1.0
+CD0149,"Incident Investigation",2.0.1217
+CD0150,"Maritime English, Superintendent Inspection",2.0.430
+CD0151,"HAZMAT - IMDG Code, Advanced",6
+CD0152,"Hatch Cover Maintenance - Bulk Carrier",1.0.3651
+CD0155,"Stowaways, Migrants and Refugees",6
+CD0156,"Piracy and armed robbery 1",8
+CD0157,"TMSA 3",6
+CD0158,"Maritime English, Report Writing",1.0.3830
+CD0160,"Fire fighting, Basic",8
+CD0161,"Fire fighting, Advanced",6
+CD0162,"Separators, ALCAP Separation principles",3.0.899
+CD0163,"Separators, The ALCAP system",4.0.2399
+CD0164,"Separators, ALCAP Fuel oil system",3.0.9239
+CD0165,"Separators, ALCAP Lube oil system",3.0.3201
+CD0166,"Separators, ALCAP Monitoring and control",4.0.2409
+CD0167,"Tanker Training System - Familiarisation",4.0.594
+CD0168,"Gas Tanker Training System - Advanced",3.0.864
+CD0169,"Oil Tanker Training System - Advanced",4.0.490
+CD0170,"Chemical Tanker Training System - Advanced",4.0.680
+CD0172,"International Collision Regulations",3.0.705
+CD0173,"Introduction to computers",2.0.1273
+CD0174,"Learning MS Word 2003",1.0.22
+CD0175,"Learning MS Excel 2003",1.0.202
+CD0176,"Learning MS PowerPoint 2003",1.0.458
+CD0177,"Learning MS Outlook 2003",1.0.863
+CD0178,"Container Fires",1.0.3420
+CD0179,"Marine Fuel Properties II",3.0.1906
+CD0181,"Ship to Ship Transfer Operations",3.0.1293
+CD0183,"Electrical safety",1.0.1303
+CD0186,"Vessel General Permit - VGP",8
+CD0187,"Marine environmental awareness",6
+CD0190,"H2S Hydrogen sulphide awareness",8
+CD0191,"Maritime Labour Convention 2006, an Introduction",3.0.4605
+CD0192,"MLC 2006 Onboard Responsibilities",2.0.1647
+CD0193,"MLC 2006 Shipowner's Responsibilities",2.0.1284
+CD0194,"Lifestyle assessment and advice",1.0.1048
+CD0195,"Physical exercise and lifestyle coaching",3.0.1022
+CD0196,"Volatile Organic Compound",1.0.3560
+CD0197,"MLC 2006, Basic Introduction",4.0.2009
+CD0211,"ECDIS system and chart types",6
+CD0212,"ECDIS display features",6
+CD0213,"Passage planning with ECDIS",6
+CD0215,"Voyage planning, Pre-departure",2.0.446
+CD0216,"Voyage planning, The sea passage",1.0.340
+CD0217,"Voyage planning, Pilotage and berthing",2.0.255
+CD0218,"Oil Record Book, Part I",3.0.2686
+CD0219,"Oil Record Book, Part II",2.0.1411
+CD0220,"Galley Operations, Workplace and equipment safety",6
+CD0221,"Galley Operations, Hygiene",6
+CD0222,"Galley Operations, Food handling",6
+CD0223,"Galley operations, Nutrition",6
+CD0224,"Nutrition and well-being",6
+CD0225,"Personal survival, Familiarisation",8
+CD0226,"Personal survival, Survival craft",8
+CD0227,"Personal survival, Rescue and abandoning ship",8
+CD0228,"Fire-fighting, Advanced, Management of fire-fighting",6
+CD0229,"Fire-fighting, Advanced, Hazards and tactics",6
+CD0230,"High Voltage, Fundamentals",1.0.1913
+CD0231,"High Voltage, Ship's electrical networks",1.0.994
+CD0232,"High Voltage, Equipment and testing",1.1.1901
+CD0233,"High Voltage, Management on Ships",1.1.2775
+CD0234,"Electric Propulsion, Fundamentals",1.0.1358
+CD0235,"Electric Propulsion, Electrical machines",1.0.963
+CD0236,"Electric Propulsion, Power electronics",1.0.1512
+CD0237,"Electric Propulsion, Systems for ships",1.0.891
+CD0240,"Bunker Fraud",2.0.1204
+CD0241,"Development of Heavy Weather",1.0.4443
+CD0242,"Heavy Weather Navigation",2.0.2235
+CD0245,"Safe operation and maintenance of grinding wheels",6
+CD0246,"Piracy and armed robbery II",8
+CD0247,"Anchor Mooring Procedures",6
+CD0250,"Conflict Management.",3.0.213
+CD0251,Culture.,2.0.320
+CD0252,"Active Listening.",2.0.184
+CD0253,"Corrective Feedback.",2.0.141
+CD0254,"Meeting Management.",2.0.147
+CD0255,"Question Techniques.",3.0.252
+CD0256,"Team Leadership.",2.0.150
+CD0257,"Stress Management",3.0.463
+CD0258,SEEMP,6
+CD0260,"Behaviour based safety",8
+CD0261,Mentoring,1.0.3684
+CD0263,"Principles of assessment",1.0.2992
+CD0264,"Onboard assessment",1.0.1123
+CD0265,"Shore based assessment",1.0.1198
+CD0271,"Leadership, Communication for maritime leaders",2.0.1789
+CD0272,"Leadership, Maritime conventions",2.0.1373
+CD0273,"Leadership, Shipboard Personell Management and Training",2.0.1306
+CD0274,"Leadership, Task and workload management",2.0.2419
+CD0275,"Leadership, Effective resource management",1.0.320
+CD0275.01,"Leadership, Effective resource management, Part 1",2.0.1459
+CD0275.02,"Leadership, Effective resource management, Part 2",2.0.629
+CD0276,"Leadership, Decision making techniques",2.0.1052
+CD0277,"Marine environmental awareness, Environmental challenges",2.0.5275
+CD0278,"Marine environmental awareness, Sustainable shipping",2.0.2776
+CD0280,"Engineering operations in cold environments",1.0.1822
+CD0281,"Personal safety in cold environments",8
+CD0282,"Hot work, Doing the job safely",8
+CD0283,"Hot work, Management of hot work",8
+CD0285,"Enclosed space entry, Awareness",3.0.1093
+CD0286,"Crane operations, Heavy lift",1.0.1387
+CD0287,"Inspection of mooring lines",6
+CD0288,"Green Passport (Inventory of Hazardous Materials)",1.0.1407
+CD0289,"Learning MS Word 2007",1.0.2154
+CD0290,"Learning MS Excel 2007",1.0.2873
+CD0291,"Learning MS PowerPoint 2007",1.0.835
+CD0292,"Learning MS Outlook 2007",1.0.1500
+CD0297,"Recovery of persons from the water",6
+CD0298,"Use of Liferafts",6
+CD0299,"SIRE inspections",2.0.854
+CD0300,"Rigging and Slinging",6
+CD0301,"Lifting operation, Safe use of conventional cranes",8
+CD0302,"Permit to work",6
+CD0303,"COLREGs, Lights, shapes and sound signals",2.0.815
+CD0304,"COLREGs, Conduct of vessels",2.0.539
+CD0306,"Incident investigation, Cause and effect",8
+CD0307,"Incident investigation, Investigation techniques",8
+CD0310,"Working at height",6
+CD0311,"Vessel inspection and CMID",1.0.1345
+CD0316,"Anchor handling operation",1.0.677
+CD0317,"Lifting and Slinging, Equipment and operation",1.0.1094
+CD0318,"Lifting and Slinging, Roles and responsibility",1.0.982
+CD0319,"Periodic maintenance and inspection of lifting equipment",2.0.1379
+CD0320,"Personal safety for offshore vessels",1.0.1276
+CD0329,"Vessel inspection and OVID",1.0.1072
+CD0330,"GOMO awareness",2.0.3155
+CD0334,"Deck safety for supply vessels",1.0.1478
+CD0335,"Deck safety for anchor handlers",1.0.1710
+CD0336,"Back deck safety for seismic vessels",1.0.1233
+CD0337,"Fresh water management",yes.3117
+CD0338,"Fresh water system sanitation",yes.880
+CD0340,"Introduction to bulk carriers",1.0.1086
+CD0341,"Liquefying cargoes",2.0.1274
+CD0342,"Common bulk cargoes",1.0.1069
+CD0343,"Preparation for loading bulk carriers",1.0.936
+CD0344,"Loading bulk carriers",1.0.661
+CD0345,"Hull structural strength",1.0.732
+CD0346,"Personal safety and environmental protection",1.0.1900
+CD0347,"Bulk carriers, Trim and stability",1.0.942
+CD0348,"Bulk carrier voyage",1.0.1091
+CD0349,"Bulk Carriers, Unloading",1.0.1082
+CD0353,"Report writing, General principles",8
+CD0358,"SOPEP, Your role",6
+CD0360,"Crude oil tankers, Control of flow rates during loading",6
+CD0361,"Crude oil tankers, Control of flow rates during discharge",6
+CD0362,"Crude oil tankers, Crude oil washing planning",6
+CD0363,"Crude oil tankers, Practical crude oil washing operations",6
+CD0370,"Mooring, Risk assessment and management",8
+CD0371,"Mooring, Safe handling and good practice",8
+CD0378,"Garbage and waste management",8
+CD0379,"Incinerators, Introduction to safe operation",8
+CD0380,"ISO 9001",2.0.2324
+CD0385,"Occupational health and safety management system",6
+CD0387,"Enclosed space entry, Hazard awareness and preparations for entry",8
+CD0388,"Enclosed space entry, The entry operation",8
+CD0389,"Enclosed space entry, Emergencies and rescue",8
+CD0390,"Harassment and bullying",1.0.1750
+CD0391,"Fatigue management",6
+CD0395,"Gas carrier, Basic principles",8
+CD0396,"Gas carrier, Cargo cooling systems, introduction",6
+CD0397,"Gas carrier, Cargo cooling systems, advanced",6
+CD0398,"Gas carrier, Cargo cooling equipment",6
+CD0400,"Container ships, Introduction to operation",8
+CD0403,"Container ships - Securing cargo awareness",8
+CD0404,"Container ships - Securing cargo arrangements",8
+CD0406,"Container ships, Familiarity with reefer containers",8
+CD0407,"Container ships, Care of reefer cargo",8
+CD0414,"Fuel oil bunkering, Good bunkering practice",6
+CD0415,"Fuel Oil Bunkering, Effective Practice and Sampling",6
+CD0416,"Fuel oil bunkering, Understanding test results",6
+CD0418,"Bilge water separator, Part 1",8
+CD0419,"Bilge water separator, Part 2",8
+CD0420,"Lockout Tagout",6
+CD0421,"Ballast water management, the BWM Convention",8
+CD0422,"Ballast water management, BWM systems",8
+CD0425,"Gas measurement, A safe atmosphere",2.0.1654
+CD0426,"Gas measurement, Measuring instruments",2.0.894
+CD0427,"Navigation in cold environments",8
+CD0428,"Passage planning in cold environments",6
+CD0460,"Engine room emergencies, Recovery from a blackout",8
+CD0481,"Separators, S-type separator",yes.3574
+CD0482,"Fixed firefighting systems for engine rooms",6
+CD0483,"Introduction to two-stroke diesel engines",yes.1665
+CD0484,"Diesel engine diagnostics",6
+CD0485,"Introduction to four-stroke diesel engines",yes.1365
+CD0500,"Pilot ladders",6
+CD0501,"Gangway security",6
+CD0502,"Human behaviours, How did that happen?",8
+CD0510,"Onboard paint maintenance, Inspection, planning and stock-keeping",8
+CD0511,"Onboard paint maintenance, Health and safety",8
+CD0512,"Onboard paint maintenance, Surface preparation",8
+CD0513,"Onboard paint maintenance, Paint preparation and application",8
+CD0514,"Onboard paint maintenance, Corrosion",8
+CD0515,"Onboard paint maintenance, Paint technology and coating life-cycle",8
+CD0520,"Elementary first aid, Principles of first aid",8
+CD0521,"Elementary first aid, Assessing the casualty",8
+CD0522,"Elementary first aid, Facilities and equipment",8
+CD0523,"Elementary first aid, Causes of unconsciousness",8
+CD0524,"Elementary first aid, Cardiopulmonary resuscitation",8
+CD0525,"Elementary first aid, Automated external defibrillator",8
+CD0526,"Elementary first aid, Bleeding and bandaging",8
+CD0527,"Elementary first aid, Burns",8
+CD0528,"Elementary first aid, Shock",8
+CD0529,"Elementary first aid, Fractures and dislocations",8
+CD0530,"Elementary first aid, Transporting a casualty",8
+CD0531,"Elementary first aid, Spinal injuries",8
+CD0532,"Elementary first aid, Electric shock",8
+CD0551,"Slips, trips and falls",8
+CD0555,"Workshop safety",8
+CD0556,"Hand tool safety",8
+CD0570,"Resilience, Positivity, perspective and confidence",8
+CD0571,"Resilience, Adapting to change",8
+CD0572,"Resilience, Connecting with others",8
+CD0573,"Resilience, Wellbeing and purpose",8
+CD0574,"Safety data sheets",6
+CD0576,"Use of PPE",8
+CD0583,"Oil spill response",6
+CD0584,"Tank inspection, Ballast compartments",8
+CD0586,"Fire-fighting, Effective boundary cooling",6
+CD0587,"SCBA, Effective control in an emergency",8
+CD0591,"Effective fire drills",6
+CD0592,"Effective lifeboat drills",6
+CD0593,"Effective security drills",6
+CD0594,"Ship inspections",6
+CD0595,"Inspection and maintenance of safety equipment",8
+CD0596,"On board familiarisation, Introduction",6
+CD0597,"Portable tanks, Carrying dangerous goods",8
+CD0598,"Search techniques, Ship and stowaway searches",8
+CD0599,"Search techniques, Personnel and baggage searches",8
+CD0600,"CEMS - Crew Endurance Management System",1.1
+CD0601,"Vapor Control Systems",1.1
+CD0602,"Benzene Cargo Safety",2.0.278
+CD0604,"Eye protection",8
+CD0605,"Workplace Ergonomics and Back Care",1.0.1267
+CD0606,"Hearing protection",8
+CD0608,"Drug and Alcohol Policy and Testing",6
+CD0612,"Respiratory Protection",1.0.1270
+CD0630,"Boiler furnace explosions",6
+CD0670,"Separators, S-type maintenence part 1",8
+CD0671,"Separators, P-type maintenence part 1",8
+CD0672,"Separators, S-type and P-type maintenence part 2",8
+CD0673,"Back to basics, Engine room rounds part one",8
+CD0674,"Back to basics, Engine room rounds part two",8
+CD1510,"MAERSK LINE ISO 14001",2.1.388
+CD1512,"MAERSK LINE ANTI-CORRUPTION",2.2.1431
+CD1513,"MAERSK LINE CREW INDUCTION 1",1.1.1512
+CD1532,"MAERSK LINE SAFE TRANSPORTATION",1.0.373
+CD1540,"Cylinder Condition Evaluation Guidelines",1.1.458
+CD1543,"WHR System, Output Maximisation",1.2.525
+CD1544,"WHR System, Voyage Planning",1.1.222
+CD1546,"MAERSK LINE CREW INDUCTION 3 [MSPS]",1.0.240
+CD1555,"MAERSK LINE Environmental Training, Advanced",1.0.1016
+CD2402,"Fire-fighting, Advanced, Management of fire-fighting",6
+CD2403,"Fire-fighting, Advanced, Hazards and tactics",6
+CD2404,"Personal survival, Familiarisation",8
+CD2405,"Personal survival, Survival craft",8
+CD2406,"Personal survival, Rescue and abandoning ship",8
+CD2520,"Fuel oil bunkering, Good bunkering practice",6
+CD2524,"Safety data sheets",6
+CD2541,"Effective fire drills",6
+CD2543,"Effective security drills",6
+CD2551,"SOPEP, Your role",6
+CD4000,"Seagull ECDIS Simulator",2.0.203
+CD4010,"Maris ECDIS",4.0.1553
+CD4011,"Consilium ECDIS",2.0.671
+CD4012,"Kelvin Hughes ECDIS",1.0.1663
+CD4013,"Tokyo Keiki ECDIS",6.0.1385
+CD4014,"JRC ECDIS",8.0.288
+CD4015,"SAM Electronics ECDIS CHARTPILOT 93x0/1100",2.0.2743
+CD4016,"SAM Electronics ECDISPILOT 1, Basic and Platinum",1.0.6397
+CD4017,"SAM Electronics ECDISPILOT 2, Basic and Platinum",1.0.1478
+CD4019,"Tokyo Keiki ECDIS, EC 8000A, 8100, 8500A, 8600",1.0.793
+CD4020,"JRC ECDIS, models JAN-7201, 9201 and ‘S’ series",6
+CD4054,VettingAss1,1.0.118
+CD4055,VettingAss2,1.0.94
+CD4060,"Social Media awareness",6
+CD4064,"Cyber security, Awareness",8
+CD407010,"Transas ECDIS, Assessment",1.0.237
+CD407611,"Sperry ECDIS, Assessment",1.0.233
+CD4090,"Tokyo Keiki ECDIS",8
+CD4091,TECDIS,6
+CD4101,"Tank Cleaning 1, Introduction and Safety",2.0.1338
+CD4102,"Tank Cleaning 2, Principles of Tank Cleaning",1.0.1104
+CD4103,"Tank Cleaning 3, Planning of Tank Cleaning Operations",1.0.887
+CD4127,Ex7,1.0.149
+CD4150,"Norwegian maritime rules and regulations",8
+CD7001,"TOTS 1A-Ship Handling and Characteristics",1.0.32
+CD7002,"TOTS 1A-Pilotage",1.0.6
+CD7003,"TOTS 1A-Mooring Equipment and Operations",2.0.12
+CD7004,"TOTS 1A-Passage Planning and Navigation",1.0.3
+CD7005,"TOTS 1A-Navigating in Restricted Visibility",1.0.7
+CD7006,"TOTS 1A-Heavy Weather Navigation",1.0.7
+CD7007,"TOTS 1A-Emergencies, Drills and Fire Fighting",1.0.22
+CD7008,"TOTS 1A-Ship and Shore Interface",1.0.3
+CD7009,"TOTS 1A-Ship to Ship Transfer",1.0.9
+CD7010,"TOTS 1A-Helicopter Operations",1.0.10
+CD7011,"TOTS 1A-Pollution Prevention and Environmental",1.0.6
+CD7012,"TOTS 1A-General Tanker Section",1.0.11
+CD7013,"TOTS 1A-The Flammability Diagram",1.0.13
+CD7014,"TOTS 1A-Fixed and Portable Gas Detec. Systems",1.0.3
+CD7015,"TOTS 1A-Enclosed Spaces and Tank Atmosphere..",1.0.6
+CD7016,"TOTS 1A-Familiarisation prior Cargo Operations",1.0.6
+CD7017,"TOTS 1A-Cargo Information, Precautions..",1.0.4
+CD7020,"TOTS 1B-Engine Room Operations - manoeuvring",1.0.5
+CD7021,"TOTS 1B-Engine Room Operations-special circumst..",1.0.6
+CD7022,"TOTS 1B-Watch keeping in the Engine Room",1.0.4
+CD7023,"TOTS 1B-Operation, monitoring, machinery",1.0.15
+CD7024,"TOTS 1B-Electrical, Electronic and Operations",1.0.12
+CD7025,"TOTS 1B-Maintenance and Repair",1.0.6
+CD7026,"TOTS 1B-Control of operations - Care of personnel",1.0.7
+CD7027,"TOTS 1B-Management of the Engineering Department",1.0.33
+CD7028,"TOTS 1B-Emergencies, Drills and Fire Fighting",1.0.30
+CD7029,"TOTS 1B-Pollution Prevention and Environmental",1.0.6
+CD7030,"TOTS 1B-General Tanker Section",1.0.2
+CD7031,"TOTS 1B-The Flammability Diagram",1.0.10
+CD7032,"TOTS 1B-Fixed and Portable Gas Detections Systems",1.0.3
+CD7033,"TOTS 1B-Enclosed Spaces and Tank Atmosphere..",1.0.5
+CD7034,"TOTS 1B-Familiarisation prior Cargo Operations",1.0.2
+CD7035,"TOTS 1B-Cargo Information, Precautions..",1.0.5
+CD7040,"TOTS 1C-Ship Handling and Characteristics",1.0.7
+CD7041,"TOTS 1C-Pilotage",1.0.3
+CD7042,"TOTS 1C-Mooring Equipment and Operations",1.0.10
+CD7043,"TOTS 1C-Emergencies, Drills and Fire Fighting",1.0.19
+CD7044,"TOTS 1C-Passage Planning and Navigation",1.0.4
+CD7045,"TOTS 1C-Navigating in Restricted Visibility",1.0.2
+CD7046,"TOTS 1C-Heavy Weather Navigation",1.0.5
+CD7047,"TOTS 1C-General Tanker Section",1.0.2
+CD7048,"TOTS 1C-The Flammability Diagram",1.0.15
+CD7049,"TOTS 1C-Fixed and Portable Gas Detections Systems",1.0.4
+CD7050,"TOTS 1C-Enclosed Spaces and Tank Atmosphere..",1.0.8
+CD7051,"TOTS 1C-Familiarisation prior Cargo Operations",1.0.3
+CD7052,"TOTS 1C-Cargo Information, Precautions..",1.0.5
+CD7053,"TOTS 1C-Engine room operations during manoeuvring",1.0.7
+CD7054,"TOTS 1C-Watchkeeping in the Engine Room",1.0.5
+CD7055,"TOTS 1C-Operation, monitoring, machinery",1.0.7
+CD7056,"TOTS 1C-Maintenance and Repair",1.0.8
+CD7057,"TOTS 1C-Control of Operations - Care of Persons",1.0.9
+CD7058,"TOTS 1C-Management of the Engineering Department",1.0.5
+CD7059,"TOTS 1C-Pollution and Environment Protection",1.0.5
+CD8524,8524,1.1.1150
+CD8525,8525,1.1.1027
+CD8527,"Fall Protection",1.0.1860
+CD8532,"Ex basic refresher and assessment ",yes.4614
+CD8533,"Electrical installation in Ex-area ",yes.4428
+CD8534,"Electrical Exi installation ",yes.2940
+CD8535,"Cables, cable entry and IP-degree in Ex-area",yes.2826
+CD8536,"Ex inspection and maintenance",yes.2609
+CD8537,"Exi protection concepts (Exi a,b,c,nL)",yes.3009
+CD8538,"Exi components in Ex zone and safe zone",yes.3741
+CD8539,"Exi verification and documentation",yes.4921
+CD8540,"Exi installation and inspection",yes.2796
+CD8562,"Ex Basic, Ex theory and area classification",6
+CD8563,"Ex Basic, Ex equipment",6
+CD8564,"Ex Basic, Protection concepts",6
+CD8565,"Ex Basic, Protection concepts Exi",6
+CD8566,"Ex Basic, Ex protection in practice",6
+CD8567,"Ex Basic, Assessment",6

@@ -213,6 +213,6 @@ Settings → Alert sounds is enabled by default and includes Test sound. Questio
 
 ### Versioned answer-bank files
 
-Use `name-ver-1.0.json`, increasing the version for subsequent bank releases. The defaults are `sagarmeinyog-ver-1.0.json` and the reserved `dgs-elearning-ver-1.0.json`. Project sources live in `private/answer-banks/`; installed copies live in `~/.autopilot/answer-banks/`. Built-in former default names resolve to the versioned default so saved routines continue to work. Old local files are preserved; explicitly selected versioned filenames remain pinned. Add a new version and choose it in routine options rather than overwriting an existing user bank.
+Use `name-ver-1.0.json`, increasing the version for subsequent bank releases. The defaults are `sagarmeinyog-ver-1.0.json` and the reserved `dgs-elearning-ver-1.0.json`. Project sources live in `private/qa/`; installed copies live in `~/.autopilot/answer-banks/`. Built-in former default names resolve to the versioned default so saved routines continue to work. Old local files are preserved; explicitly selected versioned filenames remain pinned. Add a new version and choose it in routine options rather than overwriting an existing user bank.
 
 Sagar Mein Yog uses plain-text `options` and `answer` values in its versioned JSON bank. Display-order prefixes from the website are removed only for matching and before approved answers are saved; meaningful numeric values such as `2.1 liters` are preserved. The earlier unversioned bank is not used as a fallback.

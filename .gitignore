@@ -19,10 +19,13 @@ captures
 node_modules/
 
 # private/ layout: see "Private folder" in AGENTS.md.
-# Tracked: private/docs/, private/scripts/ and project data such as private/answer-banks/.
+# Tracked: private/docs/, private/scripts/ and project data such as private/qa/.
 # Temporary or unimportant files (backups, screenshots, research, reports, scratch) go in
 # private/misc/, which never reaches Git.
 /private/misc/
+# Encrypted source databases are kept locally only; their reviewed CSV exports are tracked in private/qa/.
+/private/qa/apk-inspection/source/
+/private/qa/apk-inspection/export.sql
 # Working plans stay local.
 /private/plans/
 # Android release signing: never commit

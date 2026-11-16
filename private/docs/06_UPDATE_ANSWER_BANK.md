@@ -11,7 +11,7 @@ Use **name-ver-1.0.json**, then a new version such as **name-ver-1.1.json** for 
 | Sagar Mein Yog | `sagarmeinyog-ver-1.0.json` |
 | DGS reserved bank | `dgs-elearning-ver-1.0.json` |
 
-Your updated project bank is in `private/answer-banks/sagarmeinyog-ver-1.0.json`. Its contents were preserved when renamed. The app's bundled default was refreshed from that file. DGS assessment automation remains reserved for later.
+Your updated project bank is in `private/qa/sagarmeinyog-ver-1.0.json`. Its contents were preserved when renamed. The app's bundled default was refreshed from that file. DGS assessment automation remains reserved for later.
 
 Installed bank folder:
 
