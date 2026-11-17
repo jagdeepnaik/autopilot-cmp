@@ -2,7 +2,7 @@
   if (window.__autoPilotOceanTG) return;
   window.__autoPilotOceanTG = true;
   const documentId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
-  const ids = new WeakMap(); let nextId = 0, session = null, last = '', handled = new Set();
+  const ids = new WeakMap(); let nextId = 0, session = null, last = '', lastSentAt = 0, handled = new Set();
   const clean = value => (value || '').replace(/\s+/g, ' ').trim().slice(0, 2000);
   const visible = node => { const box=node?.getBoundingClientRect?.(), style=node && getComputedStyle(node); return !!box && box.width>0 && box.height>0 && style.display!=='none' && style.visibility!=='hidden'; };
   const id = node => { if (!ids.has(node)) ids.set(node, String(++nextId)); return ids.get(node); };
@@ -46,6 +46,8 @@
     const success=!!node; if(node) node.click();
     chrome.runtime.sendMessage({type:'oceanAction',session,document:documentId,request:action.request,success});
   }
-  async function tick() { const hello=await chrome.runtime.sendMessage({type:'oceanHello'}).catch(()=>null); if(!hello?.session) { session=null; return; } session=hello.session; const value=reading(), encoded=JSON.stringify(value); if(encoded!==last) { last=encoded; const reply=await chrome.runtime.sendMessage({type:'oceanReading',session,document:documentId,reading:value}).catch(()=>null); if(reply?.session===session) execute(reply.action); } }
+  // Keep asking briefly even when the page is unchanged: the app can publish the next action
+  // just after it handles this page's previous reading.
+  async function tick() { const hello=await chrome.runtime.sendMessage({type:'oceanHello'}).catch(()=>null); if(!hello?.session) { session=null; return; } session=hello.session; const value=reading(), encoded=JSON.stringify(value), now=Date.now(); if(encoded!==last || now-lastSentAt>=1500) { last=encoded; lastSentAt=now; const reply=await chrome.runtime.sendMessage({type:'oceanReading',session,document:documentId,reading:value}).catch(()=>null); if(reply?.session===session) execute(reply.action); } }
   setInterval(tick, 1000); tick();
 })();

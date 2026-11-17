@@ -45,6 +45,20 @@ class BrowserExtensionTest {
     }
 
     @Test
+    fun `background imports each helper only once`() {
+        val background = bundled("background.js")
+        listOf("course-automation-background.js", "dgs-elearning-background.js", "dgs-browser-clicks.js", "oceantg-background.js").forEach { helper ->
+            assertEquals(1, Regex(Regex.escape(helper)).findAll(background).count(), "$helper must be imported once")
+        }
+    }
+
+    @Test
+    fun `OLP helper retries an unchanged reading so delayed actions are received`() {
+        val ocean = bundled("oceantg.js")
+        assertTrue("now-lastSentAt>=1500" in ocean)
+    }
+
+    @Test
     fun `given the app bundle when writing the extension then every file arrives`() {
         val folder = Files.createTempDirectory("extension").toFile()
         try {

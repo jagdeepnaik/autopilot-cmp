@@ -80,6 +80,15 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                     Detail("Assessments","Manual · not automated")
                     Detail("Reserved answer bank",page.routine.answerBankFile)
                 }
+                if(page is PageActivity.Ocean) {
+                    RunSection("OLP learning progress")
+                    Detail("Status", page.progress.detail)
+                    Detail("Current chapter", page.progress.chapter ?: "Waiting for course details")
+                    Detail("Slide", page.progress.slide?.let { current -> "$current / ${page.progress.slideCount ?: "?"}" } ?: "No slide open")
+                    Detail("Final assessment", "Manual · not automated")
+                    Text("Keep the OLP course tab active and Chrome in front while the routine searches, opens chapters and watches media.",
+                        Modifier.padding(horizontal=16.dp), style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if(page !is PageActivity.Automation) {
                     RunSection("Run progress")
                     val clicks=when(page) {
