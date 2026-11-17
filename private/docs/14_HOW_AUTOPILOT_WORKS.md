@@ -401,7 +401,7 @@ Both course routines run in `PageController` like Scroll and click, but the exte
 4. Progress is saved to `autopilot.db` as it happens: completed lessons, all-video module markers and real assessment results, per user profile. The next run skips finished work ([saved progress](07_SAVED_COURSE_PROGRESS.md)).
 5. The **Running routine** screen shows the current module, question, approvals and progress. Stop stays at the bottom.
 
-Answer banks are JSON files in `~/.autopilot/answer-banks/` ([updating them](06_UPDATE_ANSWER_BANK.md)). Approved corrections are saved to the selected bank.
+The app uses the Sagar Mein Yog SQLite database in `~/.autopilot/databases/qa/` ([updating the sources](06_UPDATE_ANSWER_BANK.md)). Approved corrections are saved to that same routine database. Compatible JSON banks in `~/.autopilot/answer-banks/` are imported once.
 
 ### DGS E-Learning
 
@@ -553,13 +553,14 @@ On desktop, everything is in `~/.autopilot/` (`%USERPROFILE%\.autopilot\` on Win
 | `history/run_history.preferences_pb` | The newest 200 runs | DataStore, one JSON document |
 | `databases/autopilot.db` | Saved course progress: user profiles, lessons, videos, assessment results, DGS study time | Room (`AppRoomDatabase`, schema version 1) |
 | `databases/course-progress.db` | The older progress database. Imported into `autopilot.db` on its first open and kept as a backup | SQLite |
-| `answer-banks/` | Answer banks such as `sagarmeinyog-ver-1.0.json`, and `backups/` | JSON |
+| `databases/qa/` | One writable bundled-and-learned Q&A database per routine | SQLite |
+| `answer-banks/` | Compatible legacy answer-bank imports and backups | JSON |
 | `extensions/chrome/` | The unpacked Chrome extension, rewritten at every start | Files |
 | `logs/` | Debug-run logs (Windows debug launcher) | Text |
 
 The window's size and position are stored separately, in Java Preferences under `com/jagdeep/autopilot/window`.
 
-`DesktopDataPaths` moves older files from the top of `~/.autopilot` into these folders before their stores open, and never overwrites an existing file. Absent or unknown saved values fall back to defaults, and unreadable documents are treated as empty. The first launch creates one ready-to-use routine, and the bundled answer bank is copied in only when no file of that name exists.
+`DesktopDataPaths` moves older files from the top of `~/.autopilot` into these folders before their stores open, and never overwrites an existing file. Absent or unknown saved values fall back to defaults, and unreadable documents are treated as empty. The first launch creates one ready-to-use routine, and each routine database is copied only when its private copy does not yet exist.
 
 **Routine files:** **Settings → Routine files** exports selected routines, or all of them, to a readable `.autopilot.json` file (`RoutineFileCodec`, format `autopilot-routines`, version 1), with each routine in the same shape the app saves. **Import** reads one back through the system's Open panel: each routine gets a new id, so nothing of the user's is replaced, and must pass the editor's own checks, so a damaged or hand-edited file can't add, for example, a 0 ms interval. Files over 2 million characters, other formats and unknown routine kinds are refused, and retired kinds are skipped. The file dialogs are `DesktopRoutineFiles` in `shared`; phones don't offer import or export.
 
@@ -670,7 +671,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./gradlew iosSimulatorA
 | Storage | `PreferencesRoutineRepositoryTest`, `ActivityTest` | Saving and reading back |
 | Link | `JvmLocalBridgeTest` | Long polling and header checks |
 | Screens | `*ScreenUiTest`, `HomeScreensUiTest` | What each state shows. Set `UI_TEST_SHOT_DIR` to save images |
-| Wiring | `AppWiringTest`, `BrowserExtensionTest`, `BundledAnswerBankTest` | Registration, extension ID, port agreement, permissions, the bundled answer bank |
+| Wiring | `AppWiringTest`, `BrowserExtensionTest`, `BundledAnswerBankTest` | Registration, extension ID, port agreement, permissions and packaged routine Q&A databases |
 | Browser | `shared` `integration/` (`LiveChromeExtensionTest`, `LiveCourseAutomationTest`, `ProgressCollectorBrowserTest`, `DgsCollectorBrowserTest`) | The extension's scripts in a real browser engine |
 
 Two tests are opt-in because they do real things:

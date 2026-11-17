@@ -10,6 +10,7 @@ import csv
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 QA = ROOT / "private" / "qa"
 OUT = QA / "autopilot_qa.db"
+RUNTIME_RESOURCES = ROOT / "shared" / "src" / "jvmMain" / "resources" / "qa-routines"
 
 
 def norm(value: str) -> str:
@@ -178,7 +180,11 @@ def main() -> None:
     db.execute("VACUUM")
     db.close()
     compact_database(OUT)
-    print(OUT)
+    generated = split_routine_databases(OUT)
+    OUT.unlink()
+    print("Generated routine Q&A databases:")
+    for path in generated:
+        print(path)
 
 
 def compact_database(raw_path: Path) -> None:
@@ -238,6 +244,85 @@ def compact_database(raw_path: Path) -> None:
     target.close()
     source.close()
     os.replace(compact_path, raw_path)
+
+
+def routine_database_name(routine: str) -> str:
+    return {
+        "sagar-mein-yog": "sagarmeinyog_qa.db",
+        "ocean-learning-platform": "olp_qa.db",
+        "seagull-ces": "seagull_qa.db",
+        "seagull-cbt": "seagull_qa.db",
+    }[routine]
+
+
+def answer_key(question: str, options: list[str]) -> str:
+    payload = norm(question) + "\x1f" + "\x1e".join(sorted(norm(text_option(option)) for option in options))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def split_routine_databases(master_path: Path) -> list[Path]:
+    """Create compact routine databases. Source files in private/qa remain the audit record."""
+    master = sqlite3.connect(master_path)
+    outputs = {name: QA / name for name in {routine_database_name(row[0]) for row in master.execute("SELECT DISTINCT routine FROM qa_question_sources")}}
+    for path in outputs.values():
+        if path.exists():
+            path.unlink()
+    databases = {name: sqlite3.connect(path) for name, path in outputs.items()}
+    schema = """
+        CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE qa_questions (
+          id INTEGER PRIMARY KEY, bank_name TEXT NOT NULL, module TEXT NOT NULL,
+          question_text TEXT NOT NULL, question_key TEXT NOT NULL,
+          UNIQUE(bank_name, module, question_key)
+        );
+        CREATE TABLE qa_options (
+          question_id INTEGER NOT NULL REFERENCES qa_questions(id) ON DELETE CASCADE,
+          position INTEGER NOT NULL, option_text TEXT NOT NULL,
+          PRIMARY KEY(question_id, position)
+        );
+        CREATE TABLE qa_answers (
+          question_id INTEGER NOT NULL REFERENCES qa_questions(id) ON DELETE CASCADE,
+          answer_text TEXT NOT NULL, answer_key TEXT NOT NULL,
+          source TEXT NOT NULL CHECK(source IN ('source','learned')),
+          learned_at INTEGER, reviewed_at INTEGER,
+          PRIMARY KEY(question_id, answer_key)
+        );
+        CREATE INDEX qa_bank_lookup ON qa_questions(bank_name, module, question_key);
+    """
+    for database in databases.values():
+        database.execute("PRAGMA foreign_keys = ON")
+        database.executescript(schema)
+    source_counts = {name: 0 for name in outputs}
+    for source_id, question_id, routine, bank, module, question in master.execute(
+        "SELECT s.id,s.question_id,s.routine,s.bank_name,s.module,q.question_text FROM qa_question_sources s JOIN qa_questions q ON q.id=s.question_id ORDER BY s.id"
+    ):
+        name = routine_database_name(routine)
+        database = databases[name]
+        options = [row[0] for row in master.execute("SELECT option_text FROM qa_options WHERE question_id=? ORDER BY position", (question_id,))]
+        key = answer_key(question, options)
+        cursor = database.execute("INSERT OR IGNORE INTO qa_questions(bank_name,module,question_text,question_key) VALUES (?,?,?,?)", (bank, module, question, key))
+        if cursor.rowcount:
+            local_id = cursor.lastrowid
+            database.executemany("INSERT INTO qa_options(question_id,position,option_text) VALUES (?,?,?)", ((local_id, position, option) for position, option in enumerate(options, 1)))
+        else:
+            local_id = database.execute("SELECT id FROM qa_questions WHERE bank_name=? AND module=? AND question_key=?", (bank, module, key)).fetchone()[0]
+        answers = master.execute("SELECT answer_text,answer_normalized FROM qa_source_answers WHERE source_id=?", (source_id,))
+        database.executemany("INSERT OR IGNORE INTO qa_answers(question_id,answer_text,answer_key,source,learned_at,reviewed_at) VALUES (?,?,?,'source',NULL,NULL)",
+                             ((local_id, answer, answer_hash) for answer, answer_hash in answers))
+        source_counts[name] += 1
+    for name, database in databases.items():
+        database.execute("INSERT INTO metadata VALUES ('format','autopilot-routine-qa.v1')")
+        database.execute("INSERT INTO metadata VALUES ('routine_database',?)", (name,))
+        database.execute("INSERT INTO metadata VALUES ('source_question_records',?)", (str(source_counts[name]),))
+        database.execute("INSERT INTO metadata VALUES ('unique_question_sets',?)", (str(database.execute("SELECT count(*) FROM qa_questions").fetchone()[0]),))
+        database.commit()
+        database.execute("VACUUM")
+        database.close()
+    master.close()
+    RUNTIME_RESOURCES.mkdir(parents=True, exist_ok=True)
+    for path in outputs.values():
+        shutil.copy2(path, RUNTIME_RESOURCES / path.name)
+    return sorted(outputs.values())
 
 
 if __name__ == "__main__":

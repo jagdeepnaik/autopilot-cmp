@@ -14,15 +14,13 @@ class SqliteQuestionAnswerStoreTest {
             val source = File(root, "source.db")
             BundledSQLiteDriver().open(source.absolutePath).use { db ->
                 fun sql(value: String) = db.prepare(value).use { it.step() }
-                sql("CREATE TABLE qa_questions(id INTEGER PRIMARY KEY,question_text TEXT NOT NULL,question_normalized TEXT NOT NULL)")
-                sql("CREATE TABLE qa_options(question_id INTEGER NOT NULL,position INTEGER NOT NULL,option_text TEXT NOT NULL,option_normalized TEXT NOT NULL,PRIMARY KEY(question_id,position))")
-                sql("CREATE TABLE qa_question_sources(id INTEGER PRIMARY KEY,question_id INTEGER NOT NULL,routine TEXT NOT NULL,bank_name TEXT NOT NULL,module TEXT NOT NULL,source TEXT NOT NULL,source_reference TEXT,imported_at TEXT NOT NULL)")
-                sql("CREATE TABLE qa_source_answers(source_id INTEGER NOT NULL,answer_text TEXT NOT NULL,answer_normalized TEXT NOT NULL,learned_at INTEGER,reviewed_at INTEGER,PRIMARY KEY(source_id,answer_normalized))")
-                sql("INSERT INTO qa_questions VALUES(1,'Known?','known?')")
-                sql("INSERT INTO qa_options VALUES(1,1,'A','a')")
-                sql("INSERT INTO qa_options VALUES(1,2,'B','b')")
-                sql("INSERT INTO qa_question_sources VALUES(1,1,'routine','bank.json','Module','bundled_json','source',CURRENT_TIMESTAMP)")
-                sql("INSERT INTO qa_source_answers VALUES(1,'B','b',NULL,NULL)")
+                sql("CREATE TABLE qa_questions(id INTEGER PRIMARY KEY,bank_name TEXT NOT NULL,module TEXT NOT NULL,question_text TEXT NOT NULL,question_key TEXT NOT NULL,UNIQUE(bank_name,module,question_key))")
+                sql("CREATE TABLE qa_options(question_id INTEGER NOT NULL,position INTEGER NOT NULL,option_text TEXT NOT NULL,PRIMARY KEY(question_id,position))")
+                sql("CREATE TABLE qa_answers(question_id INTEGER NOT NULL,answer_text TEXT NOT NULL,answer_key TEXT NOT NULL,source TEXT NOT NULL,learned_at INTEGER,reviewed_at INTEGER,PRIMARY KEY(question_id,answer_key))")
+                sql("INSERT INTO qa_questions VALUES(1,'bank.json','Module','Known?','key')")
+                sql("INSERT INTO qa_options VALUES(1,1,'A')")
+                sql("INSERT INTO qa_options VALUES(1,2,'B')")
+                sql("INSERT INTO qa_answers VALUES(1,'B','b','source',NULL,NULL)")
             }
             val store = SqliteQuestionAnswerStore(File(root, "installed.db")) { source.inputStream() }
             assertEquals(listOf("B"), store.entries("bank.json")!!.single().answers)
