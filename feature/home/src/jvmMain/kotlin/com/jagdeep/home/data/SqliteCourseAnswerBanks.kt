@@ -59,7 +59,7 @@ class SqliteCourseAnswerBanks(
     private fun routineDatabase(bank: String) = when {
         bank.startsWith("olp-apk-") || bank == "oceantg-ver-1.0.json" -> "olp_qa.db"
         bank == "ces_qa.db" -> "seagull_qa.db"
-        else -> "sagarmeinyog_qa.db"
+        else -> SMY_DATABASE
     }
     private suspend fun loadName(name: String): CourseAnswerBank? {
         prepare()
@@ -81,6 +81,7 @@ class SqliteCourseAnswerBanks(
     }
     private suspend fun prepare() = migration.withLock {
         if (migrated) return@withLock
+        migrateRenamedSagarDatabase()
         legacyFolder.listFiles().orEmpty().filter { it.isFile && it.extension.equals("json", true) }.forEach { file ->
             val bank = runCatching { CourseAnswerBank.decode(file.readText()) }.getOrNull() ?: return@forEach
             val target = store(routineDatabase(file.name))
@@ -98,5 +99,14 @@ class SqliteCourseAnswerBanks(
         }
         migrated = true
     }
-    private companion object { val ROUTINE_DATABASES = listOf("sagarmeinyog_qa.db", "olp_qa.db", "seagull_qa.db") }
+    private fun migrateRenamedSagarDatabase() {
+        val oldFile = File(databaseFolder, "sagarmeinyog_qa.db")
+        val newFile = File(databaseFolder, SMY_DATABASE)
+        if (oldFile.isFile && !newFile.exists()) oldFile.renameTo(newFile)
+    }
+
+    private companion object {
+        const val SMY_DATABASE = "smy_qa.db"
+        val ROUTINE_DATABASES = listOf(SMY_DATABASE, "olp_qa.db", "seagull_qa.db")
+    }
 }

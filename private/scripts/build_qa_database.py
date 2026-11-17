@@ -248,7 +248,7 @@ def compact_database(raw_path: Path) -> None:
 
 def routine_database_name(routine: str) -> str:
     return {
-        "sagar-mein-yog": "sagarmeinyog_qa.db",
+        "sagar-mein-yog": "smy_qa.db",
         "ocean-learning-platform": "olp_qa.db",
         "seagull-ces": "seagull_qa.db",
         "seagull-cbt": "seagull_qa.db",

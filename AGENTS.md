@@ -272,7 +272,7 @@ private/
   Installers and updates never touch this folder. A move between paths renames files, never overwrites an existing one. These databases hold real user progress: never delete or reset them as a shortcut. Schema changes follow Part A's version-1 rule, and dropping data needs the owner's explicit approval.
 - **Answer banks:**
   - Legacy files use `name-ver-X.Y.json`, for example `sagarmeinyog-ver-1.0.json`, with plain-text `options` and `answer` values.
-  - The project's audit sources remain in `private/qa/` (JSON/CSV/extraction exports). `python3 private/scripts/build_qa_database.py` builds the compact routine files `sagarmeinyog_qa.db`, `olp_qa.db` and `seagull_qa.db`, then copies them to `shared/src/jvmMain/resources/qa-routines/` for packaging.
+  - The project's audit sources remain in `private/qa/` (JSON/CSV/extraction exports). `python3 private/scripts/build_qa_database.py` builds the compact routine files `smy_qa.db`, `olp_qa.db` and `seagull_qa.db`, then copies them to `shared/src/jvmMain/resources/qa-routines/` for packaging.
   - On desktop, the app seeds `~/.autopilot/databases/qa/<routine>_qa.db` from the matching bundle, then reads and writes that same routine file through `core:persistence`. Bundled and learned answers therefore stay together, while the original JSON/CSV sources remain unchanged for audit. Each learned or reviewed answer has its source and timestamps in its routine database.
 - **The Chrome extension's source** is `shared/src/jvmMain/resources/chrome-extension/`. Raise the manifest version when it changes. The app writes it to `~/.autopilot/extensions/chrome/` at every start; the user reloads it in Chrome.
 
