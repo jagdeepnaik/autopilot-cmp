@@ -22,8 +22,20 @@ class SqliteQuestionAnswerStoreTest {
                 sql("INSERT INTO qa_options VALUES(1,2,'B')")
                 sql("INSERT INTO qa_answers VALUES(1,'B','b','source',NULL,NULL)")
             }
-            val store = SqliteQuestionAnswerStore(File(root, "installed.db")) { source.inputStream() }
+            val updated = File(root, "updated.db")
+            source.copyTo(updated)
+            BundledSQLiteDriver().open(updated.absolutePath).use { db ->
+                fun sql(value: String) = db.prepare(value).use { it.step() }
+                sql("INSERT INTO qa_questions VALUES(2,'bank.json','Module','Bundled later?','later')")
+                sql("INSERT INTO qa_options VALUES(2,1,'Yes')")
+                sql("INSERT INTO qa_options VALUES(2,2,'No')")
+                sql("INSERT INTO qa_answers VALUES(2,'Yes','yes','source',NULL,NULL)")
+            }
+            var bundled = source
+            val store = SqliteQuestionAnswerStore(File(root, "installed.db")) { bundled.inputStream() }
             assertEquals(listOf("B"), store.entries("bank.json")!!.single().answers)
+            bundled = updated
+            assertEquals(setOf("Known?", "Bundled later?"), store.entries("bank.json")!!.map { it.question }.toSet())
             assertEquals(QuestionAnswerWriteResult.Saved, store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Learned?", listOf("One", "Two"), "Two")), reviewed = false))
             val learned = store.entries("bank.json")!!.single { it.question == "Learned?" }
             assertEquals(listOf("Two"), learned.answers)

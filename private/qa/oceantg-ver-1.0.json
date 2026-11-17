@@ -9,6 +9,14 @@
         "The crewmember was wearing inappropriate footwear."
       ],
       "answer": "There were unexpected obstacles in the crewmember's way."
+    },
+    {
+      "question": "Safety is the first priority when your vessel is in dry dock, just as it is when it's at sea! And yet, these two environments are very different! While you are still responsible for your own safety, who do you think has overall responsibility or authority for your safety while in dry dock- the Master or the Shipyard? Make your selection by selecting the appropriate hot spot.",
+      "options": [
+        "Master",
+        "Shipyard Manager"
+      ],
+      "answer": "Shipyard Manager"
     }
   ]
 }

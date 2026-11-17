@@ -3,6 +3,7 @@ package com.jagdeep.persistence.qa
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import java.io.File
+import java.security.DigestInputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
@@ -83,9 +84,76 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
     private fun answersFor(db: SQLiteConnection, id: Long): List<String> = db.prepare("SELECT answer_text FROM qa_answers WHERE question_id=? ORDER BY answer_key").use { row -> row.bindLong(1, id); buildList { while (row.step()) add(row.getText(0)) } }
     private suspend fun <T> read(block: (SQLiteConnection) -> T): T? = withContext(Dispatchers.IO) { if (!prepare()) null else runCatching { driver.open(databaseFile.absolutePath).use(block) }.getOrNull() }
     private suspend fun prepare(): Boolean = mutex.withLock {
-        if (databaseFile.isFile) return@withLock true
         val input = bundledDatabase() ?: return@withLock false
-        runCatching { databaseFile.parentFile.mkdirs(); val temporary = File(databaseFile.parentFile, ".${databaseFile.name}.tmp"); input.use { source -> temporary.outputStream().use(source::copyTo) }; Files.move(temporary.toPath(), databaseFile.toPath(), StandardCopyOption.ATOMIC_MOVE) }.isSuccess
+        runCatching {
+            databaseFile.parentFile.mkdirs()
+            val bundled = File(databaseFile.parentFile, ".${databaseFile.name}.bundled.tmp")
+            val fingerprint = input.use { source ->
+                val digest = MessageDigest.getInstance("SHA-256")
+                DigestInputStream(source, digest).use { checked -> bundled.outputStream().use(checked::copyTo) }
+                digest.digest().joinToString("") { "%02x".format(it) }
+            }
+            if (!databaseFile.isFile) {
+                Files.move(bundled.toPath(), databaseFile.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            } else {
+                driver.open(databaseFile.absolutePath).use { installed ->
+                    installed.prepare("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)").use { it.step() }
+                    val current = installed.prepare("SELECT value FROM metadata WHERE key='bundled_sha256'").use { row -> if (row.step()) row.getText(0) else null }
+                    if (current != fingerprint) {
+                        driver.open(bundled.absolutePath).use { source -> mergeBundledSource(installed, source) }
+                        installed.prepare("INSERT OR REPLACE INTO metadata(key,value) VALUES ('bundled_sha256',?)").use { row -> row.bindText(1, fingerprint); row.step() }
+                    }
+                }
+                bundled.delete()
+            }
+            true
+        }.getOrElse { false }
+    }
+
+    /** Adds current bundled questions without discarding answers learned in the user's copy. */
+    private fun mergeBundledSource(installed: SQLiteConnection, source: SQLiteConnection) {
+        installed.prepare("BEGIN IMMEDIATE").use { it.step() }
+        try {
+            source.prepare("SELECT id,bank_name,module,question_text,question_key FROM qa_questions ORDER BY id").use { questions ->
+                while (questions.step()) {
+                    val sourceId = questions.getLong(0)
+                    val bank = questions.getText(1)
+                    val module = questions.getText(2)
+                    val question = questions.getText(3)
+                    val key = questions.getText(4)
+                    val installedId = installed.prepare("SELECT id FROM qa_questions WHERE bank_name=? AND module=? AND question_key=?").use { row ->
+                        row.bindText(1, bank); row.bindText(2, module); row.bindText(3, key)
+                        if (row.step()) row.getLong(0) else null
+                    } ?: run {
+                        installed.prepare("INSERT INTO qa_questions(bank_name,module,question_text,question_key) VALUES (?,?,?,?)").use { row ->
+                            row.bindText(1, bank); row.bindText(2, module); row.bindText(3, question); row.bindText(4, key); row.step()
+                        }
+                        val id = installed.prepare("SELECT last_insert_rowid()").use { row -> row.step(); row.getLong(0) }
+                        source.prepare("SELECT position,option_text FROM qa_options WHERE question_id=? ORDER BY position").use { options ->
+                            options.bindLong(1, sourceId)
+                            while (options.step()) installed.prepare("INSERT INTO qa_options(question_id,position,option_text) VALUES (?,?,?)").use { row ->
+                                row.bindLong(1, id); row.bindLong(2, options.getLong(0)); row.bindText(3, options.getText(1)); row.step()
+                            }
+                        }
+                        id
+                    }
+                    val hasLearned = installed.prepare("SELECT 1 FROM qa_answers WHERE question_id=? AND source='learned' LIMIT 1").use { row -> row.bindLong(1, installedId); row.step() }
+                    if (!hasLearned) {
+                        installed.prepare("DELETE FROM qa_answers WHERE question_id=?").use { row -> row.bindLong(1, installedId); row.step() }
+                        source.prepare("SELECT answer_text,answer_key FROM qa_answers WHERE question_id=? ORDER BY answer_key").use { answers ->
+                            answers.bindLong(1, sourceId)
+                            while (answers.step()) installed.prepare("INSERT INTO qa_answers(question_id,answer_text,answer_key,source,learned_at,reviewed_at) VALUES (?,?,?,'source',NULL,NULL)").use { row ->
+                                row.bindLong(1, installedId); row.bindText(2, answers.getText(0)); row.bindText(3, answers.getText(1)); row.step()
+                            }
+                        }
+                    }
+                }
+            }
+            installed.prepare("COMMIT").use { it.step() }
+        } catch (error: Throwable) {
+            installed.prepare("ROLLBACK").use { it.step() }
+            throw error
+        }
     }
     private fun valid(value: LearnedQuestionAnswer) = value.module.isNotBlank() && value.question.isNotBlank() && value.options.size in 2..20 && value.options.all { it.isNotBlank() } && value.options.map(::normalize).toSet().size == value.options.size && normalize(value.answer) in value.options.map(::normalize)
     private fun questionKey(question: String, options: List<String>) = sha256(normalize(question) + "\u001f" + options.map { normalize(optionText(it)) }.sorted().joinToString("\u001e"))

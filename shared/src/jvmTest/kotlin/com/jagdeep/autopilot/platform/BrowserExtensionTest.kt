@@ -65,6 +65,12 @@ class BrowserExtensionTest {
     }
 
     @Test
+    fun `OLP helper recognizes clickable hotspot practice answers`() {
+        val ocean = bundled("oceantg.js")
+        assertTrue("-poText" in ocean)
+    }
+
+    @Test
     fun `given the app bundle when writing the extension then every file arrives`() {
         val folder = Files.createTempDirectory("extension").toFile()
         try {

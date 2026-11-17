@@ -24,11 +24,15 @@
       return {type:'oceanReading',session,document:documentId,top:true,path:location.pathname,profileName,courseTitle:text(document.querySelector('h1')),courseCode:code,chapters};
     }
     const finish = [...document.querySelectorAll('body *')].some(n => visible(n) && /You have now finished this chapter/i.test(text(n)));
-    const heading = text(document.querySelector('h1')) || null;
+    const heading = text(document.querySelector('h1,h2,h3')) || null;
     const counter = text(document.body).match(/(\d+)\s*\/\s*(\d+)/);
     const pause = button('Pause');
-    const options = [...document.querySelectorAll('input[type=radio], [role=radio], label, button')].filter(n => visible(n) && /^(?:[A-D][.)]\s*)?[^]{2,}$/.test(text(n))).slice(0,8);
-    const questionNode = [...document.querySelectorAll('p,h2,h3,h4,legend')].find(n => visible(n) && /\?$/.test(text(n)));
+    // Seagull lessons use clickable `*-poText*` hot spots rather than inputs for many
+    // practice questions. Treat those as options too, so a known answer can advance the slide.
+    const options = [...document.querySelectorAll('input[type=radio], [role=radio], label, button, [id*="-poText"], [id*="-poText" i], [class*="hotspot" i]')]
+      .filter(n => visible(n) && /^(?:[A-D][.)]\s*)?[^]{2,}$/.test(text(n))).slice(0,8);
+    const questionNode = [...document.querySelectorAll('[id*="pText" i]:not([id*="-poText" i]), p,h2,h3,h4,legend')]
+      .find(n => visible(n) && /\?/.test(text(n)));
     const feedback = [...document.querySelectorAll('p,div')].map(text).find(t => /That'?s right|correct answer|incorrect/i.test(t));
     const correct = feedback && /That'?s right|correct answer/i.test(feedback) ? options.find(n => text(n).length>2) : null;
     const practice = questionNode && options.length >= 2 ? {text:text(questionNode),options:options.map(n=>({id:id(n),text:text(n),selected:n.matches(':checked,[aria-checked=true]')})),feedback:feedback||null,correctAnswer:correct?text(correct):null} : null;
