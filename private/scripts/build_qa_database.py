@@ -287,7 +287,6 @@ def split_routine_databases(master_path: Path) -> list[Path]:
           learned_at INTEGER, reviewed_at INTEGER,
           PRIMARY KEY(question_id, answer_key)
         );
-        CREATE INDEX qa_bank_lookup ON qa_questions(bank_name, module, question_key);
     """
     for database in databases.values():
         database.execute("PRAGMA foreign_keys = ON")
