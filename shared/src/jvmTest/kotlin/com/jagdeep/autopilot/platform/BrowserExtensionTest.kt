@@ -59,6 +59,12 @@ class BrowserExtensionTest {
     }
 
     @Test
+    fun `OLP helper targets the clickable chapter row rather than its heading`() {
+        val ocean = bundled("oceantg.js")
+        assertTrue("[data-test=\"ChapletRow\"]" in ocean)
+    }
+
+    @Test
     fun `given the app bundle when writing the extension then every file arrives`() {
         val folder = Files.createTempDirectory("extension").toFile()
         try {

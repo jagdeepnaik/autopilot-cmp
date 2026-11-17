@@ -18,8 +18,8 @@
       return {type:'oceanReading',session,document:documentId,top:true,path:location.pathname,profileName,results};
     }
     if (top && window === window.top) {
-      const heads = [...document.querySelectorAll('h3')].filter(visible);
-      const chapters = heads.map(node => { let parent=node; for(let i=0;i<5&&parent;i++,parent=parent.parentElement) { const t=text(parent); if (/Completed|Not attempted|In progress/i.test(t)) return {id:id(node),title:text(node),status:(t.match(/Completed|Not attempted|In progress/i)||['Not attempted'])[0]}; } return {id:id(node),title:text(node),status:'Not attempted'}; });
+      const rows = [...document.querySelectorAll('[data-test="ChapletRow"]')].filter(visible);
+      const chapters = rows.map(row => { const heading=row.querySelector('h3'); const status=text(row).match(/Completed|Not attempted|In progress/i); return {id:id(row),title:text(heading),status:status?.[0]||'Not attempted'}; });
       const body=text(document.body); const code=(body.match(/Activity number\s*(\d{3,5})/i)||[])[1] || null;
       return {type:'oceanReading',session,document:documentId,top:true,path:location.pathname,profileName,courseTitle:text(document.querySelector('h1')),courseCode:code,chapters};
     }
@@ -39,7 +39,7 @@
     handled.add(action.request); let node=null;
     if (action.kind==='searchCourse') { location.assign('/OLP/search/library?query='+encodeURIComponent(action.target)); return; }
     if (action.kind==='openCourse') node=[...document.querySelectorAll('a[href*="/OLP/elearning/details/"]')].find(n=>id(n)===action.target);
-    else if (action.kind==='openChapter') node=[...document.querySelectorAll('h3')].find(n=>id(n)===action.target);
+    else if (action.kind==='openChapter') node=[...document.querySelectorAll('[data-test="ChapletRow"]')].find(n=>id(n)===action.target);
     else if (action.kind==='answerPractice') node=[...document.querySelectorAll('input[type=radio], [role=radio], label, button')].find(n=>id(n)===action.target);
     else if (action.kind==='returnToMenu') node=[...document.querySelectorAll('button,a')].find(n=>visible(n)&&/Return to the Menu/i.test(text(n)));
     else if (action.kind==='next') node=button('Next page');
