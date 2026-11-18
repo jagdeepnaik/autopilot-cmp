@@ -116,9 +116,9 @@ MAC_WINDOWS_HOME="${MAC_WINDOWS_HOME:-C:\Users\Jagdeep}"
 MAC_LINUX_HOME="${MAC_LINUX_HOME:-/home/jagdeep}"
 DEBUG_PORT=5005
 LOW_MEMORY=(--no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process')
-# The Mac-local Linux VM may have less memory than the home server. Keep Gradle and the Kotlin
-# compiler daemon inside a smaller envelope so the guest OS does not kill the build process.
-LOCAL_LINUX_MEMORY=(--no-daemon --console=plain --max-workers=1 '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' '-Dkotlin.daemon.jvm.options=-Xmx512m')
+# The Mac-local Linux VM has a 2 GB allocation. Keep Gradle and the Kotlin compiler daemon within
+# a 768 MB envelope so its runtime-image packaging stage does not exhaust the guest's RAM/swap.
+LOCAL_LINUX_MEMORY=(--no-daemon --console=plain --max-workers=1 '-Dorg.gradle.jvmargs=-Xmx768m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' '-Dkotlin.daemon.jvm.options=-Xmx256m')
 FOCUSED_TESTS=(:core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :shared:jvmTest --tests '*DesktopDataPathsTest*' --tests '*AppVersionTest*')
 
 # The help text is the comment block at the top of this file, up to the first line of code.
