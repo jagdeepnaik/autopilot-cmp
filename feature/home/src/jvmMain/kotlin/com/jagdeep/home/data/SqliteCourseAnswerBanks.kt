@@ -58,6 +58,7 @@ class SqliteCourseAnswerBanks(
     }
     private fun routineDatabase(bank: String) = when {
         bank.startsWith("olp-apk-") || bank == "oceantg-ver-1.0.json" -> "olp_qa.db"
+        bank == "marinesamraj-public-ver-1.0.json" -> "marinesamraj_qa.db"
         bank == "ces_qa.db" -> "seagull_qa.db"
         else -> SMY_DATABASE
     }
@@ -107,6 +108,6 @@ class SqliteCourseAnswerBanks(
 
     private companion object {
         const val SMY_DATABASE = "smy_qa.db"
-        val ROUTINE_DATABASES = listOf(SMY_DATABASE, "olp_qa.db", "seagull_qa.db")
+        val ROUTINE_DATABASES = listOf(SMY_DATABASE, "olp_qa.db", "seagull_qa.db", "marinesamraj_qa.db")
     }
 }

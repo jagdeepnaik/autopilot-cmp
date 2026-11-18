@@ -47,7 +47,7 @@ class BrowserExtensionTest {
     @Test
     fun `background imports each helper only once`() {
         val background = bundled("background.js")
-        listOf("course-automation-background.js", "dgs-elearning-background.js", "dgs-browser-clicks.js", "oceantg-background.js").forEach { helper ->
+        listOf("course-automation-background.js", "dgs-elearning-background.js", "dgs-browser-clicks.js", "oceantg-background.js", "marinesamraj-background.js").forEach { helper ->
             assertEquals(1, Regex(Regex.escape(helper)).findAll(background).count(), "$helper must be imported once")
         }
     }

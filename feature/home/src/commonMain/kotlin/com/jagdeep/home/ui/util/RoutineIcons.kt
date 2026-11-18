@@ -17,4 +17,5 @@ fun RoutineKind.icon(): ImageVector = when (this) {
     RoutineKind.DgsELearning -> Icons.Default.TravelExplore
     RoutineKind.CourseAutomation -> Icons.Default.School
     RoutineKind.OceanTG -> Icons.Default.School
+    RoutineKind.MarineSamraj -> Icons.Default.School
 }

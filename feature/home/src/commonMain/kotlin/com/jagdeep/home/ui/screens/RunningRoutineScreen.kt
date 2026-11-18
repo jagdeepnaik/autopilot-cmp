@@ -89,6 +89,14 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                     Text("Keep the OLP course tab active and Chrome in front while the routine searches, opens chapters and watches media.",
                         Modifier.padding(horizontal=16.dp), style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                if(page is PageActivity.MarineSamraj) {
+                    RunSection("Public Q&A collection")
+                    Detail("Status", page.progress.detail)
+                    Detail("Permitted pages visited", page.progress.pages.toString())
+                    Detail("Questions saved this run", page.progress.questions.toString())
+                    Text("Only public exam-preparation pages are collected. Private, user, admin, review and notification pages are never opened.",
+                        Modifier.padding(horizontal=16.dp), style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if(page !is PageActivity.Automation) {
                     RunSection("Run progress")
                     val clicks=when(page) {

@@ -13,6 +13,7 @@ enum class RoutineKind(val label: String, val description: String) {
     DgsELearning("DGS E-Learning", "Reads DGS e-book pages, watches videos and reviews until your active study-time target."),
     CourseAutomation("Sagar Mein Yog automation", "Automatically opens unfinished courses and video lessons on sagarmeinyog.com, watches videos, and follows the selected assessment mode."),
     OceanTG("Ocean Learning Platform (OLP)", "Works through Ocean Learning Platform chapters in order, watches media and answers saved practice questions. It stops before the final assessment."),
+    MarineSamraj("MarineSamraj public Q&A", "Collects public MarineSamraj question-and-answer pages already open in Chrome, with local duplicate protection."),
 }
 
 /** Something the Routines page can save and run. Only one routine runs at a time. */

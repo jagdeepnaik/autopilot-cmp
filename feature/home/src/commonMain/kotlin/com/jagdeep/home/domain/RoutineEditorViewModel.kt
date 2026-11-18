@@ -177,6 +177,7 @@ class RoutineEditorViewModel(
     private fun newDraft(kind: RoutineKind, name: String): RoutineDraft = when (kind) {
         RoutineKind.DgsELearning -> RoutineDraft(kind=kind,name=name,answerBankFile=DGS_ANSWER_BANK,requiredHours="")
         RoutineKind.OceanTG -> RoutineDraft(kind=kind,name=name,answerBankFile=OCEANTG_ANSWER_BANK)
+        RoutineKind.MarineSamraj -> RoutineDraft(kind=kind,name=name,answerBankFile=MARINESAMRAJ_ANSWER_BANK)
         RoutineKind.Sequence -> RoutineDraft(kind = kind, name = name, targetMode = TargetMode.AtPoints, limitMode = LimitMode.Passes, limitPasses = "1")
         else -> RoutineDraft(kind = kind, name = name)
     }

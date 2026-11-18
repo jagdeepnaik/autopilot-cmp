@@ -33,7 +33,7 @@ data class HomeUiState(
 }
 
 /** Website automation uses the extension; pointer-based routines need native input permission. */
-fun Routine.needsInputAccess(): Boolean = this !is CourseAutomationRoutine && this !is DgsELearningRoutine && this !is OceanTGRoutine
+fun Routine.needsInputAccess(): Boolean = this !is CourseAutomationRoutine && this !is DgsELearningRoutine && this !is OceanTGRoutine && this !is MarineSamrajRoutine
 
 class HomeViewModel(
     private val controller: ClickController,
@@ -147,4 +147,5 @@ internal fun Routine.withId(id: String): Routine = when (this) {
     is CourseAutomationRoutine -> copy(id = id)
     is DgsELearningRoutine -> copy(id = id)
     is OceanTGRoutine -> copy(id = id)
+    is MarineSamrajRoutine -> copy(id = id)
 }

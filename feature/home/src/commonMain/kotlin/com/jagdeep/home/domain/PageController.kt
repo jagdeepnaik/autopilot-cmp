@@ -60,6 +60,8 @@ sealed interface PageActivity {
     ) : PageActivity
 
     data class Ocean(override val routine: OceanTGRoutine, val progress: OceanProgress) : PageActivity
+
+    data class MarineSamraj(override val routine: MarineSamrajRoutine, val progress: MarineSamrajProgress) : PageActivity
 }
 
 data class PageState(
@@ -139,6 +141,7 @@ internal data class HelperCommand(
     val courseAutomation: CourseCommand? = null,
     val dgs: DgsCommand? = null,
     val oceanTG: OceanCommand? = null,
+    val marineSamraj: MarineSamrajCommand? = null,
 )
 
 @Serializable
@@ -364,6 +367,7 @@ class PageController(
     private var pendingText: String? = null
     private var courseAutomation: CourseAutomationSession? = null
     private var oceanTG: OceanTGSession? = null
+    private var marineSamraj: MarineSamrajSession? = null
     private val oceanProgressMutex = Mutex()
     private var activeAnswerBankStore: CourseAnswerBankStore = answerBankStore
     private var courseProgress: CourseProgressSession? = null
@@ -494,6 +498,17 @@ class PageController(
                 automation.apps.bringToFront(BROWSER_APP_NAME)
                 null
             }
+            is MarineSamrajRoutine -> {
+                val bankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(routine.answerBankFile) ?: routine.answerBankFile
+                activeAnswerBankStore = answerBankStore.forName(bankFile)
+                val runner = MarineSamrajSession("${newId()}:${now()}", routine.maxPages)
+                marineSamraj = runner
+                launchActivity(PageActivity.MarineSamraj(routine.copy(answerBankFile = bankFile), runner.progress), scrolling = false) {
+                    performMarineSamraj(routine, runner)
+                }
+                automation.apps.bringToFront(BROWSER_APP_NAME)
+                null
+            }
             is ScrollClickRoutine -> {
                 if (automation.access.access() != InputAccess.Granted) return "Allow Accessibility access so clicks can reach Chrome."
                 pageReading.value = null
@@ -521,6 +536,7 @@ class PageController(
             publish()
         }
         if (state.value.activity is PageActivity.Ocean) { oceanTG = null; publish() }
+        if (state.value.activity is PageActivity.MarineSamraj) { marineSamraj = null; publish() }
         if (active) job?.cancel()
         return active
     }
@@ -532,7 +548,7 @@ class PageController(
                 live.log(LiveSource.Keys) { "Scroll key: stopping scroll and click" }
                 stop()
             }
-            is PageActivity.Automation, is PageActivity.Ocean, is PageActivity.Dgs, null -> Unit
+            is PageActivity.Automation, is PageActivity.Ocean, is PageActivity.MarineSamraj, is PageActivity.Dgs, null -> Unit
         }
     }
 
@@ -685,6 +701,20 @@ class PageController(
         }
     }
 
+    private suspend fun performMarineSamraj(routine: MarineSamrajRoutine, runner: MarineSamrajSession) {
+        val startedAt = now()
+        var outcome = RunOutcome.StoppedByUser
+        try {
+            while (true) {
+                if (!state.value.isConnected) { outcome = RunOutcome.BrowserDisconnected; break }
+                if (runner.progress.completed) { outcome = RunOutcome.Completed; break }
+                kotlinx.coroutines.delay(200)
+            }
+        } finally {
+            withContext(NonCancellable) { endActivity(); record(routine.name, startedAt, runner.progress.questions.toLong(), outcome) }
+        }
+    }
+
     private suspend fun record(name: String, startedAt: Long, clicks: Long, outcome: RunOutcome) {
         val record = RunRecord(newId(), name, startedAt, now(), clicks, outcome)
         live.log(LiveSource.Routine) { "Ended $name: ${outcome.label}, $clicks clicks" }
@@ -703,6 +733,7 @@ class PageController(
         dgsStudy=null
         courseAutomation = null
         oceanTG = null
+        marineSamraj = null
         courseProgress = null
         courseChunks.clear()
         questionAlertKey = null
@@ -751,6 +782,7 @@ class PageController(
                 mutableState.update { it.copy(activity=activity.copy(progress=runner.progress)) }; publish(); return
             }
         }
+        if (handleMarineSamrajMessage(raw)) return
         if (handleOceanMessage(raw)) return
         if (handleCourseMessage(raw)) return
         live.log(LiveSource.Chrome) { "← ${raw.take(MAX_LOGGED_MESSAGE)}" }
@@ -781,6 +813,30 @@ class PageController(
         "playing" -> PageVideo.Playing
         "needsPlay" -> PageVideo.NeedsPlay
         else -> PageVideo.None
+    }
+
+    private suspend fun handleMarineSamrajMessage(raw: String): Boolean {
+        val action = runCatching { json.decodeFromString(MarineSamrajActionAck.serializer(), raw) }.getOrNull()
+        if (action?.type == "marineSamrajAction") {
+            marineSamraj?.takeIf { it.session == action.session }?.acknowledge(action.request, action.success)
+            publish()
+            return true
+        }
+        val reading = runCatching { json.decodeFromString(MarineSamrajReading.serializer(), raw) }.getOrNull() ?: return false
+        if (reading.type != "marineSamrajReading") return false
+        val runner = marineSamraj ?: return true
+        if (reading.session != runner.session) return true
+        runner.read(reading)
+        runner.takeCapture()?.let { capture ->
+            // The generic Q&A store requires selectable options.  A public written answer is kept
+            // verbatim as the answer and first option; the second marker preserves its text safely.
+            activeAnswerBankStore.save(capture.module, CourseAnswer(capture.question, listOf(capture.answer, "Reference answer"), capture.answer))
+        }
+        val activity = state.value.activity as? PageActivity.MarineSamraj ?: return true
+        mutableState.update { it.copy(activity = activity.copy(progress = runner.progress)) }
+        observeProgress("marinesamraj", "${runner.progress.pages}:${runner.progress.questions}:${runner.progress.detail}")
+        publish()
+        return true
     }
 
     private suspend fun handleOceanMessage(raw: String): Boolean {
@@ -834,7 +890,7 @@ class PageController(
             pixelsPerSecond = when (activity) {
                 is PageActivity.ScrollClick -> activity.routine.pixelsPerSecond
                 null -> DEFAULT_PIXELS_PER_SECOND
-                is PageActivity.Automation, is PageActivity.Ocean, is PageActivity.Dgs -> DEFAULT_PIXELS_PER_SECOND
+                is PageActivity.Automation, is PageActivity.Ocean, is PageActivity.MarineSamraj, is PageActivity.Dgs -> DEFAULT_PIXELS_PER_SECOND
             },
             words = emptyList(),
             advance = 0,
@@ -846,6 +902,7 @@ class PageController(
             dgs = dgsSession?.command,
             courseAutomation = courseAutomation?.let { CourseCommand(it.session, if (courseProgress?.blocksActions == true) null else courseProgress?.action ?: it.action, it.playbackSpeed) },
             oceanTG = oceanTG?.let { OceanCommand(it.session, it.action) },
+            marineSamraj = marineSamraj?.let { MarineSamrajCommand(it.session, it.action) },
         )
         val encoded = json.encodeToString(HelperCommand.serializer(), command)
         if (encoded != lastPublished) live.log(LiveSource.Chrome) { "→ $encoded" }

@@ -102,6 +102,7 @@ internal fun RunPanel(
         activity is PageActivity.Dgs -> "DGS E-Learning on"
         activity is PageActivity.Automation -> "Sagar Mein Yog automation on"
         activity is PageActivity.Ocean -> "OLP automation on"
+        activity is PageActivity.MarineSamraj -> "MarineSamraj public Q&A on"
         activity is PageActivity.ScrollClick -> "Round ${activity.progress.round} of ${activity.progress.rounds}"
         run is RunState.CountingDown -> "Starting in ${run.secondsLeft}…"
         run is RunState.Running -> if (run.pause != null) "Paused" else "Clicking"
@@ -116,6 +117,7 @@ internal fun RunPanel(
         activity is PageActivity.Dgs -> activity.progress.detail
         activity is PageActivity.Automation -> activity.detail
         activity is PageActivity.Ocean -> activity.progress.detail
+        activity is PageActivity.MarineSamraj -> activity.progress.detail
         run is RunState.CountingDown -> "Move to the target now. ${run.routine.name} starts soon."
         run is RunState.Running -> buildString {
             append(run.routine.name).append(" · ").append(clicksLabel(run.clicks))

@@ -201,6 +201,13 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                     AnswerBankOptions(state, viewModel)
                     Text("The final Assessment stays manual in this first OLP routine.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
                 }
+                RoutineKind.MarineSamraj -> {
+                    Group("MarineSamraj public Q&A")
+                    Text("Open a public MarineSamraj exam-preparation page in Chrome, then start. The routine follows only public exam-prep links, never signs in, and refuses user, admin, review and notification pages.", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
+                    NumberField("Maximum public pages this run", draft.marineSamrajMaxPages, errors.points, { value -> update { it.copy(marineSamrajMaxPages = value) } }, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                    AnswerBankOptions(state, viewModel)
+                    Text("Collection stops after the selected limit or when no more permitted public links are visible. Keep Chrome in front and stop at any time.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
+                }
             }
 
         }
