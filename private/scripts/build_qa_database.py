@@ -248,10 +248,10 @@ def compact_database(raw_path: Path) -> None:
 
 def routine_database_name(routine: str) -> str:
     return {
-        "sagar-mein-yog": "smy_qa.db",
-        "ocean-learning-platform": "olp_qa.db",
-        "seagull-ces": "seagull_qa.db",
-        "seagull-cbt": "seagull_qa.db",
+        "sagar-mein-yog": "smy.db",
+        "ocean-learning-platform": "olp.db",
+        "seagull-ces": "seagull.db",
+        "seagull-cbt": "seagull.db",
     }[routine]
 
 
@@ -266,7 +266,7 @@ def split_routine_databases(master_path: Path) -> list[Path]:
     outputs = {name: QA / name for name in {routine_database_name(row[0]) for row in master.execute("SELECT DISTINCT routine FROM qa_question_sources")}}
     # MarineSamraj public pages are learned at run time.  Bundle its empty routine database so
     # every machine begins with the same schema and still keeps learned data in its own file.
-    outputs.setdefault("marinesamraj_qa.db", QA / "marinesamraj_qa.db")
+    outputs.setdefault("marinesamraj.db", QA / "marinesamraj.db")
     for path in outputs.values():
         if path.exists():
             path.unlink()

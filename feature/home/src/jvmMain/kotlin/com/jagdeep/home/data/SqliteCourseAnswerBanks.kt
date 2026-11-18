@@ -57,9 +57,9 @@ class SqliteCourseAnswerBanks(
         SqliteQuestionAnswerStore(File(databaseFolder, name)) { bundledDatabase(name) }
     }
     private fun routineDatabase(bank: String) = when {
-        bank.startsWith("olp-apk-") || bank == "oceantg-ver-1.0.json" -> "olp_qa.db"
-        bank == "marinesamraj-public-ver-1.0.json" -> "marinesamraj_qa.db"
-        bank == "ces_qa.db" -> "seagull_qa.db"
+        bank.startsWith("olp-apk-") || bank == "oceantg-ver-1.0.json" -> "olp.db"
+        bank == "marinesamraj-public-ver-1.0.json" -> "marinesamraj.db"
+        bank == "ces_qa.db" -> "seagull.db"
         else -> SMY_DATABASE
     }
     private suspend fun loadName(name: String): CourseAnswerBank? {
@@ -82,7 +82,7 @@ class SqliteCourseAnswerBanks(
     }
     private suspend fun prepare() = migration.withLock {
         if (migrated) return@withLock
-        migrateRenamedSagarDatabase()
+        migrateRenamedRoutineDatabases()
         legacyFolder.listFiles().orEmpty().filter { it.isFile && it.extension.equals("json", true) }.forEach { file ->
             val bank = runCatching { CourseAnswerBank.decode(file.readText()) }.getOrNull() ?: return@forEach
             val target = store(routineDatabase(file.name))
@@ -100,14 +100,27 @@ class SqliteCourseAnswerBanks(
         }
         migrated = true
     }
-    private fun migrateRenamedSagarDatabase() {
-        val oldFile = File(databaseFolder, "sagarmeinyog_qa.db")
-        val newFile = File(databaseFolder, SMY_DATABASE)
-        if (oldFile.isFile && !newFile.exists()) oldFile.renameTo(newFile)
+    /** Move local learned answers forward when the compact routine files are renamed. */
+    private fun migrateRenamedRoutineDatabases() {
+        val legacyNames = mapOf(
+            SMY_DATABASE to listOf("smy_qa.db", "sagarmeinyog_qa.db"),
+            "olp.db" to listOf("olp_qa.db"),
+            "seagull.db" to listOf("seagull_qa.db"),
+            "marinesamraj.db" to listOf("marinesamraj_qa.db"),
+        )
+        legacyNames.forEach { (newName, oldNames) ->
+            val destination = File(databaseFolder, newName)
+            val source = oldNames.asSequence().map { File(databaseFolder, it) }.firstOrNull(File::isFile) ?: return@forEach
+            if (destination.exists()) return@forEach
+            listOf("", "-wal", "-shm").forEach { suffix ->
+                val oldPart = File(databaseFolder, source.name + suffix)
+                if (oldPart.exists()) oldPart.renameTo(File(databaseFolder, newName + suffix))
+            }
+        }
     }
 
     private companion object {
-        const val SMY_DATABASE = "smy_qa.db"
-        val ROUTINE_DATABASES = listOf(SMY_DATABASE, "olp_qa.db", "seagull_qa.db", "marinesamraj_qa.db")
+        const val SMY_DATABASE = "smy.db"
+        val ROUTINE_DATABASES = listOf(SMY_DATABASE, "olp.db", "seagull.db", "marinesamraj.db")
     }
 }

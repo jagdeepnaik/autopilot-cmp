@@ -11,7 +11,7 @@ Use **name-ver-1.0.json**, then a new version such as **name-ver-1.1.json** for 
 | Sagar Mein Yog | `sagarmeinyog-ver-1.0.json` |
 | DGS reserved bank | `dgs-elearning-ver-1.0.json` |
 
-Your updated project bank is in `private/qa/sagarmeinyog-ver-1.0.json`. Run `python3 private/scripts/build_qa_database.py` after changing any source record. It rebuilds and packages the small routine databases automatically: `smy_qa.db`, `olp_qa.db` and `seagull_qa.db`. Each installed routine database holds its bundled answers and any answers learned later; the JSON/CSV sources remain in `private/qa/` for audit. Older JSON banks are preserved during one-time import. DGS assessment automation remains reserved for later.
+Your updated project bank is in `private/qa/sagarmeinyog-ver-1.0.json`. Run `python3 private/scripts/build_qa_database.py` after changing any source record. It rebuilds and packages the small routine databases automatically: `smy.db`, `olp.db`, `seagull.db` and `marinesamraj.db`. Each installed routine database holds its bundled answers and any answers learned later; the JSON/CSV sources remain in `private/qa/` for audit. Older JSON banks are preserved during one-time import. DGS assessment automation remains reserved for later.
 
 Installed bank folder:
 
