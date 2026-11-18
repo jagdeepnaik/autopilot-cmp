@@ -2,6 +2,7 @@ package com.jagdeep.home.data
 
 import com.jagdeep.home.domain.CourseCertificateStore
 import com.jagdeep.home.domain.CourseCertificateTarget
+import com.jagdeep.home.domain.SAGAR_MEIN_YOG_MODULES
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -15,7 +16,9 @@ class DownloadsCourseCertificateStore(
     private val startedAt = mutableMapOf<CourseCertificateTarget, Long>()
 
     override fun hasCertificate(target: CourseCertificateTarget): Boolean =
-        (destination(target).isFile && destination(target).length() > 0) || confirmed(target)
+        (destination(target).isFile && destination(target).length() > 0) ||
+            (legacyDestination(target).isFile && legacyDestination(target).length() > 0) ||
+            confirmed(target)
 
     override fun prepareDownload(target: CourseCertificateTarget) {
         startedAt[target] = System.currentTimeMillis()
@@ -68,9 +71,18 @@ class DownloadsCourseCertificateStore(
         if (retained + entry != existing) file.writeText((retained + entry).joinToString("\n", postfix = "\n"))
     }
 
-    private fun destination(target: CourseCertificateTarget): File = File(
-        File(File(downloads, "AutoPilot"), safe(target.profileName)), "${safe(target.module)}.pdf",
-    )
+    private fun destination(target: CourseCertificateTarget): File = File(profileFolder(target), "${certificateFileStem(target)}.pdf")
+
+    /** Old files remain valid completion evidence after numbering new SMY certificates. */
+    private fun legacyDestination(target: CourseCertificateTarget): File = File(profileFolder(target), "${safe(target.module)}.pdf")
+
+    private fun profileFolder(target: CourseCertificateTarget): File =
+        File(File(downloads, "AutoPilot"), safe(target.profileName))
+
+    private fun certificateFileStem(target: CourseCertificateTarget): String {
+        val moduleNumber = SAGAR_MEIN_YOG_MODULES.indexOfFirst { it.equals(target.module.trim(), ignoreCase = true) }
+        return if (moduleNumber >= 0) "${moduleNumber + 1}. ${safe(target.module)}" else safe(target.module)
+    }
 
     private fun confirmed(target: CourseCertificateTarget): Boolean =
         File(destination(target).parentFile, "certificate-completions.txt").takeIf(File::isFile)
