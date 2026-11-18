@@ -24,8 +24,13 @@ object NoCourseProgressRepository : CourseProgressRepository {
     val pageSize: Int? = null, val pageSizeControl: String? = null,
     val pageSizeOpen: Boolean = false, val pageSizeOptions: List<ProgressPageSize> = emptyList())
 @Serializable internal data class ProgressPageSize(val id: String, val value: Int)
-data class ProgressProfileRequest(val token: String, val displayName: String = "",
-    val profiles: List<LearningAccount> = emptyList(), val loading: Boolean = false)
+data class ProgressProfileRequest(
+    val token: String,
+    /** Name read from the signed-in Sagar Mein Yog page, when that page exposes it. */
+    val detectedProfileName: String? = null,
+    val profiles: List<LearningAccount> = emptyList(),
+    val loading: Boolean = false,
+)
 data class CourseProgressSummary(val account: String, val displayName: String, val checkedAt: Long, val records: List<LearningRecord>)
 
 /** The fixed catalogue shown by Sagar Mein Yog. Keep the running view useful before a module is opened. */

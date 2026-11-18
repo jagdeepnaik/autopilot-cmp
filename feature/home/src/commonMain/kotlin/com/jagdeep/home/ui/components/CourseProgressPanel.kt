@@ -13,27 +13,43 @@ import com.jagdeep.persistence.room.learning.LearningAccount
 @Composable
 internal fun CourseProgressPanel(request: ProgressProfileRequest?, summary: CourseProgressSummary?, confirm: (String,String)->Unit) {
     if (request != null) {
-        var selected by remember(request.token, request.profiles) { mutableStateOf(request.profiles.firstOrNull()?.key) }
-        var name by remember(request.token) { mutableStateOf("") }
-        AlertDialog(onDismissRequest = {}, title = { Text("Choose progress profile") }, text = {
+        val detected = request.detectedProfileName
+        var selected by remember(request.token, request.profiles, detected) {
+            mutableStateOf(request.profiles.firstOrNull { profile ->
+                detected != null && CourseAnswerBank.normalize(profile.displayName) == CourseAnswerBank.normalize(detected)
+            }?.key ?: if (detected == null) request.profiles.firstOrNull()?.key else null)
+        }
+        var name by remember(request.token, detected) { mutableStateOf(detected.orEmpty()) }
+        var profilesOpen by remember(request.token) { mutableStateOf(false) }
+        AlertDialog(onDismissRequest = {}, title = { Text("Confirm progress profile") }, text = {
             Column(Modifier.heightIn(max = 450.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Choose the profile for the account signed into Chrome. The website does not show a username on assessment pages, so the app uses your choice throughout this run.")
+                if (detected != null) {
+                    Text("Signed-in SMY account detected", style = MaterialTheme.typography.labelLarge)
+                    Text(detected, style = MaterialTheme.typography.titleMedium)
+                    Text("Use this account for this run, or select one of the previously saved profiles below.")
+                } else Text("The current SMY page did not expose an account name. Select a saved profile or enter one manually. Assessment pages do not show a username, so this choice is used throughout the run.")
                 if (request.loading) Text("Loading saved profiles…")
-                request.profiles.forEachIndexed { index, profile ->
-                    TextButton(modifier = Modifier.fillMaxWidth(), onClick = { selected = profile.key }) {
-                        RadioButton(selected = selected == profile.key, onClick = null)
-                        Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(profile.displayName)
-                            Text(profile.key.removePrefix("sagarmeinyog:") + if (index == 0) " · Most recent" else "", style = MaterialTheme.typography.bodySmall)
+                if (request.profiles.isNotEmpty()) {
+                    Box {
+                        OutlinedButton(enabled = !request.loading, onClick = { profilesOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(request.profiles.firstOrNull { it.key == selected }?.let { "Saved profile: ${it.displayName}" } ?: "Choose saved profile")
+                        }
+                        DropdownMenu(expanded = profilesOpen, onDismissRequest = { profilesOpen = false }) {
+                            request.profiles.forEachIndexed { index, profile ->
+                                DropdownMenuItem(
+                                    text = { Text(profile.displayName + if (index == 0) " · Most recent" else "") },
+                                    onClick = { selected = profile.key; profilesOpen = false },
+                                )
+                            }
                         }
                     }
                 }
-                TextButton(enabled = !request.loading, onClick = { selected = null }) { Text("Create new profile") }
-                if (selected == null && !request.loading) {
+                if (detected != null) TextButton(enabled = !request.loading, onClick = { selected = null; name = detected }) { Text("Use detected account") }
+                if (detected == null) TextButton(enabled = !request.loading, onClick = { selected = null }) { Text("Enter a new profile") }
+                if (selected == null && !request.loading && detected == null) {
                     OutlinedTextField(value = name, onValueChange = { if(it.length <= 120) name = it }, label = { Text("Profile name") }, singleLine = true)
                 }
-                Text("Select the correct account before continuing. Use a distinct profile for each person. Never enter a password here.")
+                Text("Saved profiles are ordered with the most recently used first. Use a distinct profile for each person. Never enter a password here.")
             }
         }, confirmButton = { TextButton(enabled = !request.loading && (selected != null || name.isNotBlank()), onClick = { confirm(request.token, selected ?: name.trim()) }) { Text("Use this profile") } })
     }

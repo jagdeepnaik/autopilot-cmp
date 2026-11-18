@@ -189,6 +189,17 @@ class CourseAutomationTest {
         assertNull(runner.action, "Wait before retrying a paused or refused player")
     }
 
+    @Test fun `given a paused video with a resume control then retry that control safely`() {
+        val runner = CourseAutomationSession("session")
+        val video = CourseElement("video", tag = "video", paused = true)
+        val resume = CourseElement("resume", tag = "div", label = "Resume")
+        runner.read(snapshot(lesson, video, resume), 0)
+        assertEquals("resume", runner.action?.element)
+        runner.ack()
+        runner.read(snapshot(lesson, video, resume), 5000)
+        assertEquals("resume", runner.action?.element)
+    }
+
     @Test
     fun `given a video pauses again when retry interval passes then resume without advancing`() {
         val runner = CourseAutomationSession("session")

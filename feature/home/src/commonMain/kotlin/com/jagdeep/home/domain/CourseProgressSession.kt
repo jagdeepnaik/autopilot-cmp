@@ -26,6 +26,7 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
     private var scanSize: Int? = null
     private val collected = mutableListOf<Map<String,String>>()
     private var profilesPrepared = false
+    private var detectedProfileName: String? = null
     private var deferredVerification = false
     private var lessonDigest = ""
     private var fatal = false
@@ -36,11 +37,26 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
             val profiles = repository.accounts().first().filter { it.key.startsWith("sagarmeinyog:") }
             val lastUsed = profiles.associate { account -> account.key to
                 (repository.records(account.key).firstOrNull { it.key == "profile-last-used" }?.observedAt ?: account.checkedAt) }
-            request = request?.copy(profiles = profiles.sortedWith(
+            request = request?.copy(detectedProfileName = detectedProfileName, profiles = profiles.sortedWith(
                 compareByDescending<LearningAccount> { lastUsed[it.key] ?: 0 }.thenBy { it.displayName.lowercase() }), loading = false)
             profilesPrepared = true
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: Exception) { fatal = true; request = null; detail = "Could not load saved profiles. Check local storage and restart." }
+    }
+
+    /**
+     * The extension can read the signed-in account from normal course/dashboard pages.
+     * Assessment pages omit it, so retain the first valid value for this run and never
+     * replace a choice the user has already confirmed.
+     */
+    fun observeProfileName(rawName: String?) {
+        if (request == null || detectedProfileName != null) return
+        val name = rawName?.trim()?.takeIf { it.isNotBlank() && it.length <= 120 }
+            ?.takeUnless { it.equals("profile", true) || it.equals("account", true) || it.equals("menu", true) }
+            ?: return
+        detectedProfileName = name
+        request = request?.copy(detectedProfileName = name)
+        detail = "Detected signed-in Sagar Mein Yog profile $name. Confirm it to continue."
     }
     suspend fun confirm(requestToken: String, localName: String, now: Long = 0): Boolean {
         val current = request?.takeIf { it.token == requestToken && !it.loading } ?: return false

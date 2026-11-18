@@ -922,6 +922,10 @@ class PageController(
         } else courseChunks.accept(event)?.let { snapshot ->
             lastCourseSnapshot = snapshot
             lastCourseInventoryAt = now()
+            // Normal SMY pages show the signed-in account, while assessment pages do not.
+            // Capture it before the profile dialog is prepared so the user can confirm the
+            // actual Chrome account instead of creating it by hand.
+            courseProgress?.observeProfileName(snapshot.profileName)
             observeProgress("course:${snapshot.document}", snapshot.progressMarker())
             val summary = "Course page ${snapshot.path} top=${snapshot.top} · " + snapshot.elements
                 .filter { it.visible && (it.tag in setOf("h1", "h2", "h3", "h4") || it.expanded != null) }

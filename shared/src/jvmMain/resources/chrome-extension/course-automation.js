@@ -257,7 +257,13 @@
     if (node?.isConnected && visible(node) && !node.matches(':disabled') && !node.closest('[inert],[aria-disabled="true"]')) {
       if (action.kind === 'play' && node.tagName === 'VIDEO') {
         node.scrollIntoView({ block: 'center' });
-        try { await node.play(); success = true; } catch {}
+        try {
+          await node.play();
+          // A fulfilled play() promise is not enough on every embedded player: some pause
+          // again immediately. Report success only when a later snapshot can see playback.
+          await new Promise(resolve => setTimeout(resolve, 150));
+          success = !node.paused;
+        } catch {}
       } else if ((action.kind === 'click' && !/quiz|assessment|exam|submit|delete|purchase/i.test(label(node))) || progressActionAllowed(action, node) || assessmentActionAllowed(action, node)) {
         node.scrollIntoView({ block: 'center' });
         // A radio click does not navigate away. Verify that the site actually selected the

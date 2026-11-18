@@ -6,6 +6,20 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class CourseProgressTest {
+    @Test fun `page account name is proposed and saved profiles remain newest first`() = runTest {
+        val store = Store().apply { profiles = listOf(
+            LearningAccount("sagarmeinyog:older", "Older", 10),
+            LearningAccount("sagarmeinyog:recent", "Recent", 20),
+        ) }
+        val tracking = CourseProgressSession(store, "run", 0)
+        tracking.observeProfileName("Jagdeep Naik")
+        tracking.prepareProfiles()
+        assertEquals("Jagdeep Naik", tracking.request!!.detectedProfileName)
+        assertEquals(listOf("Recent", "Older"), tracking.request!!.profiles.map { it.displayName })
+        assertTrue(tracking.confirm(tracking.request!!.token, "Jagdeep Naik", 30))
+        assertEquals("Jagdeep Naik", tracking.summary!!.displayName)
+    }
+
     @Test fun `profile picker is ready without any page snapshot and most recently used sorts first`() = runTest {
         val store = Store().apply { profiles = listOf(
             LearningAccount("sagarmeinyog:older", "Older", 900), LearningAccount("sagarmeinyog:recent", "Recent", 100),

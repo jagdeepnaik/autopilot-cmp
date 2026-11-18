@@ -787,12 +787,19 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 }
                 // Use the player's own start control first: it may initialize its media source.
                 // Calling HTMLVideoElement.play() alone can fail before that initialization.
-                val playButton = elements.firstOrNull {
-                    it.tag == "button" && it.label.trim().lowercase() in setOf("play", "play video") &&
-                        "$pageId:${snapshot.document}:${it.id}:click" !in attempted
+                val playButton = elements.firstOrNull { control ->
+                    val label = control.label.trim().lowercase()
+                    val resume = label in setOf("resume", "resume video")
+                    control.tag in setOf("button", "a", "div", "span") &&
+                        (label in setOf("play", "play video") || resume) &&
+                        (resume || "$pageId:${snapshot.document}:${control.id}:click" !in attempted)
                 }
                 if (playButton != null) {
-                    issue(playButton, message = "Starting the video with its player control.")
+                    // Players may pause more than once. An explicit Resume control is safe to
+                    // repeat; a generic Play control gets one initialization attempt then the
+                    // media fallback below takes over.
+                    val resume = playButton.label.trim().lowercase() in setOf("resume", "resume video")
+                    issue(playButton, message = "Resuming the paused video with its player control.", repeat = resume)
                     return
                 }
                 // Playback is repeatable: an unfinished lesson can pause again after it starts.

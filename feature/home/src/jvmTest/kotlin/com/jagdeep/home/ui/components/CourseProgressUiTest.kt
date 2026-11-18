@@ -12,18 +12,30 @@ class CourseProgressUiTest {
         var confirmed: String? = null
         val profiles=listOf(LearningAccount("sagarmeinyog:recent","Recent user",10),LearningAccount("sagarmeinyog:older","Older user",20))
         setContent { AppTheme { CourseProgressPanel(ProgressProfileRequest("token",profiles=profiles),null) { token, name -> assertEquals("token",token); confirmed=name } } }
-        onNodeWithText("Choose progress profile").assertIsDisplayed()
-        onNodeWithText("recent · Most recent").assertExists()
+        onNodeWithText("Confirm progress profile").assertIsDisplayed()
+        onNodeWithText("Saved profile: Recent user").assertExists()
         runOnIdle { assertNull(confirmed) }
         onNodeWithText("Use this profile").performClick()
         runOnIdle { assertEquals("sagarmeinyog:recent",confirmed) }
+        onNodeWithText("Saved profile: Recent user").performClick()
         onNodeWithText("Older user").performClick()
         onNodeWithText("Use this profile").performClick()
         runOnIdle { assertEquals("sagarmeinyog:older",confirmed) }
-        onNodeWithText("Create new profile").performClick()
+        onNodeWithText("Enter a new profile").performClick()
         onNodeWithText("Use this profile").assertIsNotEnabled()
         onNodeWithText("Profile name").performTextInput("Separate person")
         onNodeWithText("Use this profile").performClick()
         runOnIdle { assertEquals("Separate person",confirmed) }
+    }
+
+    @Test fun `detected signed in account is offered before manual entry`() = runDesktopComposeUiTest {
+        var confirmed: String? = null
+        setContent { AppTheme {
+            CourseProgressPanel(ProgressProfileRequest("token", detectedProfileName = "Jagdeep Naik"), null) { _, name -> confirmed = name }
+        } }
+        onNodeWithText("Signed-in SMY account detected").assertIsDisplayed()
+        onNodeWithText("Jagdeep Naik").assertIsDisplayed()
+        onNodeWithText("Use this profile").performClick()
+        runOnIdle { assertEquals("Jagdeep Naik", confirmed) }
     }
 }
