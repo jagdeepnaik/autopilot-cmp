@@ -258,6 +258,21 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var focusedModule: String? = null
     private var focusedAction: CourseModuleAction? = null
 
+    // SMY has a fixed ten-module catalogue. Never turn the dashboard's transient set of
+    // visible cards into a claim that all videos are done: its last card can load late.
+    private val isSmyRoutine get() = answerBankFile == com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE
+    private val smyModuleKeys = SAGAR_MEIN_YOG_MODULES.map(CourseAnswerBank::normalize).toSet()
+    private val isSmyCatalogueActive get() = isSmyRoutine && (
+        savedVideoTitles.any { it in smyModuleKeys } ||
+            moduleTitles.values.any { CourseAnswerBank.normalize(it) in smyModuleKeys } ||
+            currentModule?.let(CourseAnswerBank::normalize) in smyModuleKeys
+        )
+    private fun completedSmyVideoKeys(): Set<String> = savedVideoTitles +
+        videoFinishedCourses.mapNotNull(moduleTitles::get).map(CourseAnswerBank::normalize)
+    private fun missingSmyVideoModules(): List<String> = SAGAR_MEIN_YOG_MODULES.filter {
+        CourseAnswerBank.normalize(it) !in completedSmyVideoKeys()
+    }
+
     fun runModule(module: String, moduleAction: CourseModuleAction) {
         focusedModule = CourseAnswerBank.normalize(module)
         focusedAction = moduleAction
@@ -1029,10 +1044,18 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                 issue(nextPage, message = "This dashboard page is finished. Opening the next page of modules.")
                 blockedPath = pageId
             } else {
+                val missingSmyModules = if (isSmyCatalogueActive) missingSmyVideoModules() else emptyList()
+                if (missingSmyModules.isNotEmpty()) {
+                    // Do not stop at nine modules just because the site has not yet rendered its
+                    // final course card. A later snapshot can still expose it and resume normally.
+                    detail = "Waiting for the remaining SMY video module${if (missingSmyModules.size == 1) "" else "s"}: ${missingSmyModules.joinToString()}."
+                    return
+                }
                 if (learningOrder == LearningOrder.VideosFirst && answerAssessments && !assessmentPass && videoFinishedCourses.any { it !in passedAssessments }) {
                     waitingForAssessmentPass = true
                     approval = CourseApprovalRequest("$session:assessment-pass", CourseApprovalKind.StartAssessmentPass, "Unfinished module assessments")
-                    detail = "All available videos finished. Confirm in the app before beginning unfinished assessments."
+                    detail = if (isSmyCatalogueActive) "All 10 SMY module videos finished. Confirm in the app before beginning unfinished assessments."
+                        else "All available videos finished. Confirm in the app before beginning unfinished assessments."
                     return
                 }
                 completed = true
@@ -1057,6 +1080,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             Regex("course\\s+id", RegexOption.IGNORE_CASE).findAll(text).count() <= 1
         if (hasCardMetadata) return true
         val title = element.courseTitle?.trim().orEmpty()
+        // The final SMY card can be rendered as a bare course link before the surrounding card
+        // metadata arrives. Its known title and real course URL are sufficient to open it.
+        if (isSmyRoutine && CourseAnswerBank.normalize(title) in smyModuleKeys &&
+            element.tag in setOf("a", "button") && element.href?.let { Regex("/dashboard/courses/[A-Za-z0-9_-]+").matches(it) } == true) return true
         return title.isNotEmpty() && element.tag in setOf("a", "button") &&
             (text.contains("course id", true) || text.contains("duration", true) ||
                 text.contains(title, true) || element.svg)

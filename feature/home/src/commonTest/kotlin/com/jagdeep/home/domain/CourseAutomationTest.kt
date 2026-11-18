@@ -14,6 +14,41 @@ class CourseAutomationTest {
         CourseSnapshot("session", document, path, elements = elements.toList())
     private fun CourseAutomationSession.ack(success: Boolean = true) = acknowledge(action!!.request, success)
 
+    @Test fun `SMY opens a late tenth module instead of declaring the first nine complete`() {
+        val runner = CourseAutomationSession("session", learningOrder = LearningOrder.VideosFirst)
+        val firstNine = SAGAR_MEIN_YOG_MODULES.take(9).mapIndexed { index, module ->
+            val path = "/dashboard/courses/module-$index"
+            com.jagdeep.persistence.room.learning.LearningRecord("user", "videos:$index", module, "module-videos", "Videos", "completed", details = path, observedAt = 0)
+        }
+        runner.configureProgress(CourseProgressSummary("user", "User", 0, firstNine))
+        val tenth = CourseElement("tenth", tag = "a", href = "/dashboard/courses/module-10", courseTitle = "Spiritual Wellness", context = "Open course")
+
+        runner.read(snapshot("/dashboard", tenth), 0)
+
+        assertEquals("tenth", runner.action?.element)
+        assertFalse(runner.completed)
+    }
+
+    @Test fun `SMY does not begin assessments or complete when a tenth module is still missing`() {
+        val runner = CourseAutomationSession("session", learningOrder = LearningOrder.VideosFirst, answerAssessments = true)
+        val firstNine = SAGAR_MEIN_YOG_MODULES.take(9).mapIndexed { index, module ->
+            val path = "/dashboard/courses/module-$index"
+            com.jagdeep.persistence.room.learning.LearningRecord("user", "videos:$index", module, "module-videos", "Videos", "completed", details = path, observedAt = 0)
+        }
+        runner.configureProgress(CourseProgressSummary("user", "User", 0, firstNine))
+        val cards = firstNine.mapIndexed { index, record ->
+            CourseElement("module-$index", tag = "a", href = record.details, courseTitle = record.course,
+                context = "${record.course} Completed Min. Pass 75% Duration 20min")
+        }
+
+        runner.read(snapshot("/dashboard", *cards.toTypedArray()), 0)
+        runner.read(snapshot("/dashboard", *cards.toTypedArray()), 2_000)
+
+        assertFalse(runner.completed)
+        assertNull(runner.approval)
+        assertTrue(runner.detail.contains("Spiritual Wellness"))
+    }
+
     @Test fun `verification is deferred while a video or assessment is open`() {
         val runner=CourseAutomationSession("session")
         assertTrue(runner.canVerifyProgress(snapshot(course)))
