@@ -181,8 +181,12 @@
   }
   function profileName() {
     if (window !== window.top || location.origin !== 'https://sagarmeinyog.com') return null;
-    const names = [...document.querySelectorAll('button[aria-haspopup="menu"] > span')]
-      .filter(visible).map(n => safeText(n, 200)).filter(Boolean);
+    // The site has used both a direct span and nested content inside its account-menu button.
+    // Read the complete visible button so an already-open course page identifies the user without
+    // asking for a reload or manual profile entry.
+    const ignored = /^(?:profile|account|menu|courses?|notifications?)$/i;
+    const names = [...document.querySelectorAll('button[aria-haspopup="menu"],[role="button"][aria-haspopup="menu"]')]
+      .filter(visible).map(n => safeText(n, 200)).filter(name => name && !ignored.test(name));
     return names.length === 1 ? names[0] : null;
   }
   function courseTitle(element) {

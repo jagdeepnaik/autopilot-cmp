@@ -1036,7 +1036,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             openedCard = next.context
             currentModule = next.courseTitle?.takeIf { it.isNotBlank() }
             next.href?.let { href -> currentModule?.let { moduleTitles[href] = it } }
-            issue(next, message = "Opening the next unfinished course."); blockedPath = pageId
+            // A course card can take a while to mount its SPA navigation handler, especially on
+            // Linux. Repeating this safe, non-destructive dashboard click is preferable to
+            // permanently asking the user to reload a page that is already open and readable.
+            issue(next, message = "Opening the next unfinished course.", repeat = true)
         }
         else if (allCards.isNotEmpty() && cards.isEmpty() && settled(snapshot, now)) {
             val nextPage = elements.firstOrNull { it.label.trim().equals("Next", true) && it.tag in setOf("button", "a") }

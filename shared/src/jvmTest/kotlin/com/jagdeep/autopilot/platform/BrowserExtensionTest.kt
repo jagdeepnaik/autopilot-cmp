@@ -59,6 +59,13 @@ class BrowserExtensionTest {
     }
 
     @Test
+    fun `SMY helper finds the account menu on an already open course page`() {
+        val course = bundled("course-automation.js")
+        assertTrue("button[aria-haspopup=\"menu\"]" in course)
+        assertTrue("[role=\"button\"][aria-haspopup=\"menu\"]" in course)
+    }
+
+    @Test
     fun `OLP helper targets the clickable chapter row rather than its heading`() {
         val ocean = bundled("oceantg.js")
         assertTrue("[data-test=\"ChapletRow\"]" in ocean)
