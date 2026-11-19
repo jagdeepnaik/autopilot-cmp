@@ -192,12 +192,23 @@
   }
   function profileName() {
     if (window !== window.top || location.origin !== 'https://sagarmeinyog.com') return null;
-    // The site has used both a direct span and nested content inside its account-menu button.
-    // Read the complete visible button so an already-open course page identifies the user without
-    // asking for a reload or manual profile entry.
+    // Read text nodes only, excluding icon glyphs and accessible icon artwork. The account button
+    // can render its user icon as a text ligature alongside the actual signed-in name.
     const ignored = /^(?:profile|account|menu|courses?|notifications?)$/i;
+    const iconText = new Set(['person', 'person_outline', 'account_circle', 'account_box', 'manage_accounts', 'face', 'user', 'avatar']);
+    const iconSelector = 'svg,[aria-hidden="true"],[role="img"],i,[data-icon],[class*="material-icons" i],[class*="material-symbols" i],[class*="lucide" i]';
+    const nameText = (element) => {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      const parts = [];
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node.parentElement?.closest(`input,textarea,select,script,style,${iconSelector}`)) continue;
+        parts.push(node.textContent || '');
+      }
+      return clean(parts.join(' ').split(/\s+/).filter(part => !iconText.has(part.toLowerCase())).join(' '), 200);
+    };
     const names = [...document.querySelectorAll('button[aria-haspopup="menu"],[role="button"][aria-haspopup="menu"]')]
-      .filter(visible).map(n => safeText(n, 200)).filter(name => name && !ignored.test(name));
+      .filter(visible).map(nameText).filter(name => name && !ignored.test(name));
     return names.length === 1 ? names[0] : null;
   }
   function courseTitle(element) {
