@@ -75,6 +75,12 @@ test('acknowledgement must match the active session, request and registered docu
   assert.equal(JSON.parse(reports[0]).request, 3);
 });
 
+test('browser-level video playback refuses requests without the current play action', async () => {
+  const { send, snapshot } = fixture();
+  await send({ type: 'courseInventory', snapshot });
+  assert.equal(await send({ type: 'courseBrowserPlay', session: 'run', document: 'doc', request: 1, element: 'video' }), null);
+});
+
 test('client-side navigation uses the live document path even when Chrome retains the original sender URL', async () => {
   const { send, sender, snapshot, reports } = fixture();
   const initialSender = { ...sender, documentId: 'same-document', url: 'https://sagarmeinyog.com/dashboard' };

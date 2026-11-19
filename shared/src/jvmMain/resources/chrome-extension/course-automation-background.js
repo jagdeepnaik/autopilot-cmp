@@ -42,12 +42,46 @@ async function courseReport(event) {
   if (!response.ok) throw new Error('Course report refused');
 }
 
+async function courseBrowserPlay(message, sender) {
+  const authorized = await courseAuthorization(sender);
+  const action = authorized?.action;
+  const frame = sender.frameId ?? 0;
+  // This is deliberately narrower than the DGS browser-click helper: it can only click the
+  // centre of the exact paused HTML video currently selected by the active course action.
+  if (!authorized || frame !== 0 || message.session !== authorized.session ||
+    !action || action.kind !== 'play' || action.request !== message.request ||
+    action.document !== message.document || action.element !== message.element ||
+    courseDocuments.get(frame) !== message.document || !chrome.debugger?.attach) return null;
+  const target = { tabId: sender.tab.id };
+  let attached = false;
+  try {
+    await chrome.debugger.attach(target, '1.3');
+    attached = true;
+    const fresh = await courseAuthorization(sender);
+    if (!fresh || fresh.session !== authorized.session || fresh.action?.request !== action.request) return null;
+    const point = await chrome.tabs.sendMessage(target.tabId, {
+      type: 'courseResolvePlay', session: authorized.session, document: action.document, element: action.element,
+    }, { frameId: 0 });
+    if (!point || ![point.x, point.y, point.width, point.height].every(Number.isFinite) ||
+      point.width <= 0 || point.height <= 0 || point.x < 0 || point.y < 0 || point.x >= point.width || point.y >= point.height) return null;
+    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y, button: 'none' });
+    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+    return { accepted: true };
+  } catch {
+    return null;
+  } finally {
+    if (attached) { try { await chrome.debugger.detach(target); } catch {} }
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (!['courseHello', 'courseInventory', 'courseAction'].includes(message.type)) return false;
+  if (!['courseHello', 'courseInventory', 'courseAction', 'courseBrowserPlay'].includes(message.type)) return false;
   (async () => {
     const authorized = await courseAuthorization(sender);
     if (!authorized) return null;
     const frame = sender.frameId ?? 0;
+    if (message.type === 'courseBrowserPlay') return courseBrowserPlay(message, sender);
     if (message.type === 'courseHello') return { session: authorized.session };
     if (message.session && message.session !== authorized.session) return null;
     if (message.type === 'courseAction') {

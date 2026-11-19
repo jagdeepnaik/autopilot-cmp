@@ -264,6 +264,21 @@
           await new Promise(resolve => setTimeout(resolve, 150));
           success = !node.paused;
         } catch {}
+        // Linux Chrome can reject script-initiated video playback after the AutoPilot window
+        // takes focus. Ask the worker for a tightly validated browser-level click only for this
+        // current video/action; it creates the user activation that the player requires.
+        if (!success && window === window.top) {
+          try {
+            const fallback = await chrome.runtime.sendMessage({
+              type: 'courseBrowserPlay', session, document: documentId,
+              request: action.request, element: action.element,
+            });
+            if (fallback?.accepted) {
+              await new Promise(resolve => setTimeout(resolve, 250));
+              success = !node.paused;
+            }
+          } catch {}
+        }
       } else if ((action.kind === 'click' && !/quiz|assessment|exam|submit|delete|purchase/i.test(label(node))) || progressActionAllowed(action, node) || assessmentActionAllowed(action, node)) {
         node.scrollIntoView({ block: 'center' });
         // A radio click does not navigate away. Verify that the site actually selected the
@@ -338,6 +353,19 @@
     if (action.kind === 'assessmentReturn') return node.matches('a,button') && !/submit|retry|retake|quiz|exam/i.test(actual);
     return false;
   }
+  chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+    if (message?.type !== 'courseResolvePlay') return false;
+    const node = elements.get(message.element);
+    if (message.session !== session || message.document !== documentId || !node?.isConnected ||
+      node.tagName !== 'VIDEO' || !visible(node) || node.paused !== true) {
+      respond(null);
+      return false;
+    }
+    const rect = node.getBoundingClientRect();
+    if (rect.width < 16 || rect.height < 16) { respond(null); return false; }
+    respond({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: innerWidth, height: innerHeight });
+    return false;
+  });
   async function tick() {
     try {
       const authorization = await chrome.runtime.sendMessage({ type: 'courseHello' });
