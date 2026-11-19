@@ -4,6 +4,8 @@ let courseSession = null;
 let courseSnapshotSequence = 0;
 const courseDocuments = new Map();
 let courseTop = null;
+let handledSmyPageRequest = 0;
+let smyDiscoveryTimer = null;
 
 async function courseAuthorization(sender) {
   const current = command?.enabled ? command.courseAutomation : null;
@@ -40,6 +42,49 @@ async function courseAuthorization(sender) {
 async function courseReport(event) {
   const response = await fetch(`${BASE}/event`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(event) });
   if (!response.ok) throw new Error('Course report refused');
+}
+
+function stopSmyDiscovery() {
+  if (smyDiscoveryTimer !== null) clearInterval(smyDiscoveryTimer);
+  smyDiscoveryTimer = null;
+}
+
+async function discoverSmyPage(request) {
+  const current = command?.enabled ? command.courseAutomation : null;
+  if (!current || current.findSmyPageRequest !== request) {
+    stopSmyDiscovery();
+    return false;
+  }
+  try {
+    const tabs = await chrome.tabs.query({ url: 'https://sagarmeinyog.com/dashboard/*' });
+    const tab = tabs.find(candidate => candidate.active) || tabs[0];
+    if (!tab || tab.id === undefined || tab.windowId === undefined) return false;
+    await chrome.tabs.update(tab.id, { active: true });
+    await chrome.windows.update(tab.windowId, { focused: true });
+    if (command?.courseAutomation?.session !== current.session) return false;
+    courseSession = current.session;
+    courseTab = tab.id;
+    courseTop = null;
+    courseDocuments.clear();
+    stopSmyDiscovery();
+    await courseReport({ type: 'smyPageFound', session: current.session, success: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function applySmyPageRequest(next) {
+  const course = next?.enabled ? next.courseAutomation : null;
+  if (!course) { stopSmyDiscovery(); return; }
+  const request = Number(course.findSmyPageRequest ?? 0);
+  if (request <= handledSmyPageRequest) return;
+  handledSmyPageRequest = request;
+  stopSmyDiscovery();
+  discoverSmyPage(request).then(found => {
+    if (found || !command?.enabled || command.courseAutomation?.findSmyPageRequest !== request) return;
+    smyDiscoveryTimer = setInterval(() => { discoverSmyPage(request); }, 1500);
+  });
 }
 
 async function courseBrowserPlay(message, sender) {

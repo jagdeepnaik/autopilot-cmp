@@ -5,13 +5,14 @@ import kotlinx.coroutines.flow.first
 
 /** Serial snapshot consumer. A complete, validated import must be durable before navigation resumes. */
 internal class CourseProgressSession(private val repository: CourseProgressRepository, private val token: String, private val wait: Long) {
-    val blocksActions get() = fatal || request != null
-    val isChecking get() = request != null || fatal
-    var request: ProgressProfileRequest? = ProgressProfileRequest("$token:profile", loading = true); private set
+    val blocksActions get() = fatal || profile == null || request != null
+    val isChecking get() = profile == null || request != null || fatal
+    val needsProfileSelection get() = profile == null && !fatal && request == null
+    var request: ProgressProfileRequest? = null; private set
     var summary: CourseProgressSummary? = null; private set
     var hasLocalChanges = false; private set
     var action: CourseAction? = null; private set
-    var detail = "Choose a saved progress profile or create one to continue."; private set
+    var detail = "Looking for an open Sagar Mein Yog page in Chrome."; private set
     private var profile: LearningAccount? = null
     private var phase = "check"
     private var sequence = 1_000_000_000L
@@ -37,8 +38,12 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
             val profiles = repository.accounts().first().filter { it.key.startsWith("sagarmeinyog:") }
             val lastUsed = profiles.associate { account -> account.key to
                 (repository.records(account.key).firstOrNull { it.key == "profile-last-used" }?.observedAt ?: account.checkedAt) }
-            request = request?.copy(detectedProfileName = detectedProfileName, profiles = profiles.sortedWith(
-                compareByDescending<LearningAccount> { lastUsed[it.key] ?: 0 }.thenBy { it.displayName.lowercase() }), loading = false)
+            request = ProgressProfileRequest(
+                token = "$token:profile",
+                detectedProfileName = detectedProfileName,
+                profiles = profiles.sortedWith(compareByDescending<LearningAccount> { lastUsed[it.key] ?: 0 }.thenBy { it.displayName.lowercase() }),
+                loading = false,
+            )
             profilesPrepared = true
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: Exception) { fatal = true; request = null; detail = "Could not load saved profiles. Check local storage and restart." }
@@ -50,7 +55,7 @@ internal class CourseProgressSession(private val repository: CourseProgressRepos
      * replace a choice the user has already confirmed.
      */
     fun observeProfileName(rawName: String?) {
-        if (request == null || detectedProfileName != null) return
+        if (profile != null || detectedProfileName != null) return
         val name = rawName?.trim()?.takeIf { it.isNotBlank() && it.length <= 120 }
             ?.takeUnless { it.equals("profile", true) || it.equals("account", true) || it.equals("menu", true) }
             ?: return

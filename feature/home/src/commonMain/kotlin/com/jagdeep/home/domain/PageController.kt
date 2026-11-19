@@ -474,13 +474,14 @@ class PageController(
                 quizNewQuestions = 0
                 quizUpdatedQuestions = 0
                 quizSavedAnswers = 0
+                lastCourseSnapshot = null
                 courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode, routine.learningOrder, bankFile, routine.answerQuizzes, routine.autoDownloadCertificates)
                 courseProgress = if (progressRepository.available) CourseProgressSession(progressRepository, courseAutomation!!.session, routine.waitAfterClickMillis) else null
                 courseChunks.clear()
                 launchActivity(
                     PageActivity.Automation(
                         routine.copy(answerBankFile = bankFile),
-                        courseProgress?.detail ?: courseAutomation!!.detail,
+                        courseProgress?.detail ?: "Looking for an open Sagar Mein Yog page in Chrome.",
                         progressProfile = courseProgress?.request,
                         // Show the complete course catalogue immediately. The live
                         // snapshot then replaces these rows with saved statuses.
@@ -635,18 +636,8 @@ class PageController(
         val runner = courseAutomation
         var outcome = RunOutcome.StoppedByUser
         try {
-            courseProgress?.let { tracking ->
-                courseProgressMutex.withLock {
-                    tracking.prepareProfiles()
-                    mutableState.update { state ->
-                        val activity = state.activity as? PageActivity.Automation ?: return@update state
-                        state.copy(activity = activity.copy(progressProfile = tracking.request, detail = tracking.detail))
-                    }
-                    publish()
-                }
-            }
-            // Bring Chrome forward before waiting for its first inventory. This lets the
-            // extension identify the already-open SMY page and signed-in profile immediately.
+            // Wait for the extension to find and activate an existing SMY tab before showing
+            // the profile prompt or allowing course actions.
             automation.apps.bringToFront(BROWSER_APP_NAME)
             if (routine.answerAssessments || routine.answerQuizzes) {
                 val bank = try { activeAnswerBankStore.load() }
@@ -667,8 +658,10 @@ class PageController(
                     mutableState.update { state ->
                         val activity = state.activity as? PageActivity.Automation ?: return@update state
                         val progressStep = courseProgress?.takeIf { it.isChecking }?.detail
-                        val detail = if (progressStep != null) "Waiting for page updates. Keep the course tab active in Chrome. Last progress step: $progressStep"
-                            else "Waiting for page updates. Keep the course tab active in Chrome."
+                        val detail = if (lastCourseSnapshot == null || courseProgress?.needsProfileSelection == true) {
+                            "Looking for an open Sagar Mein Yog page in Chrome. Open the site there if it is not already open."
+                        } else if (progressStep != null) "Waiting for page updates. Keep the course tab active in Chrome. Last progress step: $progressStep"
+                        else "Waiting for page updates. Keep the course tab active in Chrome."
                         state.copy(activity = activity.copy(detail = detail))
                     }
                 }
@@ -913,7 +906,10 @@ class PageController(
             focusBrowserRequest = focusBrowserRequest,
             course = false,
             dgs = dgsSession?.command,
-            courseAutomation = courseAutomation?.let { CourseCommand(it.session, if (courseProgress?.blocksActions == true) null else courseProgress?.action ?: it.action, it.playbackSpeed) },
+            courseAutomation = courseAutomation?.let {
+                CourseCommand(it.session, if (courseProgress?.blocksActions == true) null else courseProgress?.action ?: it.action,
+                    it.playbackSpeed, focusBrowserRequest)
+            },
             oceanTG = oceanTG?.let { OceanCommand(it.session, it.action) },
             marineSamraj = marineSamraj?.let { MarineSamrajCommand(it.session, it.action) },
         )
@@ -925,9 +921,19 @@ class PageController(
 
     private suspend fun handleCourseMessage(raw: String): Boolean {
         val event = runCatching { json.decodeFromString(CourseWireEvent.serializer(), raw) }.getOrNull() ?: return false
-        if (event.type != "courseChunk" && event.type != "courseAction") return false
+        if (event.type != "courseChunk" && event.type != "courseAction" && event.type != "smyPageFound") return false
         val runner = courseAutomation ?: return true
         if (event.session != runner.session) return true
+        if (event.type == "smyPageFound") {
+            if (event.success) {
+                val activity = state.value.activity as? PageActivity.Automation
+                if (activity != null) {
+                    mutableState.update { it.copy(activity = activity.copy(detail = "Found the Sagar Mein Yog page. Reading the signed-in profile…")) }
+                    publish()
+                }
+            }
+            return true
+        }
         courseProgressMutex.withLock {
         if (event.type == "courseAction") {
             live.log(LiveSource.Chrome) { "Course action ${event.request}: ${if (event.success) "accepted" else "refused"}" }
@@ -939,6 +945,14 @@ class PageController(
             // Capture it before the profile dialog is prepared so the user can confirm the
             // actual Chrome account instead of creating it by hand.
             courseProgress?.observeProfileName(snapshot.profileName)
+            courseProgress?.takeIf { snapshot.top && it.needsProfileSelection }?.let { tracking ->
+                tracking.prepareProfiles()
+                mutableState.update { state ->
+                    val activity = state.activity as? PageActivity.Automation ?: return@update state
+                    state.copy(activity = activity.copy(progressProfile = tracking.request, detail = tracking.detail))
+                }
+                publish()
+            }
             observeProgress("course:${snapshot.document}", snapshot.progressMarker())
             val summary = "Course page ${snapshot.path} top=${snapshot.top} · " + snapshot.elements
                 .filter { it.visible && (it.tag in setOf("h1", "h2", "h3", "h4") || it.expanded != null) }

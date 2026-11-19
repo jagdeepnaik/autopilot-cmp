@@ -39,6 +39,7 @@ async function pollApp() {
 
 function applyCommand(next) {
   command = next;
+  applySmyPageRequest(next);
   const focusRequest = Number(next?.focusBrowserRequest ?? 0);
   if (focusRequest > handledFocusRequest) {
     handledFocusRequest = focusRequest;

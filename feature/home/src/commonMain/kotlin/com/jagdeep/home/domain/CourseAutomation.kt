@@ -63,7 +63,12 @@ internal data class CourseSnapshot(
 internal data class CourseAction(val request: Long, val document: String, val element: String, val kind: String = "click", val expectedLabel: String? = null)
 
 @Serializable
-internal data class CourseCommand(val session: String, val action: CourseAction? = null, val playbackSpeed: Double = 1.0)
+internal data class CourseCommand(
+    val session: String,
+    val action: CourseAction? = null,
+    val playbackSpeed: Double = 1.0,
+    val findSmyPageRequest: Long = 0,
+)
 
 internal data class CourseCompletion(
     val key: String,
