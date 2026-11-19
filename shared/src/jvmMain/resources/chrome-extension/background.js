@@ -9,6 +9,7 @@ let polling = false;
 let lastPage = null; // what the app last heard about the page being scrolled
 let handledTextRequest = 0; // the last "click the button with this text" request carried out
 let textClickInFlight = false;
+let handledFocusRequest = 0;
 const frames = new Map(); // "tabId:frameId" -> scroll, video and requested-text state
 
 const sleep = (millis) => new Promise((resolve) => setTimeout(resolve, millis));
@@ -38,9 +39,34 @@ async function pollApp() {
 
 function applyCommand(next) {
   command = next;
+  const focusRequest = Number(next?.focusBrowserRequest ?? 0);
+  if (focusRequest > handledFocusRequest) {
+    handledFocusRequest = focusRequest;
+    focusChromeOnLinux();
+  }
   if (!next || !next.autoRun) lastPage = null;
   // A restarted app counts its requests from the start again.
   if (next && (next.clickRequest ?? 0) < handledTextRequest) handledTextRequest = 0;
+}
+
+// Linux window managers restrict cross-application focus requests. Ask Chrome itself to
+// activate its browser window, which works through the desktop's normal app integration.
+async function focusChromeOnLinux() {
+  try {
+    const platform = await chrome.runtime.getPlatformInfo();
+    if (platform.os !== "linux") return;
+    const target = await chrome.windows.getLastFocused();
+    if (target.id === undefined) {
+      report({ type: "browserFocus", success: false });
+      return;
+    }
+    await chrome.windows.update(target.id, { focused: true });
+    await sleep(150);
+    const focused = await chrome.windows.getLastFocused();
+    report({ type: "browserFocus", success: focused.focused === true });
+  } catch {
+    report({ type: "browserFocus", success: false });
+  }
 }
 
 async function activeTabId() {

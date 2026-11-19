@@ -136,6 +136,8 @@ internal data class HelperCommand(
     /** During a scroll and click run: the button text to click, once, for request [clickRequest]. */
     val clickText: String? = null,
     val clickRequest: Long = 0,
+    /** Monotonic request for the extension to focus Chrome when a routine starts. */
+    val focusBrowserRequest: Long = 0,
     /** Always false; retained until older installed extensions have been reloaded. */
     val course: Boolean = false,
     val courseAutomation: CourseCommand? = null,
@@ -155,6 +157,7 @@ internal data class HelperEvent(
     val signature: String? = null,
     val video: String? = null,
     val request: Long? = null,
+    val success: Boolean = false,
 )
 
 internal const val BROWSER_APP_NAME = "Google Chrome"
@@ -364,6 +367,7 @@ class PageController(
     private var job: Job? = null
     private var lastPublished: String? = null
     private var textRequest = 0L
+    private var focusBrowserRequest = 0L
     private var pendingText: String? = null
     private var courseAutomation: CourseAutomationSession? = null
     private var oceanTG: OceanTGSession? = null
@@ -554,6 +558,9 @@ class PageController(
 
     private fun launchActivity(activity: PageActivity, scrolling: Boolean, body: suspend () -> Unit) {
         // Set before launching, so a second press can never start a second routine.
+        // Include wall-clock time so an extension worker retained across app restarts still
+        // sees this as a fresh request; keep it monotonic if two runs start in one millisecond.
+        focusBrowserRequest = maxOf(now(), focusBrowserRequest + 1)
         mutableState.update { it.copy(activity = activity, isScrolling = scrolling) }
         publish()
         job = scope.launch { body() }.also { started ->
@@ -804,6 +811,9 @@ class PageController(
             }
             "found" -> mutableState.update { it.copy(foundLabel = event.label?.take(MAX_LABEL_LENGTH)) }
             "textClicked" -> if (event.request == textRequest) textClicks.done.value = textRequest
+            "browserFocus" -> live.log(LiveSource.Chrome) {
+                if (event.success) "Chrome window brought to the front" else "Chrome could not be brought to the front; select its window to continue"
+            }
             "page" -> {
                 observeProgress("scroll", "${event.signature}:${event.progress?.take(4000)}:${event.atBottom}:${event.video}")
                 pageReading.value = PageReading(event.focused, event.atBottom, event.signature?.take(MAX_SIGNATURE_LENGTH), pageVideo(event.video))
@@ -900,6 +910,7 @@ class PageController(
             watchVideos = (activity as? PageActivity.ScrollClick)?.routine?.watchVideos ?: false,
             clickText = pendingText.takeIf { activity is PageActivity.ScrollClick },
             clickRequest = textRequest,
+            focusBrowserRequest = focusBrowserRequest,
             course = false,
             dgs = dgsSession?.command,
             courseAutomation = courseAutomation?.let { CourseCommand(it.session, if (courseProgress?.blocksActions == true) null else courseProgress?.action ?: it.action, it.playbackSpeed) },
