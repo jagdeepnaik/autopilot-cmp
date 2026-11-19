@@ -484,7 +484,7 @@ class PageController(
                     ),
                     scrolling = false,
                 ) { performCourseAutomation(routine) }
-                if (courseProgress == null) automation.apps.bringToFront(BROWSER_APP_NAME)
+                automation.apps.bringToFront(BROWSER_APP_NAME)
                 null
             }
             is OceanTGRoutine -> {
@@ -638,13 +638,15 @@ class PageController(
                     publish()
                 }
             }
+            // Bring Chrome forward before waiting for its first inventory. This lets the
+            // extension identify the already-open SMY page and signed-in profile immediately.
+            automation.apps.bringToFront(BROWSER_APP_NAME)
             if (routine.answerAssessments || routine.answerQuizzes) {
                 val bank = try { activeAnswerBankStore.load() }
                 catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                 catch (_: Exception) { null }
                 runner?.configureAnswers(bank)
             }
-            if (courseProgress?.request == null) automation.apps.bringToFront(BROWSER_APP_NAME)
             while (true) {
                 if (!state.value.isConnected) { outcome = RunOutcome.BrowserDisconnected; break }
                 runner?.certificateDownload?.let { target ->

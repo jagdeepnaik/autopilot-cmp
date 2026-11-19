@@ -1,8 +1,6 @@
 package com.jagdeep.home.ui.components
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -21,37 +19,27 @@ internal fun CourseProgressPanel(request: ProgressProfileRequest?, summary: Cour
         }
         var name by remember(request.token, detected) { mutableStateOf(detected.orEmpty()) }
         var profilesOpen by remember(request.token) { mutableStateOf(false) }
-        AlertDialog(onDismissRequest = {}, title = { Text("Confirm progress profile") }, text = {
-            Column(Modifier.heightIn(max = 450.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (detected != null) {
-                    Text("Signed-in SMY account detected", style = MaterialTheme.typography.labelLarge)
-                    Text(detected, style = MaterialTheme.typography.titleMedium)
-                    Text("Use this account for this run, or select one of the previously saved profiles below.")
-                } else Text("The current SMY page did not expose an account name. Select a saved profile or enter one manually. Assessment pages do not show a username, so this choice is used throughout the run.")
-                if (request.loading) Text("Loading saved profiles…")
+        AlertDialog(onDismissRequest = {}, title = { Text("Choose profile") }, text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (request.loading) Text("Loading profiles…")
+                if (detected != null) Text("Found on page: $detected", style = MaterialTheme.typography.bodyMedium)
                 if (request.profiles.isNotEmpty()) {
                     Box {
                         OutlinedButton(enabled = !request.loading, onClick = { profilesOpen = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text(request.profiles.firstOrNull { it.key == selected }?.let { "Saved profile: ${it.displayName}" } ?: "Choose saved profile")
+                            Text(request.profiles.firstOrNull { it.key == selected }?.displayName ?: "Choose saved profile")
                         }
                         DropdownMenu(expanded = profilesOpen, onDismissRequest = { profilesOpen = false }) {
-                            request.profiles.forEachIndexed { index, profile ->
-                                DropdownMenuItem(
-                                    text = { Text(profile.displayName + if (index == 0) " · Most recent" else "") },
-                                    onClick = { selected = profile.key; profilesOpen = false },
-                                )
+                            request.profiles.forEach { profile ->
+                                DropdownMenuItem(text = { Text(profile.displayName) }, onClick = { selected = profile.key; profilesOpen = false })
                             }
                         }
                     }
                 }
-                if (detected != null) TextButton(enabled = !request.loading, onClick = { selected = null; name = detected }) { Text("Use detected account") }
-                if (detected == null) TextButton(enabled = !request.loading, onClick = { selected = null }) { Text("Enter a new profile") }
-                if (selected == null && !request.loading && detected == null) {
-                    OutlinedTextField(value = name, onValueChange = { if(it.length <= 120) name = it }, label = { Text("Profile name") }, singleLine = true)
+                if (detected == null || selected == null && request.profiles.isNotEmpty()) {
+                    OutlinedTextField(value = name, onValueChange = { if(it.length <= 120) name = it }, label = { Text("Or enter profile name") }, singleLine = true)
                 }
-                Text("Saved profiles are ordered with the most recently used first. Use a distinct profile for each person. Never enter a password here.")
             }
-        }, confirmButton = { TextButton(enabled = !request.loading && (selected != null || name.isNotBlank()), onClick = { confirm(request.token, selected ?: name.trim()) }) { Text("Use this profile") } })
+        }, confirmButton = { TextButton(enabled = !request.loading && (selected != null || name.isNotBlank()), onClick = { confirm(request.token, selected ?: name.trim()) }) { Text("Continue") } })
     }
     summary?.let { Text("Progress saved for ${it.displayName}: ${it.records.count { row -> row.kind == "assessment" && row.status == "passed" }} passed assessment attempts.", style = MaterialTheme.typography.bodySmall) }
 }
