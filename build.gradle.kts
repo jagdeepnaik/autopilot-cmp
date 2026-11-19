@@ -43,9 +43,9 @@ val buildNumber: Int = run {
     commits
 }
 val gitCommit: String = providers.exec {
-    commandLine("git", "rev-parse", "--short=12", "HEAD")
+    commandLine("git", "rev-parse", "--short=7", "HEAD")
     isIgnoreExitValue = true
-}.standardOutput.asText.get().trim().takeIf { it.matches(Regex("[0-9a-fA-F]{7,12}")) }
+}.standardOutput.asText.get().trim().takeIf { it.matches(Regex("[0-9a-fA-F]{7}")) }
     ?: error("The desktop version needs the Git commit: run the build inside a full Git checkout.")
 val desktopVersion = "$releaseVersion ($buildNumber · $gitCommit)"
 val desktopBuildIdentity = "$releaseVersion+build.$buildNumber.g$gitCommit"

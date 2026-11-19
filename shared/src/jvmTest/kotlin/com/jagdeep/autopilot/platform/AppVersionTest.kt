@@ -11,7 +11,7 @@ class AppVersionTest {
         // The jvmTest task receives the same compact display version the launchers get.
         val passed = assertNotNull(System.getProperty(APP_VERSION_PROPERTY), "The build didn't pass $APP_VERSION_PROPERTY")
         assertTrue(
-            Regex("""\d+\.\d+\.\d+ \(\d+ · [0-9a-fA-F]{7,12}\)""").matches(passed),
+            Regex("""\d+\.\d+\.\d+ \(\d+ · [0-9a-fA-F]{7}\)""").matches(passed),
             "Unexpected version $passed",
         )
         assertEquals(passed, appVersionName)
@@ -24,7 +24,7 @@ class AppVersionTest {
             "The build didn't pass $APP_BUILD_IDENTITY_PROPERTY",
         )
         assertTrue(
-            Regex("""\d+\.\d+\.\d+\+build\.\d+\.g[0-9a-fA-F]{7,12}""").matches(identity),
+            Regex("""\d+\.\d+\.\d+\+build\.\d+\.g[0-9a-fA-F]{7}""").matches(identity),
             "Unexpected technical build identity $identity",
         )
     }
