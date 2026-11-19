@@ -42,11 +42,14 @@ test('inventory needs no tabs URL permission, stays local and never exceeds the 
   assert.equal(restored.elements[0].context, snapshot.elements[0].context);
 });
 
-test('stopped, background, other-tab and other-site messages cannot report or receive actions', async () => {
+test('stopped, other-tab and other-site messages cannot report or receive actions', async () => {
   const { context, reports, send, sender, snapshot } = fixture();
   await send({ type: 'courseHello' });
+  // The local app can be OS-focused while Chrome remains the last-focused browser window.
+  // That must not block commands to Chrome's active, already-authorized course tab.
   context.focused = false;
-  assert.equal(await send({ type: 'courseInventory', snapshot }), null);
+  assert.equal((await send({ type: 'courseInventory', snapshot })).session, 'run');
+  reports.length = 0;
   context.focused = true;
   context.active = 2;
   assert.equal(await send({ type: 'courseHello' }, { ...sender, tab: { id: 2 } }), null);

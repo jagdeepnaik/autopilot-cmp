@@ -28,8 +28,11 @@ async function courseAuthorization(sender) {
     courseTop = { tab: tab.id, document, path, at: Date.now() };
   }
   if (!courseTop || courseTop.tab !== tab.id || Date.now() - courseTop.at > 3500) return null;
-  const window = await chrome.windows.getLastFocused();
-  if (!window.focused || (courseTab !== null && courseTab !== tab.id)) return null;
+  // `activeTabId()` already limits the command to the active tab in Chrome's last-focused
+  // window. Do not require Chrome itself to be the OS-focused app: on Linux the AutoPilot
+  // window becomes focused while it is showing live status, which otherwise prevents that
+  // already-authorized course tab from receiving its next navigation command.
+  if (courseTab !== null && courseTab !== tab.id) return null;
   courseTab = tab.id;
   return { ...current, path: courseTop.path };
 }
