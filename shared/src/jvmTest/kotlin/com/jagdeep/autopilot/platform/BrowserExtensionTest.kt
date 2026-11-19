@@ -66,6 +66,14 @@ class BrowserExtensionTest {
     }
 
     @Test
+    fun `SMY helper reads practice quiz feedback outside answer buttons`() {
+        val course = bundled("course-automation.js")
+        assertTrue("const feedbackText = safeText(root, 12000)" in course)
+        assertTrue("Correct Answer" in course)
+        assertTrue("practiceCorrectAnswer: correctAnswer || null" in course)
+    }
+
+    @Test
     fun `OLP helper targets the clickable chapter row rather than its heading`() {
         val ocean = bundled("oceantg.js")
         assertTrue("[data-test=\"ChapletRow\"]" in ocean)

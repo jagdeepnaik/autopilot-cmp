@@ -973,7 +973,8 @@ class PageController(
                                 if (result is AnswerBankSaveResult.Saved) {
                                     runner.configureAnswers(result.bank)
                                     quizLearningProblem = null
-                                    quizLearningStatus = "Learned and saved quiz answer for $module: ${question.text.take(120)}"
+                                    val outcome = if (existing == null) "learned a new" else "corrected the saved"
+                                    quizLearningStatus = "Quiz feedback: $outcome answer for $module — ${question.text.take(120)}"
                                     quizLearningStatusUntil = now() + 5_000
                                     if (existing == null) quizNewQuestions++ else quizUpdatedQuestions++
                                     quizSavedAnswers++

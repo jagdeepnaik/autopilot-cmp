@@ -69,16 +69,27 @@
         (question.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) &&
         (actionEnd.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_PRECEDING) &&
         !/^(?:previous|next|submit)$/i.test(label(node))).slice(0, 8) : [];
-      const feedback = options.some(node => /Your Answer\s+(?:Correct|Incorrect)/i.test(safeText(node)));
+      // The site has two feedback layouts: markers embedded in an option, and a separate
+      // feedback panel below the options. Read both, then return the actual option text so the
+      // app can correct the routine bank after a wrong practice-quiz answer.
+      const feedbackText = safeText(root, 12000);
+      const feedback = options.some(node => /Your Answer\s+(?:Correct|Incorrect)/i.test(safeText(node))) ||
+        /Your Answer\s+(?:Correct|Incorrect)/i.test(feedbackText);
       const correct = options.find(node => /\bCorrect Answer\b/i.test(safeText(node))) ||
         options.find(node => /Your Answer\s+Correct\b/i.test(safeText(node)));
+      const correctPanelText = [...root.querySelectorAll('p,span,div')]
+        .filter(node => node.childElementCount === 0 && visible(node))
+        .map(node => safeText(node, 500))
+        .map(text => text.match(/\bCorrect Answer\s*:?\s*(.+)$/i)?.[1]?.trim() || null)
+        .find(Boolean);
+      const correctAnswer = correct ? label(correct).replace(/\s+(?:Your Answer\s+(?:Correct|Incorrect)|Correct Answer).*$/i, '') : correctPanelText;
       const module = [...document.querySelectorAll('a[href]')].find(node => /\/dashboard\/courses\/[A-Za-z0-9_-]+$/.test(node.getAttribute('href') || ''))?.textContent?.trim() || '';
       return { module, questions: text ? [{ id: text, text, options: options.map(node => ({
         id: identify(node), text: label(node).replace(/\s+(?:Your Answer\s+(?:Correct|Incorrect)|Correct Answer).*$/i, ''),
         selected: practiceChoices.get(text) === label(node).replace(/\s+(?:Your Answer\s+(?:Correct|Incorrect)|Correct Answer).*$/i, ''), enabled: !node.matches(':disabled'), visible: true })) }] : [],
         result: null,
         quiz: true, practice: true, practiceFeedback: feedback,
-        practiceCorrectAnswer: correct ? label(correct).replace(/\s+(?:Your Answer\s+(?:Correct|Incorrect)|Correct Answer).*$/i, '') : null,
+        practiceCorrectAnswer: correctAnswer || null,
         totalQuestions: count ? Number(count[2]) : null,
         submit: submit ? identify(submit) : null, next: next ? identify(next) : null };
     }
