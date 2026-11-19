@@ -419,15 +419,16 @@ The Mac target builds from your working folder and doesn't need a push. If you h
 
 ### 2. Semantic version, build number and commit
 
-The release version in `gradle/libs.versions.toml` follows Semantic Versioning (`MAJOR.MINOR.PATCH`), for example `1.1.0`. Desktop builds add immutable build identity:
+The release version in `gradle/libs.versions.toml` follows Semantic Versioning (`MAJOR.MINOR.PATCH`), for example `1.1.0`. Desktop builds show a compact version and retain an immutable technical identity:
 
 ```text
-1.1.0+build.104.g4614d49
+Visible:   1.1.0 (104 · 4614d49)
+Technical: 1.1.0+build.104.g4614d49
 ```
 
-The build number is `git rev-list --count HEAD`, and the `g…` value is the short Git commit SHA. Together they tell us both the build sequence and the exact source commit. The full value is passed to the app as `-Dautopilot.version`, so it appears in the About screen and status bar.
+The build number is `git rev-list --count HEAD`, and the commit is the short Git SHA. Together they identify the build sequence and exact source commit. The compact value is passed to the app as `-Dautopilot.version`, so it appears in the About screen and status bar. The technical SemVer build identity is passed separately as `-Dautopilot.buildIdentity` for diagnostics.
 
-Windows MSI, DMG and DEB package metadata must remain numeric. The packaging version is therefore derived separately as `<major>.<minor>.<build number>` (for example `1.1.104`) so Windows can detect and upgrade a newer MSI. The app still displays the full SemVer/build/commit value. Android and iOS keep the release `versionName` from the version catalog.
+Windows MSI, DMG and DEB package metadata must remain numeric. The packaging version is therefore derived separately as `<major>.<minor>.<build number>` (for example `1.1.104`) so Windows can detect and upgrade a newer MSI. The app displays the compact version. Android and iOS keep the release `versionName` from the version catalog.
 
 Building the same commit twice produces the same build identity. `Install-Msi.ps1 -SkipIfInstalled` then reports *already installed* and moves on instead of failing.
 

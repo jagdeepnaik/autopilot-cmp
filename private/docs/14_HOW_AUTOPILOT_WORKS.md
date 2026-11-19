@@ -644,7 +644,7 @@ One command builds, installs and tests on each machine; see [one-command builds]
 ./gradlew :desktopApp:run                # run from source
 ```
 
-- **Versions:** the desktop version is `<major>.<minor>.<commit count>`, computed in the root `build.gradle.kts`, so each commit's MSI updates the installed app in place. About and the status bar show the same number. The extension has its own version in `manifest.json`.
+- **Versions:** the visible desktop version is `<major>.<minor>.<patch> (<commit count> · <short commit>)`, computed in the root `build.gradle.kts`; for example `1.1.0 (131 · e8a8630)`. The technical SemVer identity is retained separately as `<release>+build.<count>.g<commit>`. Packages use `<major>.<minor>.<commit count>` so each commit updates an installed app in place. The extension has its own version in `manifest.json`.
 - **Packages:** `desktopApp` builds the DMG, MSI and DEB (`:desktopApp:packageRelease<Format>`). Legion, the home server and its VMs build only from Git.
 - **Windows and Smart App Control:** the build makes the MSI install and run with Smart App Control on. It ships the JDK's signed runtime files, starts the app through the signed `javaw.exe`, and removes jpackage's unsigned installer helper ([installer fixes](09_FIX_WINDOWS_INSTALLER.md)). The packages aren't code-signed, so SmartScreen and Gatekeeper may still warn.
 

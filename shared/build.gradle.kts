@@ -22,6 +22,7 @@ val generateAnswerBankIndex by tasks.registering {
 }
 
 val desktopVersion = rootProject.extra["desktopVersion"] as String
+val desktopBuildIdentity = rootProject.extra["desktopBuildIdentity"] as String
 
 kotlin {
     androidLibrary {
@@ -106,7 +107,8 @@ kotlin {
     }
 }
 
-// Tests see the same full SemVer/build/commit value the desktop launchers pass.
+// Tests see both the compact display version and complete SemVer build identity passed to launchers.
 tasks.withType<Test>().matching { it.name == "jvmTest" }.configureEach {
     systemProperty("autopilot.version", desktopVersion)
+    systemProperty("autopilot.buildIdentity", desktopBuildIdentity)
 }

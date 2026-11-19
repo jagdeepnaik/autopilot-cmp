@@ -19,11 +19,14 @@ plugins {
 }
 
 /**
- * The app uses Semantic Versioning plus immutable build identity:
- *   <release>+build.<count>.g<short commit>
+ * The app uses Semantic Versioning plus immutable build identity. The visible desktop version is
+ * compact, while the technical identity remains valid SemVer build metadata:
+ *   visible:   <release> (<count> · <short commit>)
+ *   technical: <release>+build.<count>.g<short commit>
  *
- * Example: 1.1.0+build.104.g4614d49. The release version is shared by every platform; the build
- * number and commit identify the exact source used for a desktop build. Windows MSI cannot carry
+ * Example: 1.1.0 (104 · 4614d49) / 1.1.0+build.104.g4614d49. The release version is shared by
+ * every platform; the build number and commit identify the exact source used for a desktop build.
+ * Windows MSI cannot carry
  * SemVer build metadata, so its numeric package version is kept separately as <major>.<minor>.<build>.
  */
 val releaseVersion: String = libs.versions.versionName.get()
@@ -44,12 +47,14 @@ val gitCommit: String = providers.exec {
     isIgnoreExitValue = true
 }.standardOutput.asText.get().trim().takeIf { it.matches(Regex("[0-9a-fA-F]{7,12}")) }
     ?: error("The desktop version needs the Git commit: run the build inside a full Git checkout.")
-val desktopVersion = "$releaseVersion+build.$buildNumber.g$gitCommit"
+val desktopVersion = "$releaseVersion ($buildNumber · $gitCommit)"
+val desktopBuildIdentity = "$releaseVersion+build.$buildNumber.g$gitCommit"
 val desktopPackageVersion = "$major.$minor.$buildNumber"
 check(major in 0..255 && minor in 0..255 && buildNumber in 1..65535) {
     "Desktop package version $desktopPackageVersion is out of range"
 }
 extra["desktopVersion"] = desktopVersion
+extra["desktopBuildIdentity"] = desktopBuildIdentity
 extra["desktopPackageVersion"] = desktopPackageVersion
 
 /**

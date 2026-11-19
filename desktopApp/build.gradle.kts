@@ -19,13 +19,16 @@ dependencies {
 }
 
 val desktopVersion = rootProject.extra["desktopVersion"] as String
+val desktopBuildIdentity = rootProject.extra["desktopBuildIdentity"] as String
 val desktopPackageVersion = rootProject.extra["desktopPackageVersion"] as String
 
 compose.desktop {
     application {
         mainClass = "com.jagdeep.autopilot.MainKt"
-        // The version the desktop app shows (About, status bar): the same one the MSI carries.
+        // The compact version appears in About and the status bar; the full SemVer identity stays
+        // available to diagnostics without making the normal UI noisy.
         jvmArgs += "-Dautopilot.version=$desktopVersion"
+        jvmArgs += "-Dautopilot.buildIdentity=$desktopBuildIdentity"
 
         buildTypes.release.proguard {
             // Matches the template: shrinking is off until the dependency graph is known to survive it.
