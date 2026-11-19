@@ -2,7 +2,7 @@
 
 [All guides](00_INDEX.md) · [Manual Legion build](02_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](10_BUILD_LINUX_ON_SERVER.md)
 
-**On this page:** [Commit and push everything](#commit-and-push-everything) · [Quick reference](#quick-reference) · [Sync machine data](#sync-machine-data) · [Merge answer banks](#merge-answer-banks) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
+**On this page:** [Commit and push everything](#commit-and-push-everything) · [Release a version](#release-a-version) · [Quick reference](#quick-reference) · [Sync machine data](#sync-machine-data) · [Merge answer banks](#merge-answer-banks) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
 
 **Related:** [Git guide](19_GIT_GUIDE.md) · [Fetch and verify build artifacts](#fetch-and-verify-build-artifacts) · [Start/stop/test the server VM](12_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](03_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](09_FIX_WINDOWS_INSTALLER.md)
 
@@ -45,6 +45,18 @@ cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot && git add -A && git commit -
 The script intentionally has no destructive `reset --hard`, `clean -fd` or force-push command.
 
 Only run this when all current changes belong in the same commit. Files ignored by Git, including `private/plans/`, `private/signing/`, `private/secrets/` and `private/misc/`, are not included. Remote builds require this step before `sync`, `build` or `run` on another machine.
+
+## Release a version
+
+Use one deliberate command to raise the Semantic Version number, commit it, tag it, and push it:
+
+```sh
+./dev version patch    # 1.1.0 -> 1.1.1: bug fixes
+./dev version minor    # 1.1.1 -> 1.2.0: new features
+./dev version major    # 1.2.4 -> 2.0.0: breaking or major release
+```
+
+It requires a clean, up-to-date `main` branch. The command updates `versionName`, creates a `Release <version>` commit and annotated `v<version>` tag, then pushes both. It never guesses a release type from ordinary commits. The Git build number rises on every commit and never resets.
 
 ## Run from the project root
 

@@ -61,6 +61,9 @@ The project includes a safe daily Git wrapper. Run it from the project root with
 | `./dev git branches` | Shows local branches and their tracking state. | No |
 | `./dev git push-all` | Stages all non-ignored changes, commits them, and pushes `main`. | Yes; commits and pushes |
 | `./dev git push-all "Message"` | Same as `push-all`, with a custom commit message. | Yes; commits and pushes |
+| `./dev version patch` | Raises Patch, creates a release commit and annotated `v…` tag, then pushes both. | Yes |
+| `./dev version minor` | Raises Minor and resets Patch; then creates/pushes the release commit and tag. | Yes |
+| `./dev version major` | Raises Major and resets Minor/Patch; then creates/pushes the release commit and tag. | Yes |
 
 The wrapper intentionally does not include destructive commands such as `reset --hard`, `clean -fd` or force-push. Use those only after reviewing the Git guide and confirming the exact files affected.
 

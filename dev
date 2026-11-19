@@ -916,6 +916,81 @@ case "$COMMAND" in
 esac
 }
 
+version_main() {
+    set -euo pipefail
+
+    local kind="${1:-}" catalog current major minor patch next tag temp
+
+    version_usage() {
+        cat <<'EOF'
+Release version command
+
+Usage:
+  ./dev version <patch|minor|major>
+
+Examples:
+  ./dev version patch    # 1.1.0 -> 1.1.1
+  ./dev version minor    # 1.1.1 -> 1.2.0
+  ./dev version major    # 1.2.4 -> 2.0.0
+
+This command requires a clean, up-to-date main branch. It updates versionName,
+creates one release commit, creates an annotated v<version> tag, and pushes both.
+The Git-generated build number continues increasing and is never reset.
+EOF
+    }
+
+    case "$kind" in
+        patch|minor|major) ;;
+        -h|--help|help|'') version_usage; [ -n "$kind" ] && exit 0 || exit 2 ;;
+        *) echo "Unknown version type: $kind" >&2; version_usage >&2; exit 2 ;;
+    esac
+    [ "$#" -eq 1 ] || { echo "Use exactly: ./dev version <patch|minor|major>." >&2; exit 2; }
+
+    cd "$ROOT"
+    [ "$(git branch --show-current)" = main ] || { echo "Stopped: releases only run on main." >&2; exit 1; }
+    if [ -n "$(git status --porcelain)" ]; then
+        git status --short
+        echo "Stopped: commit, push, or stash the current changes before releasing a version." >&2
+        exit 1
+    fi
+
+    git fetch --prune --tags origin
+    git pull --ff-only origin main
+
+    catalog="$ROOT/gradle/libs.versions.toml"
+    current="$(awk -F'\"' '/^versionName = / { print $2 }' \"$catalog\")"
+    [ -n "$current" ] || { echo "Stopped: versionName must be MAJOR.MINOR.PATCH." >&2; exit 1; }
+    IFS=. read -r major minor patch <<<"$current"
+
+    case "$kind" in
+        patch) next="$major.$minor.$((patch + 1))" ;;
+        minor) next="$major.$((minor + 1)).0" ;;
+        major) next="$((major + 1)).0.0" ;;
+    esac
+    tag="v$next"
+    git rev-parse -q --verify "refs/tags/$tag" >/dev/null && {
+        echo "Stopped: tag $tag already exists. Choose the next release version." >&2
+        exit 1
+    }
+
+    temp="$(mktemp "$catalog.tmp.XXXXXX")"
+    trap 'rm -f "$temp"' RETURN
+    awk -v version="$next" '
+        /^versionName = / { printf "versionName = \"%s\"\n", version; replaced++; next }
+        { print }
+        END { if (replaced != 1) exit 1 }
+    ' "$catalog" >"$temp" || { echo "Stopped: could not update versionName." >&2; exit 1; }
+    mv "$temp" "$catalog"
+    trap - RETURN
+
+    git add "$catalog"
+    git commit -m "Release $next"
+    git tag -a "$tag" -m "Release $next"
+    git push origin main
+    git push origin "$tag"
+    echo "Released $next. The next desktop build keeps its increasing Git build number."
+}
+
 vm_main() {
 # Start, stop, check or test the Windows build VM on the home server, from the Mac, in one line.
 #
@@ -1066,6 +1141,10 @@ case "$command" in
     git)
         shift
         git_main "$@"
+        ;;
+    version)
+        shift
+        version_main "$@"
         ;;
     vm|server-vm)
         shift
