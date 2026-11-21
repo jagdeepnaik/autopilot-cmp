@@ -28,7 +28,7 @@ Use the single action-first command from the project root:
 ./dev debug legion
 ```
 
-The commands for the Mac and the home server, and how they work, are in `private/docs/project/01_ONE_COMMAND_BUILDS.md`.
+The commands for the Mac and the home server, and how they work, are in `private/docs/project/20_ONE_COMMAND_BUILDS.md`.
 
 ## Install or update remotely from the Mac
 
@@ -85,5 +85,5 @@ Install the MSI in the signed-in desktop. Start it and check the window, saved s
 
 ## One-time SSH key setup
 
-`private/misc/setup-windows-ssh-key.command` (local only, not in Git) creates the Mac's passphrase-protected key for Legion, stores it in the macOS Keychain, checks Legion's host fingerprint, and installs only the public key on Legion. It's already been run; see `private/docs/project/21_SET_UP_PASSWORD_FREE_SSH.md` before running it again.
+`private/misc/setup-windows-ssh-key.command` (local only, not in Git) creates the Mac's passphrase-protected key for Legion, stores it in the macOS Keychain, checks Legion's host fingerprint, and installs only the public key on Legion. It's already been run; see `private/docs/common/05_SET_UP_PASSWORD_FREE_SSH.md` before running it again.
 

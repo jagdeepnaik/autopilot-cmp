@@ -121,7 +121,7 @@ Use `.\gradlew.bat` on Windows.
 | iOS | Open [`iosApp`](iosApp) in Xcode and run |
 
 Android Studio and iOS run-configuration migration is documented in
-[`30_CMP_PROJECT_STANDARD_AND_MIGRATION.md`](private/docs/common/30_CMP_PROJECT_STANDARD_AND_MIGRATION.md#71-migrate-android-studio-and-ios-run-configurations).
+[`01_CMP_PROJECT_STANDARD_AND_MIGRATION.md`](private/docs/common/01_CMP_PROJECT_STANDARD_AND_MIGRATION.md#71-migrate-android-studio-and-ios-run-configurations).
 
 ## Tests
 
@@ -180,7 +180,7 @@ feature/shared     Contracts shared by more than one feature
 iosApp/            iOS entry point (Xcode project)
 ```
 
-Features depend only on core modules and `feature:shared`, never on each other. [How it works](private/docs/project/14_HOW_AUTOPILOT_WORKS.md) explains every step, including how the app talks to Chrome. Coding and architecture conventions are in [AGENTS.md](AGENTS.md).
+Features depend only on core modules and `feature:shared`, never on each other. [How it works](private/docs/project/30_HOW_AUTOPILOT_WORKS.md) explains every step, including how the app talks to Chrome. Coding and architecture conventions are in [AGENTS.md](AGENTS.md).
 
 ## AutoPilot identity
 
