@@ -254,6 +254,46 @@ Common guides describe conventions with placeholders. Actual SSH aliases, addres
 checkout paths, installed versions and product commands belong in project guides. Label
 dated results as historical evidence; they do not prove the current machines are reachable.
 
+Use uppercase filenames with underscores: `NN_TOPIC_NAME.md`, for example
+`03_UNDERSTAND_SSH_AND_KEYS.md` or `41_SEAGULL_ASSISTANT_APK_EXTRACTION_TUTORIAL.md`.
+Keep the title's numeric prefix consistent with the filename. Order guides by use frequency
+within their reserved ranges; do not create empty files to fill unused numbers.
+
+```text
+private/docs/
+  00_INDEX.md                        # main entry point linking both groups
+  common/
+    00_INDEX.md                      # reusable guide index
+    01_CMP_PROJECT_STANDARD_AND_MIGRATION.md
+    02_GIT_GUIDE.md
+    03_UNDERSTAND_SSH_AND_KEYS.md
+    ...                              # common guides use 01–19
+  project/
+    00_INDEX.md                      # app-specific guide index
+    20_ONE_COMMAND_BUILDS.md
+    ...                              # project guides use 20 onward
+```
+
+Classify by the guide's main purpose, not whether a technique could theoretically be reused.
+A general APK inspection tutorial can be common, but an extraction guide tied to a named
+third-party app, its database, findings and QA imports belongs in project. AutoPilot's
+Seagull Assistant extraction guide is therefore a project guide. Keep dated investigation
+reports in `private/reports/` and temporary captures in `private/misc/`.
+
+When migrating documentation:
+
+1. Inventory the existing guides and classify each as common or project. Preserve useful content.
+2. Create the two folders and their indexes; assign the correct number and uppercase filename.
+3. Move each guide and update its title, relative links to source files, and local section links.
+4. Update both group indexes, the main index, README, AGENTS.md, script help/error messages,
+   and other tracked references. Link across groups with `../common/` or `../project/`.
+5. Verify local file targets and heading anchors, scan for old paths and numbers, then check
+   the diff. Check command descriptions against the actual script; label historical results.
+
+Moving a guide does not require a build or machine connection. Only claim live validation
+when it was actually performed. Keep common guides tracked with each project so a checkout
+remains self-contained.
+
 ### 5.2 Root development command standard
 
 Every project exposes an executable file named `dev` at its root. Run it as `./dev` from
