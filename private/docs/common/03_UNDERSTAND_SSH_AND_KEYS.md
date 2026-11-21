@@ -17,7 +17,8 @@ users and aliases are placeholders. Use your project's machine guide for actual 
 [14 Tunnels](#14-port-forwarding-and-tunnels) · [15 Reuse](#15-connection-reuse-and-keepalives) ·
 [16 Server setup](#16-server-setup-and-administration) ·
 [17 Troubleshooting](#17-troubleshooting-in-order) · [18 Recipes](#18-everyday-recipes) ·
-[19 Reference](#19-official-reference)
+[19 Reference](#19-official-reference) ·
+[20 Verify key-only access](#20-verify-key-only-and-client-restricted-access)
 
 ## 1. What SSH does
 
@@ -647,3 +648,185 @@ features actually installed on your machine.
 - [Interactive SFTP](https://man.openbsd.org/sftp)
 - [Windows key management](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement)
 - [PowerShell command-line options](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe)
+
+## 20. Verify key-only and client-restricted access
+
+Use this procedure after setup, a reinstall, a key change, or a network/gateway change.
+It is an audit: the commands below do not alter authentication or firewall rules.
+Replace `build-linux`, `alex` and example addresses with the actual values.
+
+### 20.1 Define what must be restricted
+
+| Requirement | Evidence needed |
+| --- | --- |
+| Key-only login | Effective server authentication rules plus fresh connection tests |
+| Only the intended key | Authorized-key fingerprints, alternative key sources and tests with isolated identities |
+| Only the intended account | Effective user/group/root login restrictions, including Match rules |
+| Only the Mac network source | Firewall/access rules for every SSH route, IPv4 and IPv6, and tests from another source |
+| Only the physical Mac | Device-bound credentials or verified device access policy, beyond a reusable private-key file |
+
+A successful key login does not establish that passwords are disabled. A named key such as
+`id_ed25519_mac` is still a portable credential: its filename, comment or owning computer's
+hostname does not bind it to hardware. A fixed source IP is a network restriction, not proof
+of device identity. Record the precise guarantee you tested.
+
+### 20.2 Inventory the client and each route
+
+On the Mac:
+
+```sh
+ssh -G build-linux
+ssh-keygen -lf ~/.ssh/id_ed25519_build.pub
+ssh -S none -o BatchMode=yes -o ConnectTimeout=10 build-linux \
+  'hostname; whoami; printf "%s\n" "$SSH_CONNECTION"'
+```
+
+Record `HostName`, `Port`, `User`, every `IdentityFile`, `ProxyJump`/`ProxyCommand`, and the
+known-hosts file. Multiple identities may be configured; an old accepted key can hide the
+fact that a new dedicated key is rejected. `SSH_CONNECTION` reports the source address/port
+and server address/port for that connection.
+
+Repeat for the explicit remote alias. Through a gateway, SSH may see a proxy/container IP
+instead of the Mac's IP. A source rule for only the Mac LAN address can break remote access;
+allowing the shared gateway IP alone cannot distinguish the devices behind it.
+
+### 20.3 Inspect the effective server policy with administrator access
+
+In a server shell, replacing the example account and connection addresses:
+
+```sh
+sudo /usr/sbin/sshd -t
+sudo /usr/sbin/sshd -T -C \
+  user=alex,addr=192.0.2.10,host=client.example,laddr=192.0.2.20,lport=22
+```
+
+`-t` validates the configuration; `-T` prints effective settings. `-C` evaluates conditional
+Match rules for a supplied connection. Repeat for LAN and proxy sources and relevant
+accounts. Inspect service startup overrides and included configuration files too. A parsed
+file can differ from the running daemon until it is reloaded; fresh protocol tests provide
+additional evidence. [Server test-mode reference](https://man.openbsd.org/sshd).
+
+Review these settings together:
+
+```text
+pubkeyauthentication
+authenticationmethods
+passwordauthentication
+kbdinteractiveauthentication
+permitemptypasswords
+permitrootlogin
+allowusers / allowgroups / denyusers / denygroups
+authorizedkeysfile
+authorizedkeyscommand
+trustedusercakeys
+hostbasedauthentication
+gssapiauthentication
+```
+
+A key-only design commonly requires public-key authentication and disables password and
+keyboard-interactive methods. An `AuthenticationMethods publickey` requirement makes the
+intended method explicit. Check account restrictions and all key/certificate sources before
+claiming that only one account or key is permitted. Commented lines are not active policy;
+client options such as `PasswordAuthentication=no` do not disable server password login.
+[Authentication configuration](https://man.openbsd.org/sshd_config).
+
+If `sudo -n` requires a password, record the administrator inspection as **unverified**.
+Use your own terminal to authorize the read-only command; never put the password in scripts
+or chat. A non-root `sshd -T` error about inaccessible host keys does not mean the running
+service has no keys.
+
+### 20.4 Inspect authorized keys and restrictions
+
+On the server, for the relevant account:
+
+```sh
+ssh-keygen -lf ~/.ssh/authorized_keys
+ls -ld ~ ~/.ssh ~/.ssh/authorized_keys
+```
+
+Compare fingerprints with the Mac's public keys. Review each key line locally for options
+such as `from="..."`; fingerprints alone do not show these options. Inspect other files,
+commands or trusted certificate authorities named in the effective policy, including other
+allowed accounts. Never dump private keys for an audit.
+
+An authorized key with no `from=` restriction does not itself limit source addresses, but a
+firewall or account rule may still do so. Evaluate all layers together. See the
+[authorized_keys format](https://man.openbsd.org/sshd#AUTHORIZED_KEYS_FILE_FORMAT).
+
+### 20.5 Test fresh key authentication and isolate the identity
+
+```sh
+ssh -vv -S none -o BatchMode=yes -o ConnectTimeout=10 \
+  -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no \
+  build-linux hostname
+```
+
+Look for the offered/accepted fingerprint and `Authenticated ... using "publickey"`.
+This is a positive test of key login only. A shared control connection must not supply the
+authentication for this test.
+
+For a direct route, bypass client config to test exactly one intended identity:
+
+```sh
+ssh -F /dev/null -S none -o BatchMode=yes -o ConnectTimeout=10 \
+  -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes \
+  -i ~/.ssh/id_ed25519_build -p 22 alex@192.0.2.20 hostname
+```
+
+Use the correct known-hosts file with `-o UserKnownHostsFile=...` if needed. The identity must
+already be unlocked/usable. Restore the gateway settings explicitly when testing a proxy
+route; a direct example cannot test that route. Client configuration normally accumulates
+IdentityFile entries, so adding `-i` to a configured alias alone may still offer other keys.
+
+### 20.6 Check whether password methods are offered
+
+These probes submit no password:
+
+```sh
+ssh -vv -S none -o BatchMode=yes -o ConnectTimeout=10 \
+  -o PubkeyAuthentication=no -o PreferredAuthentications=password \
+  build-linux hostname
+
+ssh -vv -S none -o BatchMode=yes -o ConnectTimeout=10 \
+  -o PubkeyAuthentication=no -o PreferredAuthentications=keyboard-interactive \
+  build-linux hostname
+```
+
+Inspect `Authentications that can continue`. If it includes `password`, password
+authentication is still offered for that account/route. The same applies to
+`keyboard-interactive`. **Permission denied alone is not a pass:** BatchMode prevents an
+interactive password submission even when the server permits it. Do not try guessed
+passwords. Evaluate advertised methods alongside effective AuthenticationMethods and Match
+rules, then repeat on every supported route.
+
+### 20.7 Check the network and gateway layers
+
+On a Linux server, use the tools actually installed:
+
+```sh
+ss -lnt
+sudo /usr/sbin/ufw status verbose
+sudo /usr/sbin/nft list ruleset
+```
+
+Inspect active rules, IPv4/IPv6 scope, alternate SSH ports and forwarded paths. Listening on
+`0.0.0.0` or `::` does not by itself mean unrestricted access; a firewall can filter it.
+A saved `ENABLED=yes` setting is not proof of the active rules. Check router/NAT exposure
+and any access-gateway identity/device policies separately.
+
+With authorization, repeat a connection test from another device. Distinguish “TCP port
+blocked” from “port reachable but login denied.” You cannot confirm all other sources are
+blocked merely by testing from the allowed Mac. Through a shared gateway, a device policy
+or device-bound credential is needed for a stronger Mac-only guarantee.
+
+### 20.8 Record the result and plan changes separately
+
+Record the date, routes/accounts checked, accepted fingerprint, advertised authentication
+methods, effective rules and firewall evidence. Mark inaccessible checks **unverified**.
+Use a project report for actual machine details and keep this tutorial reusable.
+
+If changes are needed, first prepare the reviewed policy, a working administrator session,
+an out-of-band recovery route and a rollback plan. Authorize the change, validate syntax,
+reload, and test fresh allowed and denied connections before closing recovery access.
+Do not remove the only working key while installing a replacement. Keep required jump-host
+forwarding available for build VMs and other approved destinations.
