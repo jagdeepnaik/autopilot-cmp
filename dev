@@ -123,12 +123,20 @@ windows_ssh() {
 }
 
 windows_scp() {
-    local host="$1" source="$2" destination="$3" recursive=()
-    [ "${4:-}" = recursive ] && recursive=(-r)
+    local host="$1" source="$2" destination="$3"
+    local recursive="${4:-}"
     if [ "$host" = "$VM_HOST" ]; then
-        scp -o ConnectTimeout=10 -o ProxyJump="$VM_JUMP_HOST" -P "$VM_PORT" "${recursive[@]}" "$VM_USER@127.0.0.1:$source" "$destination"
+        if [ "$recursive" = recursive ]; then
+            scp -o ConnectTimeout=10 -o ProxyJump="$VM_JUMP_HOST" -P "$VM_PORT" -r "$VM_USER@127.0.0.1:$source" "$destination"
+        else
+            scp -o ConnectTimeout=10 -o ProxyJump="$VM_JUMP_HOST" -P "$VM_PORT" "$VM_USER@127.0.0.1:$source" "$destination"
+        fi
     else
-        scp "${recursive[@]}" "$host:$source" "$destination"
+        if [ "$recursive" = recursive ]; then
+            scp -r "$host:$source" "$destination"
+        else
+            scp "$host:$source" "$destination"
+        fi
     fi
 }
 
