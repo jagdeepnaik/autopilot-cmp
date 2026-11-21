@@ -830,3 +830,9 @@ an out-of-band recovery route and a rollback plan. Authorize the change, validat
 reload, and test fresh allowed and denied connections before closing recovery access.
 Do not remove the only working key while installing a replacement. Keep required jump-host
 forwarding available for build VMs and other approved destinations.
+
+For a worked change with an owner-authorized sudo step, a dedicated key file, active-rule
+checks and a timed rollback, see the [project server hardening procedure](../project/42_HOME_SERVER_SSH_ACCESS.md).
+Its helper is specific to the reviewed server and firewall layout; adapt and review it
+before using it elsewhere. Never treat a staged policy file as proof that a running daemon
+has loaded it: repeat fresh positive and negative connection tests.

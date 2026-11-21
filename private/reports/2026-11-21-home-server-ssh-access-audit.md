@@ -40,3 +40,49 @@ the old authorization; enforce public-key-only authentication and the intended a
 review LAN source restrictions and the gateway's device/identity policy. Preserve approved
 VM/Legion forwarding and recovery access. A portable private key or fixed source IP alone
 does not prove which physical computer is using it.
+
+## Follow-up hardening preparation
+
+The owner subsequently requested hardening. The dedicated server public key was appended
+to the account's existing authorization file, preserving the old key during preparation.
+After the owner unlocked the dedicated key locally, isolated fresh logins using only that
+key succeeded over LAN and Cloudflare. The previously recorded dedicated-key rejection
+describes the pre-install state and is no longer current.
+
+The reviewed helper and public key were staged in the account's `.ssh` directory. The
+helper was syntax-checked and its uploaded SHA256 matched the local file. The owner was
+given the sudo command and instructed to leave the session at the KEEP prompt for testing.
+At this preparation checkpoint, root policy/firewall application and final confirmation
+had not yet been observed; password blocking and source restrictions must not be claimed.
+
+The [hardening procedure](../docs/project/42_HOME_SERVER_SSH_ACCESS.md) describes the
+dedicated authorization file, account/source policy, timed rollback and final verification.
+
+## Applied policy verification
+
+The first application stopped before SSH reload because the helper expected AllowUsers on
+one output line; this OpenSSH version prints one line per source. The helper was corrected,
+the owner restored that unconfirmed attempt and stopped its timer through recovery mode,
+then applied a new attempt with its own 15-minute rollback timer.
+
+Fresh checks after the new policy loaded:
+
+| Check | Result |
+| --- | --- |
+| Dedicated key, LAN and Cloudflare | Both succeeded |
+| Old general key, LAN and Cloudflare | Both rejected with publickey-only authentication |
+| Password probes, LAN and Cloudflare | Only publickey advertised; no password submitted |
+| Root with the dedicated key | Rejected |
+| Parsed policy | AuthenticationMethods publickey; PasswordAuthentication no; KbdInteractiveAuthentication no; PermitRootLogin no |
+| Allowed users/sources | Only jagdeep@192.168.1.16 and jagdeep@172.19.0.6 |
+| Active authorization file | /home/jagdeep/.ssh/authorized_keys_server |
+| Other LAN device | Legion Test-NetConnection to 192.168.1.23:22 returned False |
+| Approved jump forwarding | home-legion-remote returned LEGION successfully |
+| Local client aliases | Old general-key fallback removed from home-server and home-server-remote only |
+
+The owner confirmed KEEP after these checks. A subsequent inspection found no remaining
+rollback timer, both aliases selected only id_ed25519_server, and fresh LAN and Cloudflare
+logins succeeded. The key/account/source restrictions are retained. Original authorization
+data and root-owned rollback backups were preserved for recovery. Cloudflare physical-device
+policy and router DHCP reservation remain unverified; possession of the portable private
+key through an approved source is not cryptographic proof of the physical Mac.

@@ -28,10 +28,12 @@ AutoPilot-specific commands, machine workflows, routine behavior and recorded ev
 | 39 | [Home Server Setup — Quick Links](39_SERVER_SETUP_QUICK_LINKS.md) |
 | 40 | [How the Chrome Extension Works](40_CHROME_EXTENSION_ARCHITECTURE.md) |
 | 41 | [Seagull Assistant APK extraction](41_SEAGULL_ASSISTANT_APK_EXTRACTION_TUTORIAL.md) |
+| 42 | [Home server SSH access restrictions](42_HOME_SERVER_SSH_ACCESS.md) |
 
 ## Server SSH audit
 
 [21 November 2026: key-only and Mac-only access checks](../../reports/2026-11-21-home-server-ssh-access-audit.md).
-Password authentication was still offered; privileged policy and device restrictions require further verification.
+The initial audit found password access enabled. The follow-up records dedicated-key hardening,
+source restrictions, positive/negative connection tests and remaining device-policy checks.
 
 Last organization review: 21 November 2026. Dated results describe their original test sessions; they do not establish current machine availability.
