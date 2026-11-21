@@ -97,8 +97,8 @@ class BrowserExtensionTest {
     }
 
     @Test
-    fun `given the extension's permissions when read then it can only reach this app`() {
-        assertEquals("[\"http://127.0.0.1:47613/*\"]", kotlinx.serialization.json.Json.parseToJsonElement(bundled("manifest.json")).let { (it as kotlinx.serialization.json.JsonObject)["host_permissions"].toString() })
+    fun `given extension permissions then only existing app and SMY origins are declared`() {
+        assertEquals("[\"http://127.0.0.1:47613/*\",\"https://sagarmeinyog.com/*\"]", kotlinx.serialization.json.Json.parseToJsonElement(bundled("manifest.json")).let { (it as kotlinx.serialization.json.JsonObject)["host_permissions"].toString() })
         val urls = Regex("https?://[^\"`\\s]+").findAll(bundled("background.js") + bundled("content.js")).map { it.value }.toSet()
         assertEquals(setOf("http://127.0.0.1:47613"), urls)
     }

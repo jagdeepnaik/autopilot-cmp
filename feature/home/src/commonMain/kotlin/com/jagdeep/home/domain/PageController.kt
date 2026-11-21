@@ -372,6 +372,8 @@ class PageController(
     private var courseAutomation: CourseAutomationSession? = null
     private var oceanTG: OceanTGSession? = null
     private var marineSamraj: MarineSamrajSession? = null
+    private val marineSamrajChunks = MarineSamrajReadingAssembler()
+    private var marineSamrajCheckpointJson: String? = null
     private val oceanProgressMutex = Mutex()
     private var activeAnswerBankStore: CourseAnswerBankStore = answerBankStore
     private var courseProgress: CourseProgressSession? = null
@@ -507,7 +509,10 @@ class PageController(
                 val bankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(routine.answerBankFile) ?: routine.answerBankFile
                 activeAnswerBankStore = answerBankStore.forName(bankFile)
                 val runner = MarineSamrajSession("${newId()}:${now()}", routine.maxPages)
+                if (progressRepository.available) runner.waitForRestore()
+                marineSamrajCheckpointJson = null
                 marineSamraj = runner
+                marineSamrajChunks.clear()
                 launchActivity(PageActivity.MarineSamraj(routine.copy(answerBankFile = bankFile), runner.progress), scrolling = false) {
                     performMarineSamraj(routine, runner)
                 }
@@ -707,6 +712,15 @@ class PageController(
         val startedAt = now()
         var outcome = RunOutcome.StoppedByUser
         try {
+            if (progressRepository.available) {
+                try {
+                    val bank = com.jagdeep.shared.answers.resolvedAnswerBankFileName(routine.answerBankFile) ?: routine.answerBankFile
+                    val saved = progressRepository.records("marinesamraj:public").firstOrNull { it.key == bank && it.kind == "marinesamraj-crawl" }
+                    val checkpoint = saved?.let { json.decodeFromString(MarineSamrajCheckpoint.serializer(), it.details) } ?: MarineSamrajCheckpoint()
+                    runner.restore(checkpoint)
+                } catch (error: CancellationException) { throw error }
+                catch (_: Exception) { runner.pauseForStorageFailure() }
+            }
             while (true) {
                 if (!state.value.isConnected) { outcome = RunOutcome.BrowserDisconnected; break }
                 if (runner.progress.completed) { outcome = RunOutcome.Completed; break }
@@ -736,6 +750,7 @@ class PageController(
         courseAutomation = null
         oceanTG = null
         marineSamraj = null
+        marineSamrajChunks.clear()
         courseProgress = null
         courseChunks.clear()
         questionAlertKey = null
@@ -821,6 +836,13 @@ class PageController(
     }
 
     private suspend fun handleMarineSamrajMessage(raw: String): Boolean {
+        val chunk = runCatching { json.decodeFromString(CourseWireEvent.serializer(), raw) }.getOrNull()
+        if (chunk?.type == "marineSamrajChunk") {
+            val runner = marineSamraj ?: return true
+            if (chunk.session != runner.session) return true
+            marineSamrajChunks.accept(chunk)?.let { reading -> processMarineSamrajReading(reading) }
+            return true
+        }
         val action = runCatching { json.decodeFromString(MarineSamrajActionAck.serializer(), raw) }.getOrNull()
         if (action?.type == "marineSamrajAction") {
             marineSamraj?.takeIf { it.session == action.session }?.acknowledge(action.request, action.success)
@@ -829,13 +851,34 @@ class PageController(
         }
         val reading = runCatching { json.decodeFromString(MarineSamrajReading.serializer(), raw) }.getOrNull() ?: return false
         if (reading.type != "marineSamrajReading") return false
+        return processMarineSamrajReading(reading)
+    }
+
+    private suspend fun processMarineSamrajReading(reading: MarineSamrajReading): Boolean {
         val runner = marineSamraj ?: return true
         if (reading.session != runner.session) return true
         runner.read(reading)
         runner.takeCapture()?.let { capture ->
             // The generic Q&A store requires selectable options.  A public written answer is kept
             // verbatim as the answer and first option; the second marker preserves its text safely.
-            activeAnswerBankStore.save(capture.module, CourseAnswer(capture.question, listOf(capture.answer, "Reference answer"), capture.answer))
+            val result = try {
+                activeAnswerBankStore.saveReference(capture.module, CourseAnswer(capture.question, listOf(capture.answer, "Reference answer"), capture.answer))
+            } catch (error: CancellationException) { throw error }
+            catch (_: Exception) { false }
+            runner.captureSaved(result)
+        }
+        if (progressRepository.available) runner.checkpoint()?.let { checkpoint ->
+            val encoded = json.encodeToString(MarineSamrajCheckpoint.serializer(), checkpoint)
+            if (encoded != marineSamrajCheckpointJson) {
+                val timestamp = now()
+                val account = com.jagdeep.persistence.room.learning.LearningAccount("marinesamraj:public", "MarineSamraj public collection", timestamp)
+                val row = com.jagdeep.persistence.room.learning.LearningRecord(account.key, activeAnswerBankNameForMarineSamraj(), "MarineSamraj", "marinesamraj-crawl", "Public collection queue", "saved", details = encoded, observedAt = timestamp)
+                try {
+                    progressRepository.save(account, listOf(row))
+                    marineSamrajCheckpointJson = encoded
+                } catch (error: CancellationException) { throw error }
+                catch (_: Exception) { runner.pauseForStorageFailure() }
+            }
         }
         val activity = state.value.activity as? PageActivity.MarineSamraj ?: return true
         mutableState.update { it.copy(activity = activity.copy(progress = runner.progress)) }
@@ -843,6 +886,9 @@ class PageController(
         publish()
         return true
     }
+
+    private fun activeAnswerBankNameForMarineSamraj(): String =
+        (state.value.activity as? PageActivity.MarineSamraj)?.routine?.answerBankFile ?: MARINESAMRAJ_ANSWER_BANK
 
     private suspend fun handleOceanMessage(raw: String): Boolean {
         val action = runCatching { json.decodeFromString(OceanActionAck.serializer(), raw) }.getOrNull()
@@ -911,7 +957,10 @@ class PageController(
                     it.playbackSpeed, focusBrowserRequest)
             },
             oceanTG = oceanTG?.let { OceanCommand(it.session, it.action) },
-            marineSamraj = marineSamraj?.let { MarineSamrajCommand(it.session, it.action) },
+            marineSamraj = marineSamraj?.let {
+                val routine = (state.value.activity as? PageActivity.MarineSamraj)?.routine
+                MarineSamrajCommand(it.session, it.action, routine?.clickDelayMillis ?: 2_000)
+            },
         )
         val encoded = json.encodeToString(HelperCommand.serializer(), command)
         if (encoded != lastPublished) live.log(LiveSource.Chrome) { "→ $encoded" }

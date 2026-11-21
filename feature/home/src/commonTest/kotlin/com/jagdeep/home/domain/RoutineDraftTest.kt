@@ -12,6 +12,16 @@ class RoutineDraftTest {
     private val valid = RoutineDraft(name = "Refresh")
 
     @Test
+    fun given_marine_samraj_click_delay_when_saved_then_it_round_trips_and_rejects_invalid_values() {
+        val draft = RoutineDraft(kind = RoutineKind.MarineSamraj, name = "Public Q&A", marineSamrajMaxPages = "25", marineSamrajClickDelaySeconds = "4")
+        val routine = draft.toRoutine("marine") as MarineSamrajRoutine
+        assertEquals(4_000, routine.clickDelayMillis)
+        assertEquals("4", routine.toDraft().marineSamrajClickDelaySeconds)
+        assertFalse(draft.validate().hasAny)
+        assertTrue(draft.copy(marineSamrajClickDelaySeconds = "61").validate().hasAny)
+    }
+
+    @Test
     fun `given a complete routine when converted to a draft and back then it is unchanged`() {
         val routine = ClickRoutine(
             id = "r",

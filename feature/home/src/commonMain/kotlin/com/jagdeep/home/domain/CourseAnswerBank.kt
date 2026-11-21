@@ -126,6 +126,8 @@ interface CourseAnswerBankStore : com.jagdeep.shared.answers.AnswerBankFiles {
     fun forName(name: String): CourseAnswerBankStore = this
     suspend fun load(): CourseAnswerBank?
     suspend fun save(module: String, answer: CourseAnswer): AnswerBankSaveResult = AnswerBankSaveResult.Unavailable
+    /** Collect a reference without materializing the entire growing bank as an assessment snapshot. */
+    suspend fun saveReference(module: String, answer: CourseAnswer): Boolean = save(module, answer) is AnswerBankSaveResult.Saved
     suspend fun saveReviewed(module: String, answers: List<ReviewedAnswer>): AnswerBankSaveResult = AnswerBankSaveResult.Unavailable
     /** Combines independent, size-limited bank files without weakening per-file validation. */
     suspend fun loadAll(names: List<String>): CourseAnswerBank? {

@@ -29,6 +29,7 @@ AutoPilot-specific commands, machine workflows, routine behavior and recorded ev
 | 40 | [How the Chrome Extension Works](40_CHROME_EXTENSION_ARCHITECTURE.md) |
 | 41 | [Seagull Assistant APK extraction](41_SEAGULL_ASSISTANT_APK_EXTRACTION_TUTORIAL.md) |
 | 42 | [Home server SSH access restrictions](42_HOME_SERVER_SSH_ACCESS.md) |
+| 43 | [MarineSamraj public collection](43_MARINESAMRAJ_PUBLIC_COLLECTION.md) |
 
 ## Server SSH audit
 

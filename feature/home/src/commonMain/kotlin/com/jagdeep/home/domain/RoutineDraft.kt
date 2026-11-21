@@ -87,6 +87,8 @@ data class RoutineDraft(
     val oceanCourseCodes: String = "",
     /** Maximum permitted public pages per MarineSamraj collection run. */
     val marineSamrajMaxPages: String = "250",
+    /** Pause before each public page/control action. Zero keeps the old immediate behavior. */
+    val marineSamrajClickDelaySeconds: String = "2",
 )
 
 /** Field-level problems; a null field is fine. */
@@ -138,7 +140,7 @@ fun Routine.toDraft(): RoutineDraft = when (this) {
     is DgsELearningRoutine -> RoutineDraft(kind=kind,name=name,requiredHours=requiredHours.toString(),creditedHours=creditedHours.toString(),pixelsPerSecond=pixelsPerSecond,playbackSpeed=playbackSpeed,waitAfterClickSeconds=(waitAfterClickMillis/1000).toString(),answerBankFile=com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile) ?: answerBankFile)
     is CourseAutomationRoutine -> RoutineDraft(kind = RoutineKind.CourseAutomation, name = name, waitAfterClickSeconds = (waitAfterClickMillis / 1000).toString(), playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode, learningOrder = learningOrder, answerBankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile) ?: answerBankFile, answerQuizzes = answerQuizzes, autoDownloadCertificates = autoDownloadCertificates)
     is OceanTGRoutine -> RoutineDraft(kind = kind, name = name, waitAfterClickSeconds = (waitAfterClickMillis / 1000).toString(), answerQuizzes = answerPracticeQuestions, answerBankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile) ?: answerBankFile, oceanCourseCodes = courseCodes.joinToString(", "))
-    is MarineSamrajRoutine -> RoutineDraft(kind = kind, name = name, answerBankFile = answerBankFile, marineSamrajMaxPages = maxPages.toString())
+    is MarineSamrajRoutine -> RoutineDraft(kind = kind, name = name, answerBankFile = answerBankFile, marineSamrajMaxPages = maxPages.toString(), marineSamrajClickDelaySeconds = (clickDelayMillis / 1_000).toString())
 }
 
 fun ClickRoutine.toDraft(): RoutineDraft {
@@ -212,6 +214,7 @@ fun RoutineDraft.validate(): DraftErrors = when (kind) {
     RoutineKind.MarineSamraj -> DraftErrors(
         name = nameError(),
         points = if (marineSamrajMaxPages.trim().toIntOrNull()?.let { it in 1..1_000 } == true) null else "Use a page limit from 1 to 1000.",
+        waitAfterClick = if (marineSamrajClickDelaySeconds.trim().toLongOrNull()?.let { it in 0..60 } == true) null else "Use whole seconds from 0 to 60.",
         answerBankFile = if (com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile) == null) "Use a simple JSON file name." else null,
     )
 }
@@ -281,7 +284,13 @@ fun RoutineDraft.toRoutine(id: String): Routine = when (kind) {
     RoutineKind.DgsELearning -> DgsELearningRoutine(id,name.trim(),requiredHours.toDouble(),creditedHours.toDouble(),pixelsPerSecond.coerceIn(MIN_PIXELS_PER_SECOND,MAX_PIXELS_PER_SECOND),playbackSpeed,waitAfterClickSeconds.toLong()*1000,requireNotNull(com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile)))
     RoutineKind.CourseAutomation -> CourseAutomationRoutine(id = id, name = name.trim(), waitAfterClickMillis = waitAfterClickSeconds.trim().toLong() * 1000, playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode, learningOrder = learningOrder, answerBankFile = requireNotNull(com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile)), answerQuizzes = answerQuizzes, autoDownloadCertificates = autoDownloadCertificates)
     RoutineKind.OceanTG -> OceanTGRoutine(id, name.trim(), waitAfterClickSeconds.trim().toLong() * 1000, answerQuizzes, requireNotNull(com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile)), oceanCodes())
-    RoutineKind.MarineSamraj -> MarineSamrajRoutine(id, name.trim(), marineSamrajMaxPages.trim().toInt(), requireNotNull(com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile)))
+    RoutineKind.MarineSamraj -> MarineSamrajRoutine(
+        id = id,
+        name = name.trim(),
+        maxPages = marineSamrajMaxPages.trim().toInt(),
+        clickDelayMillis = marineSamrajClickDelaySeconds.trim().toLong() * 1_000,
+        answerBankFile = requireNotNull(com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile)),
+    )
 }
 
 private fun RoutineDraft.oceanCodes(): List<String> = oceanCourseCodes.split(',', '\n', '\r').map(String::trim).filter(String::isNotEmpty).distinct()

@@ -30,6 +30,11 @@ class SqliteCourseAnswerBanks(
     override fun forName(name: String): CourseAnswerBankStore = object : CourseAnswerBankStore {
         override suspend fun load() = loadName(name)
         override suspend fun save(module: String, answer: CourseAnswer) = saveName(name, module, listOf(ReviewedAnswer(answer, null)), false)
+        override suspend fun saveReference(module: String, answer: CourseAnswer): Boolean {
+            val text = answer.answer ?: return false
+            prepare()
+            return store(routineDatabase(name)).save(name, listOf(PersistedLearnedAnswer(module, answer.question, answer.options, text)), reviewed = false) == PersistedWriteResult.Saved
+        }
         override suspend fun saveReviewed(module: String, answers: List<ReviewedAnswer>) = saveName(name, module, answers, true)
     }
     override suspend fun load() = loadName(com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE)

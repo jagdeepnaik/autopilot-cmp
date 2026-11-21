@@ -31,6 +31,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
         jvmTest.dependencies {
+            implementation(libs.androidx.sqlite.bundled)
             implementation(compose.desktop.currentOs)
             implementation(compose.desktop.uiTestJUnit4)
             implementation(libs.kotlinx.coroutinesSwing)
