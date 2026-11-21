@@ -5,7 +5,7 @@ This file has two parts:
 - **Part A — Core CMP instructions:** reusable coding preferences, project structure, and engineering guidelines applicable to all CMP projects using this template.
 - **Part B — AutoPilot-specific instructions:** project conventions and constraints that supplement Part A.
 
-**Project standard:** every CMP project follows [the CMP project standard and migration guide](private/docs/30_CMP_PROJECT_STANDARD_AND_MIGRATION.md): module layout, package layout, Gradle setup, the `private/` folder, and the step-by-step migration with a reusable prompt.
+**Project standard:** every CMP project follows [the CMP project standard and migration guide](private/docs/common/30_CMP_PROJECT_STANDARD_AND_MIGRATION.md): module layout, package layout, Gradle setup, the `private/` folder, and the step-by-step migration with a reusable prompt.
 
 **Project guides:** start at [the documentation index](private/docs/00_INDEX.md). It lists every guide in `private/docs/` by how often it is used: one-command builds, installing, debugging, the home server, the Git guide and setup.
 
@@ -219,8 +219,9 @@ private/
 ```
 
 - **`misc/` is the default for anything temporary or unimportant:** backups, screenshots, captures, research notes, throwaway reports, scratch files, old copies and one-off helpers. Reports worth keeping go in `reports/`. It's git-ignored as a whole, so nothing in it reaches GitHub. Never make the build, the app or a tracked guide depend on a file in `misc/`; move the file to its proper folder first.
-- `docs/`: number the guides `NN_TOPIC.md` by how often they're used, keep `00_INDEX.md` current, and update every link when renumbering. Link to a section with GitHub-style heading links (`[text](#heading-text)`, or `file.md#heading-text` for another guide): lowercase, punctuation dropped, spaces as hyphens. Keep a long guide in one file with an "On this page" list. In Android Studio, Cmd+Click a link in the editor to follow it; the Markdown preview follows `#` links only when the IDE runs on JetBrains Runtime with JCEF (see `private/docs/19_GIT_GUIDE.md`).
+- `docs/`: number the guides `NN_TOPIC.md` by how often they're used, keep `00_INDEX.md` current, and update every link when renumbering. Link to a section with GitHub-style heading links (`[text](#heading-text)`, or `file.md#heading-text` for another guide): lowercase, punctuation dropped, spaces as hyphens. Keep a long guide in one file with an "On this page" list. In Android Studio, Cmd+Click a link in the editor to follow it; the Markdown preview follows `#` links only when the IDE runs on JetBrains Runtime with JCEF (see `private/docs/common/19_GIT_GUIDE.md`).
 - `dev` at the project root is the single user-facing project command. `private/scripts/` is tracked because the build machines pull its internal implementations from Git; Gradle and Windows builds also invoke `private/scripts/windows/` PowerShell support files directly.
+- Split tracked guides into `private/docs/common/` (reusable conventions and tutorials) and `private/docs/project/` (app-specific commands, machines and features). Keep a `00_INDEX.md` in each group and the main index at `private/docs/00_INDEX.md`. Root `dev` follows the action-first command standard in the common CMP guide; document supported target differences in the project command reference.
 - `plans/` follows the planning rule at the top of this file, and stays local.
 - Keep a data folder only for data that's part of the project. Put temporary exports and captures of it in `misc/`.
 - Don't add other top-level folders under `private/` without a reason. When unsure, use `misc/`.
@@ -249,7 +250,7 @@ private/
   - **Routines** click for the user in any app: click, multi-point click, and scroll-and-click.
   - **Course routines** work through Sagar Mein Yog and DGS e-learning courses in Chrome, through the bundled Chrome extension.
 
-  macOS and Windows are the supported platforms, and a Linux DEB is built. Android and iOS build and run, but show "Desktop only for now". Priorities, in order: the user stays in control of every automation, privacy, correctness of saved progress and answers, reliability, maintainability, UX. [How AutoPilot works](private/docs/14_HOW_AUTOPILOT_WORKS.md) explains the design; update it when the design changes.
+  macOS and Windows are the supported platforms, and a Linux DEB is built. Android and iOS build and run, but show "Desktop only for now". Priorities, in order: the user stays in control of every automation, privacy, correctness of saved progress and answers, reliability, maintainability, UX. [How AutoPilot works](private/docs/project/14_HOW_AUTOPILOT_WORKS.md) explains the design; update it when the design changes.
 - **No backend, account, analytics or telemetry.** The app and the extension talk only to each other, over loopback, through `core:localbridge`: `127.0.0.1:47613`, accepting only the origin `chrome-extension://ebilomdffnbhihdfgkeienfcbceomkap`. These values are `BROWSER_LINK_PORT`, `BROWSER_EXTENSION_ORIGIN` and `BROWSER_EXTENSION_ID` in `shared` `platform/BrowserExtension.kt`, and the extension manifest's key fixes that ID. Never widen the extension's host permissions or the trusted origin, and never add an outside connection.
 - **Modules in use:**
   - `core:automation` is the only code that touches the mouse, keyboard state, the front app and the Accessibility permission.
@@ -273,7 +274,7 @@ private/
 - **Answer banks:**
   - Legacy files use `name-ver-X.Y.json`, for example `sagarmeinyog-ver-1.0.json`, with plain-text `options` and `answer` values.
   - The project's audit sources remain in `private/qa/` (JSON/CSV/extraction exports). `python3 private/scripts/build_qa_database.py` builds the compact routine files `smy.db`, `olp.db`, `seagull.db` and `marinesamraj.db`, then copies them to `shared/src/jvmMain/resources/qa-routines/` for packaging.
-  - On desktop, the app seeds `~/.autopilot/databases/qa/<routine>_qa.db` from the matching bundle, then reads and writes that same routine file through `core:persistence`. Bundled and learned answers therefore stay together, while the original JSON/CSV sources remain unchanged for audit. Each learned or reviewed answer has its source and timestamps in its routine database.
+  - On desktop, the app seeds `~/.autopilot/databases/qa/<routine>.db` from the matching bundle, then reads and writes that same routine file through `core:persistence`. Bundled and learned answers therefore stay together, while the original JSON/CSV sources remain unchanged for audit. Each learned or reviewed answer has its source and timestamps in its routine database.
 - **The Chrome extension's source** is `shared/src/jvmMain/resources/chrome-extension/`. Raise the manifest version when it changes. The app writes it to `~/.autopilot/extensions/chrome/` at every start; the user reloads it in Chrome.
 
 ## Automation safety and privacy
@@ -300,7 +301,7 @@ private/
   - the signed `javaw.exe` launcher for both shortcuts
   - jpackage's unsigned `JpCaDll` removed from the MSI
 
-  See [the installer fix guide](private/docs/09_FIX_WINDOWS_INSTALLER.md).
+  See [the installer fix guide](private/docs/project/09_FIX_WINDOWS_INSTALLER.md).
 - Build and install with `./dev` (for example `run legion`, `run mac`, `run all`). Legion, the home server and the VMs build only from Git; `dev` pushes and pulls first.
 
 ## Testing and validation

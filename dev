@@ -28,7 +28,7 @@
 #   ./dev home-server stop
 #   ./dev home-server restart
 #
-# Use the detailed help in the documentation: private/docs/01_ONE_COMMAND_BUILDS.md.
+# Use the detailed help in the documentation: private/docs/project/01_ONE_COMMAND_BUILDS.md.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -183,7 +183,7 @@ desktop_main() {
 #
 # Remote machines always build from Git: the Mac's work must be committed; unpushed commits are
 # pushed; the target pulls and must end on the same commit. Uncommitted changes on either side are
-# never overwritten: the script stops and says what to do. See private/docs/01_ONE_COMMAND_BUILDS.md.
+# never overwritten: the script stops and says what to do. See private/docs/project/01_ONE_COMMAND_BUILDS.md.
 set -euo pipefail
 
 SCRIPT="$ROOT/dev"   # absolute, so it still works after cd
