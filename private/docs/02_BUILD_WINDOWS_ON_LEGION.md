@@ -14,17 +14,21 @@ Legion currently runs two VirtualBox Debian guests:
 
 | VM | Legion-only SSH forward | Mac connection route | Checkout |
 | --- | ---: | --- | --- |
-| Debian1 | `2201` | `ssh -J home-legion -p 2201 jagdeep@127.0.0.1` | `/home/jagdeep/Projects/AutoPilot` |
-| Debian2 | `2202` | `ssh -J home-legion -p 2202 jagdeep@127.0.0.1` | `/home/jagdeep/Projects/AutoPilot` |
+| Debian1 | `2201` | `ssh legion-debian1` | `/home/jagdeep/Projects/AutoPilot` |
+| Debian2 | `2202` | `ssh legion-debian2` | `/home/jagdeep/Projects/AutoPilot` |
 
 The forwards bind to Legion loopback only; they are not exposed directly to the LAN. The Mac uses
 the dedicated `id_ed25519_mac_vms` key and `legion_debian_known_hosts` file. Password-free SSH was
 verified on both guests on 21 November 2026:
 
 ```sh
-ssh -J home-legion -p 2201 jagdeep@127.0.0.1 'hostname; whoami; uname -m'
-ssh -J home-legion -p 2202 jagdeep@127.0.0.1 'hostname; whoami; uname -m'
+ssh legion-debian1 'hostname; whoami; uname -m'
+ssh legion-debian2 'hostname; whoami; uname -m'
 ```
+
+These aliases are defined in the **Mac's** `~/.ssh/config`. Run them from a Mac terminal,
+not from inside Debian1 or Debian2; `home-legion` is a Mac SSH alias and is not defined inside
+the Debian guests.
 
 ### One-time Debian VM setup
 
@@ -48,10 +52,13 @@ git pull --ff-only
 
 ### Build on Debian1 or Debian2
 
-From the Mac, replace `2201` with `2202` for Debian2:
+From the Mac, use the matching alias:
 
 ```sh
-ssh -J home-legion -p 2201 jagdeep@127.0.0.1 \
+ssh legion-debian1 \
+  'cd ~/Projects/AutoPilot && ./gradlew --no-daemon --console=plain --max-workers=2 :desktopApp:packageReleaseDeb'
+
+ssh legion-debian2 \
   'cd ~/Projects/AutoPilot && ./gradlew --no-daemon --console=plain --max-workers=2 :desktopApp:packageReleaseDeb'
 ```
 
@@ -64,13 +71,15 @@ The DEB is created under:
 Copy it to the Mac with:
 
 ```sh
-scp -o ProxyJump=home-legion -P 2201 \
-  'jagdeep@127.0.0.1:/home/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/deb/*.deb' \
+scp legion-debian1:/home/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/deb/*.deb \
+  "$HOME/Downloads/AutoPilot/Builds/"
+
+scp legion-debian2:/home/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/deb/*.deb \
   "$HOME/Downloads/AutoPilot/Builds/"
 ```
 
-Use port `2202` for Debian2. The Debian VM package setup is currently blocked until the VM sudo
-password is entered once on each guest.
+The Debian VM package setup is currently blocked until the VM sudo password is entered once on
+each guest.
 
 ## PART C — BUILD AN EXISTING PROJECT — repeat for each build
 
