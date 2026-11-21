@@ -14,16 +14,16 @@ Legion currently runs two VirtualBox Debian guests:
 
 | VM | Legion-only SSH forward | Mac connection route | Checkout |
 | --- | ---: | --- | --- |
-| Debian1 | `2201` | `ssh legion-debian1` | `/home/jagdeep/Projects/AutoPilot` |
-| Debian2 | `2202` | `ssh legion-debian2` | `/home/jagdeep/Projects/AutoPilot` |
+| Debian1 | `2201` | `ssh home-legion-debian1` | `/home/jagdeep/Projects/AutoPilot` |
+| Debian2 | `2202` | `ssh home-legion-debian2` | `/home/jagdeep/Projects/AutoPilot` |
 
 The forwards bind to Legion loopback only; they are not exposed directly to the LAN. The Mac uses
 the dedicated `id_ed25519_mac_vms` key and `legion_debian_known_hosts` file. Password-free SSH was
 verified on both guests on 21 November 2026:
 
 ```sh
-ssh legion-debian1 'hostname; whoami; uname -m'
-ssh legion-debian2 'hostname; whoami; uname -m'
+ssh home-legion-debian1 'hostname; whoami; uname -m'
+ssh home-legion-debian2 'hostname; whoami; uname -m'
 ```
 
 These aliases are defined in the **Mac's** `~/.ssh/config`. Run them from a Mac terminal,
@@ -55,10 +55,10 @@ git pull --ff-only
 From the Mac, use the matching alias:
 
 ```sh
-ssh legion-debian1 \
+ssh home-legion-debian1 \
   'cd ~/Projects/AutoPilot && ./gradlew --no-daemon --console=plain --max-workers=2 :desktopApp:packageReleaseDeb'
 
-ssh legion-debian2 \
+ssh home-legion-debian2 \
   'cd ~/Projects/AutoPilot && ./gradlew --no-daemon --console=plain --max-workers=2 :desktopApp:packageReleaseDeb'
 ```
 
@@ -71,10 +71,10 @@ The DEB is created under:
 Copy it to the Mac with:
 
 ```sh
-scp legion-debian1:/home/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/deb/*.deb \
+scp home-legion-debian1:/home/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/deb/*.deb \
   "$HOME/Downloads/AutoPilot/Builds/"
 
-scp legion-debian2:/home/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/deb/*.deb \
+scp home-legion-debian2:/home/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/deb/*.deb \
   "$HOME/Downloads/AutoPilot/Builds/"
 ```
 
