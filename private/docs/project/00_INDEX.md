@@ -27,5 +27,6 @@ AutoPilot-specific commands, machine workflows, routine behavior and recorded ev
 | 38 | [AutoPilot Build Tasks — Quick Links](38_BUILD_TASKS_QUICK_LINKS.md) |
 | 39 | [Home Server Setup — Quick Links](39_SERVER_SETUP_QUICK_LINKS.md) |
 | 40 | [How the Chrome Extension Works](40_CHROME_EXTENSION_ARCHITECTURE.md) |
+| 41 | [Seagull Assistant APK extraction](41_SEAGULL_ASSISTANT_APK_EXTRACTION_TUTORIAL.md) |
 
 Last organization review: 21 November 2026. Dated results describe their original test sessions; they do not establish current machine availability.

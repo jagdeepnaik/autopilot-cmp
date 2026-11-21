@@ -1,6 +1,4 @@
-# 12 — Android APK Resource and SQLCipher Database Extraction
-
-Reusable procedure with worked AutoPilot examples. App names, SSH aliases, paths, script hooks and recorded results below are specific examples; adapt them to the destination project. Current AutoPilot commands and machine details are maintained in the [project guides](../project/00_INDEX.md).
+# 41 — Android APK Resource and SQLCipher Database Extraction
 
 This guide documents the static-only workflow used to unpack `SeagullAssistant721.apk`, inspect its resources, identify its encrypted database, and export its data. Do this only for applications and files you own or are authorized to analyze.
 

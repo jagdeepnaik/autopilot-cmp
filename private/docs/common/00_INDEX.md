@@ -17,6 +17,5 @@ Reusable standards, tutorials and setup procedures. Numbers 01–19 are reserved
 | 09 | [Set Up the Home Server and Windows Build VM](09_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md) |
 | 10 | [Set Up Windows and Linux Build VMs on the Mac](10_SET_UP_MAC_LOCAL_BUILD_VMS.md) |
 | 11 | [Set up Legion access through the home server and Cloudflare](11_SETUP_LEGION_VIA_HOME_SERVER_CLOUDFLARE.md) |
-| 12 | [Android APK Resource and SQLCipher Database Extraction](12_Seagull_Assistant_APK_Extraction_Tutorial.md) |
 
 Last organization review: 21 November 2026. Dated results describe their original test sessions; they do not establish current machine availability.
