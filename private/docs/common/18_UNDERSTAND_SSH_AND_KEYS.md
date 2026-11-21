@@ -1,143 +1,649 @@
-# 18 — Understand SSH Connections and Keys
+# 18 — SSH Tutorial: Theory, Commands, Keys and Configuration
 
-[All guides](../00_INDEX.md)
+[All documentation](../00_INDEX.md) · [Common guides](00_INDEX.md) · [Project machine guides](../project/00_INDEX.md)
 
-## 1. What this setup does
+This guide teaches SSH independently of any project. Commands marked **client** run on the
+computer you connect from; **server** commands run on the destination. Example addresses,
+users and aliases are placeholders. Use your project's machine guide for actual values.
 
-The Mac remains the development computer. The Windows laptop provides a real Windows environment for building the Windows installer and running the Windows app. SSH carries commands and debugger traffic between them.
+**On this page:**
+[1 Basics](#1-what-ssh-does) · [2 Communication](#2-how-the-connection-works) ·
+[3 Addresses](#3-addresses-ports-and-localhost) · [4 Files](#4-files-and-who-owns-them) ·
+[5 First connection](#5-your-first-connection) · [6 Keys](#6-public-key-authentication) ·
+[7 Password-free use](#7-password-free-use-and-the-agent) ·
+[8 Config](#8-understanding-sshconfig) · [9 Config examples](#9-config-examples) ·
+[10 Options](#10-command-options-explained) · [11 Remote commands](#11-remote-commands-and-quoting) ·
+[12 Transfers](#12-copying-files) · [13 Jump hosts](#13-jump-hosts-and-vm-connections) ·
+[14 Tunnels](#14-port-forwarding-and-tunnels) · [15 Reuse](#15-connection-reuse-and-keepalives) ·
+[16 Server setup](#16-server-setup-and-administration) ·
+[17 Troubleshooting](#17-troubleshooting-in-order) · [18 Recipes](#18-everyday-recipes) ·
+[19 Reference](#19-official-reference)
 
-There are three separate functions:
+## 1. What SSH does
 
-- **Remote commands:** the Mac asks Windows to run PowerShell, Git, Gradle, tests, and packaging.
-- **Interactive app launch:** a Windows scheduled task starts AutoPilot on the signed-in user's desktop.
-- **Remote debugging:** the Mac debugger controls the Windows JVM through a private SSH tunnel.
+SSH means Secure Shell. It carries a remote terminal, commands and supported file transfers
+over an encrypted connection. The program `ssh` is the client; `sshd` is the server service.
+Installing the client alone does not enable incoming SSH connections.
 
-SSH does not show the Windows screen. A debugger can inspect application threads, variables, and execution; it does not operate the Windows desktop or Chrome interface. The user confirmed the app window directly on the laptop.
+A terminal session acts as the remote account. For example, after connecting from a Mac to
+Debian, `pwd`, `ls` and `sudo` execute on Debian. `exit` returns to the previous shell. If you
+connect again from that remote shell, the new connection originates there.
 
+SSH does not display a desktop. GUI applications, screen sharing, remote debuggers and SSH
+are different tools. Starting an app through SSH may run it in a session without a visible
+desktop, particularly on Windows.
 
-## 2. Machine-specific configuration
+## 2. How the connection works
 
-Use an SSH alias defined in the client computer's ~/.ssh/config. Each alias specifies
-the destination, login name, identity and any jump host. Keep actual machine addresses,
-usernames, host fingerprints and setup results in the project guides.
+```text
+Client                         Server
+Resolve destination address
+Open TCP connection ----------> SSH listener, usually port 22
+Exchange protocol and algorithm preferences
+Perform key exchange; authenticate server host key
+Verify expected server identity using known_hosts
+Authenticate remote user -----> Check allowed authentication methods and user key
+Open encrypted channels <----> Shell, commands, SFTP or forwarded TCP traffic
+```
 
-For this project, see [Legion and its Debian VMs](../project/02_BUILD_WINDOWS_ON_LEGION.md),
-[Windows SSH setup](../project/20_SET_UP_WINDOWS_SSH.md) and
-[remote Legion access](../project/31_SETUP_LEGION_VIA_HOME_SERVER_CLOUDFLARE.md).
+Key exchange establishes shared secrets. The host key identifies the server. User
+authentication establishes which account may log in. These are separate steps. A public-key
+login uses a signature to prove possession of a private key; the private key stays on the
+client. Symmetric session keys protect the traffic. Ephemeral key exchange can provide
+forward secrecy against later theft of long-term keys. Specific algorithms depend on the
+versions and policies at both ends. [Protocol architecture](https://www.rfc-editor.org/rfc/rfc4251).
 
-DHCP can change private addresses. Verify the host identity after a reinstall or address
-change. Run a client alias from the machine where it is configured; it is not automatically
-available inside a remote shell.
+Encryption begins after transport negotiation; the initial protocol identification is visible.
+Encryption protects traffic in transit, while the logged-in account's permissions govern
+what commands can do. A firewall, routing, authentication and filesystem permissions each
+control a different part of the connection.
 
-## 3. SSH fundamentals
+## 3. Addresses, ports and localhost
 
-SSH means Secure Shell. On the Mac, `ssh` is the **client**. On Windows, the `sshd` service is the **server**, normally listening on TCP port 22.
-
-A connection proceeds conceptually as follows:
-
-1. The client reaches the server over TCP.
-2. Both negotiate supported protocol algorithms.
-3. A key-exchange algorithm establishes shared secret material.
-4. The server proves possession of its host private key. The client checks the corresponding known host identity.
-5. Both derive encryption and integrity keys for the connection.
-6. The user authenticates, for example with a password or a signature from a user private key.
-7. The authenticated connection opens channels for commands, file transfer, or forwarding.
-8. These channels share the encrypted transport until it closes.
-
-Long-term public/private keys establish identity. Efficient symmetric session keys protect the bulk traffic. Modern ephemeral key exchanges can provide forward secrecy: later theft of a long-term identity key should not, by itself, decrypt previously recorded sessions. The exact algorithms depend on negotiation; this project did not record the negotiated cipher suite. See [SSH architecture](https://www.rfc-editor.org/rfc/rfc4251) and [transport protocol](https://datatracker.ietf.org/doc/html/rfc4253).
-
-A command channel runs under the Windows account's permissions. SSH is not an application sandbox. It also is not a whole-device VPN: only commands and explicitly forwarded connections use it.
-
-
-## 4. Host keys, user keys, and session keys
-
-| Item | Purpose | Stored where in this setup |
+| Term | Meaning | Example |
 | --- | --- | --- |
-| Server host private key | Proves which Windows server answered | Windows, `C:\ProgramData\ssh\ssh_host_ed25519_key` |
-| Server host public key | Lets clients recognize that server | Windows `.pub` file; trusted copy in Mac known-hosts file |
-| User private key | Lets the Mac prove the user's identity without a login password | Mac `~/.ssh/id_ed25519_legion`, passphrase-protected |
-| User public key | Authorizes the corresponding user private key | Windows administrator authorization file, under the verified Match rule |
-| Session keys | Encrypt and protect one connection's traffic | Negotiated in memory |
-| Fingerprint | Short hash used to compare a public key | Displayed for human verification |
-| Control socket | Lets local commands reuse an authenticated connection | Mac `/tmp/autopilot-windows-ssh` |
+| Hostname | A name resolved to a network address | `build.example.net` |
+| IP address | Destination network address | `192.168.1.50` |
+| Private address | Reachable through an appropriate local/private network | `192.168.x.x`, `10.x.x.x`, `172.16.x.x`–`172.31.x.x` |
+| Port | Service endpoint on a machine | SSH commonly uses `22` |
+| `localhost` / `127.0.0.1` | The machine making that particular connection | Mac from Mac; jump server from a jump server |
+| SSH alias | A client configuration label | `build-linux` |
 
-A **public key** may be shared. A **private key** must remain private. Possessing the public key does not practically allow deriving a properly generated private key.
+An alias need not exist in DNS. `Host build-linux` can map it to an IP in your client config.
+DHCP may change an IP; it does not change a correctly preserved server host key. A VM's NAT
+address may be inaccessible from another computer, requiring a host port forward or jump host.
 
-A key **passphrase** encrypts the private-key file at rest. It is distinct from the Windows account password and from a Windows Hello PIN. An SSH agent can perform signatures using an unlocked key, so repeated logins do not require typing its passphrase.
+## 4. Files and who owns them
 
-`known_hosts` answers “is this the expected server?” `authorized_keys` answers “may this user key log in?” They serve opposite sides of authentication. Neither is a password database. MSI signing certificates, Git signing keys, and Chrome extension identities are separate mechanisms.
+| File | Location/owner | Purpose |
+| --- | --- | --- |
+| `~/.ssh/config` | Client user | Aliases and connection preferences |
+| `id_ed25519_build` | Client user | Private user key; protect this file |
+| `id_ed25519_build.pub` | Client; copied to server | Public user key used to authorize login |
+| `known_hosts` | Client user | Previously trusted server public keys |
+| `authorized_keys` | Remote account, usually `~/.ssh/` | Public user keys permitted to authenticate |
+| `ssh_host_*_key` | Server administrator | Private server identity keys |
+| `sshd_config` | Server administrator | Incoming connection policy |
+| `control/` | Client user, optional | Local sockets for connection reuse |
 
+`known_hosts` asks “is this the server I intended?” `authorized_keys` asks “is this user key
+allowed to log in?” Neither file stores account passwords.
 
-## 5. Key algorithms and key generation
+On macOS/Linux, `~` means the home of the current account and leading-dot folders are hidden.
+Windows user configuration normally lives under `%USERPROFILE%\.ssh`; Windows server
+configuration normally lives under `C:\ProgramData\ssh`.
 
-**Ed25519** is a suitable choice here because both computers support it. RSA can also be used with modern SHA-2 signatures, commonly with a 3072-bit or larger key when a compatibility requirement calls for it. RSA key support and the obsolete SHA-1 `ssh-rsa` signature algorithm are different matters. ECDSA is another supported family. Hardware-backed `*-sk` keys require compatible security keys and software; SSH certificates are useful for centrally managed fleets. Avoid obsolete DSA and SSH protocol version 1.
+## 5. Your first connection
 
-Generation uses secure randomness to create a private value and derives the public value mathematically. It is not generated from your account password. Algorithm key sizes are not directly comparable: Ed25519 does not take an RSA-style `-b 3072` setting. See [ssh-keygen](https://man.openbsd.org/ssh-keygen).
+**Client, using example values:**
 
-**Optional — Mac Terminal, only when ready to configure user keys:**
+```sh
+ssh alex@192.168.1.50
+ssh -p 2222 alex@192.168.1.50
+```
+
+The first form uses the default SSH port; `-p 2222` changes it. `alex` must be an account on
+the destination. It is not necessarily the client computer's username.
+
+On first contact, compare the offered host-key fingerprint with a trusted value obtained
+through the server console or administrator. Accept it only after verification. Subsequent
+connections compare against the stored key. `ssh-keyscan` collects a key but does not prove
+who supplied it. A changed-key warning after reinstalling a machine requires verification
+before removing its old trusted entry.
+
+After login:
+
+```sh
+hostname
+whoami
+pwd
+exit
+```
+
+These identify the remote computer, account and directory, then close its shell. A different
+terminal prompt is a useful clue, but `hostname` and `whoami` are clearer checks.
+
+## 6. Public-key authentication
+
+Create a key pair **on the client**, using a fresh filename:
 
 ```sh
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
-# First check that neither target file already exists.
-ls -l ~/.ssh/id_ed25519_legion*
-ssh-keygen -t ed25519 -a 100 \
-  -f ~/.ssh/id_ed25519_legion \
-  -C "Mac-to-AutoPilot-Windows"
+ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_ed25519_build -C "laptop-to-build"
 ```
 
-If `ls` says no matching file, that is expected for a new key. If a file exists, choose a different name; do not overwrite it. Enter a strong passphrase when prompted. The command produces a private file and a `.pub` public file. `-a 100` increases passphrase-derivation work for protecting the private file; it does not change network encryption strength.
+| Part | Meaning |
+| --- | --- |
+| `-t ed25519` | Selects the key type |
+| `-a 100` | Increases private-file passphrase derivation work |
+| `-f ...` | Selects the key filename |
+| `-C ...` | Adds a descriptive public-key comment |
+
+Choose another filename if it already exists. Enter a passphrase when prompted. The command
+creates the private file and its `.pub` counterpart. The comment is a label, not a username
+or authorization rule. `-a` changes protection of the saved private file, not network encryption.
 
 ```sh
-chmod 600 ~/.ssh/id_ed25519_legion
-chmod 644 ~/.ssh/id_ed25519_legion.pub
-ssh-keygen -lf ~/.ssh/id_ed25519_legion.pub
+chmod 600 ~/.ssh/id_ed25519_build
+chmod 644 ~/.ssh/id_ed25519_build.pub
+ssh-keygen -lf ~/.ssh/id_ed25519_build.pub
 ```
 
-Never send the private file to Windows, put it in Git, or paste it into a chat. The `.pub` file is the one Windows needs.
+`600` permits only the owner to read/write; `644` makes the public file readable by others.
+The last command prints its fingerprint. Keep the private file on the client; install only
+the public file on the server. [Key utility reference](https://man.openbsd.org/ssh-keygen).
 
+For a Linux server, if `ssh-copy-id` is installed on your client:
 
-## 23. Security and operational boundaries
+```sh
+ssh-copy-id -i ~/.ssh/id_ed25519_build.pub alex@192.168.1.50
+```
 
-- Keep the private key on the Mac, passphrase-protected, with restrictive permissions. Public keys are shareable; private keys and account passwords are not.
-- Saving a passphrase in macOS Keychain relies on that Mac account's security. An unlocked agent can authorize signatures; protect access to the account and control socket.
-- Keep host verification enabled. An IP address alone is not server identity.
-- Keep debugger listeners bound to loopback and carry them through SSH. No public JDWP port or router forwarding is needed.
-- Leave agent forwarding disabled unless there is a specific reviewed need. Windows does not need your Mac agent forwarded to build this project.
-- SSH grants the logged-in Windows account's authority. Administrator account access has broader consequences than a limited app process.
-- Encoded commands can contain readable secrets after decoding. Do not put passwords or private keys in them or in logs.
-- A scheduled task with an interactive principal launches on the desktop; it does not provide remote screen control, bypass login, or guarantee background course operation.
-- The release installer and the development debug launch are different outputs. A successful build and breakpoint are not proof of every production workflow.
-- Keep personal databases, question banks, credentials, host details, and this guide out of the public push. The completed Windows setup did not transfer those personal files.
+This normally requires an existing login method once. Otherwise append the public key as
+one line in the remote account's `~/.ssh/authorized_keys`. Preserve existing keys. On the
+server, typical owner permissions are `700` for `.ssh` and `600` for `authorized_keys`, with
+correct ownership of both. Permissions alone cannot fix a key installed for the wrong user.
 
-### Related Debian home-server Internet access
+For Windows, ordinary accounts normally use their profile's `authorized_keys`. The default
+administrators Match rule commonly uses `C:\ProgramData\ssh\administrators_authorized_keys`;
+its ACL must be restricted appropriately. Inspect the actual server rule before choosing
+the file. Windows Hello PINs and SSH passwords are different. Follow the
+[Windows key setup guide](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement)
+and the project's [Windows setup instructions](../project/20_SET_UP_WINDOWS_SSH.md).
 
-The Debian machine has a direct LAN shortcut, `ssh home-server`, and an existing Cloudflare SSH endpoint, `ssh home-server-remote`. The latter invokes `/opt/homebrew/bin/cloudflared access ssh --hostname %h` from the Mac SSH configuration. Cloudflare browser authentication is separate from the server's SSH-key authentication.
+## 7. Password-free use and the agent
 
-On 10 November 2026, after the owner completed Cloudflare Access sign-in, independent commands through the LAN and Cloudflare routes both succeeded with strict host-key checking and password prompts disabled. The hostname, Linux username, machine-identity hash and SSH host-key fingerprint matched exactly, confirming the same Debian destination. This verified the public Cloudflare route from the current network, rather than a separate mobile/external-network test. The complete commands, route-specific file copies, future Windows VM jump commands, and verification status are maintained in [the Debian build-server installation guide](../project/24_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md#internet-access-through-cloudflare).
+Three prompts are often confused:
 
+| Prompt | What is requesting it? |
+| --- | --- |
+| Remote account password | Server login authentication |
+| Private-key passphrase | Local unlocking of a protected key |
+| `[sudo] password for ...` | Privilege escalation after login |
 
-## 24. References
+Key authentication removes the remote password prompt. It does not grant password-free sudo.
+An SSH agent can hold an unlocked identity and sign authentication requests:
 
-Official references used for the principles and commands:
+```sh
+ssh-add ~/.ssh/id_ed25519_build
+ssh-add -l
+ssh-add -d ~/.ssh/id_ed25519_build
+```
 
-1. [SSH protocol architecture — RFC 4251](https://www.rfc-editor.org/rfc/rfc4251)
-2. [SSH transport protocol — RFC 4253](https://datatracker.ietf.org/doc/html/rfc4253)
-3. [SSH user authentication — RFC 4252](https://www.rfc-editor.org/rfc/rfc4252)
-4. [OpenSSH ssh-keygen manual](https://man.openbsd.org/ssh-keygen)
-5. [OpenSSH client configuration manual](https://man.openbsd.org/ssh_config)
-6. [Microsoft: install and first use OpenSSH](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse)
-7. [Microsoft: Windows OpenSSH key management](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement)
-8. [Win32-OpenSSH file permission protection](https://github.com/PowerShell/Win32-OpenSSH/wiki/Security-protection-of-various-files-in-win32-openssh)
-9. [Apple: OpenSSH and Keychain configuration](https://developer.apple.com/library/archive/technotes/tn2449/_index.html)
-10. [Apple ssh-add option compatibility](https://docs.github.com/en/authentication/troubleshooting-ssh/error-ssh-add-illegal-option----apple-use-keychain)
-11. [Microsoft: powershell.exe command-line options](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe?view=powershell-7.4)
-12. [Microsoft: execution policies](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies?view=powershell-5.1)
-13. [Microsoft: scheduled-task principals](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtaskprincipal?view=win10-ps)
-14. [Oracle: JVM debugger connection options](https://docs.oracle.com/en/java/javase/21/docs/specs/jpda/conninv.html)
-15. [Gradle: JavaExec debugging](https://docs.gradle.org/current/javadoc/org/gradle/api/tasks/JavaExec.html)
-16. [Gradle: daemon JVM selection](https://docs.gradle.org/current/userguide/gradle_daemon.html)
-17. [JetBrains: remote JVM debugging](https://www.jetbrains.com/help/idea/tutorial-remote-debug.html)
-18. [Compose Multiplatform: native distributions](https://kotlinlang.org/docs/multiplatform/compose-native-distribution.html)
+The first loads a key; `-l` lists loaded fingerprints; `-d` unloads that key without deleting
+its file. The agent must be available through `SSH_AUTH_SOCK`. Use your desktop's existing
+agent where available. `eval "$(ssh-agent -s)"` starts one for a shell when none is available;
+starting agents repeatedly creates unnecessary processes. [Agent commands](https://man.openbsd.org/ssh-add).
 
-The verified machine details, hashes, script behavior, and test results above come from this project's setup session and repository, rather than a generic installation example.
+Apple's bundled OpenSSH also supports Keychain integration:
+
+```sh
+/usr/bin/ssh-add --apple-use-keychain ~/.ssh/id_ed25519_build
+```
+
+That option is macOS-specific. See the installed `man ssh-add` for your macOS version.
+Keep `UseKeychain` in Mac client configuration; Linux clients may reject it.
+
+To test without an interactive password fallback or reused session:
+
+```sh
+ssh -S none -o BatchMode=yes -o PasswordAuthentication=no \
+  -o KbdInteractiveAuthentication=no build-linux 'hostname; whoami'
+```
+
+The key must already be usable, including any required local passphrase unlocking. This test
+does not install a key or disable password login on the server.
+
+## 8. Understanding ~/.ssh/config
+
+The client reads this file for each new connection. You do not restart `sshd` after editing
+it. Existing connections may retain their earlier settings.
+
+```sshconfig
+Host build-linux
+    HostName 192.168.1.50
+    User alex
+    Port 22
+    IdentityFile ~/.ssh/id_ed25519_build
+    IdentitiesOnly yes
+    ForwardAgent no
+    ConnectTimeout 10
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+
+Host *
+    AddKeysToAgent yes
+```
+
+`ssh build-linux` now selects that destination and identity. `Host` matches the alias typed;
+`HostName` is the real destination. Indentation aids reading; it does not define scope.
+A block continues until the next `Host` or `Match` directive.
+
+### Configuration fields
+
+| Field | Meaning |
+| --- | --- |
+| `Host` | Alias or matching pattern; multiple names may share a block |
+| `HostName` | Actual network hostname/address |
+| `User` | Remote login account |
+| `Port` | Destination SSH port |
+| `IdentityFile` | User identity file; multiple entries accumulate |
+| `IdentitiesOnly yes` | Limits identities offered to configured identities |
+| `ProxyJump` | Intermediate SSH host(s) |
+| `ProxyCommand` | Command supplying the destination connection |
+| `UserKnownHostsFile` | Client file for trusted server keys |
+| `StrictHostKeyChecking yes` | Requires an already trusted matching server key |
+| `AddKeysToAgent yes` | Allows loading a successfully used key into the agent |
+| `UseKeychain yes` | Apple's passphrase Keychain integration |
+| `ForwardAgent no` | Does not expose the local agent through this connection |
+| `RequestTTY force` | Requests a terminal even without local terminal input |
+| `RemoteCommand` | Command selected automatically on login |
+| `ConnectTimeout` | Connection/initial handshake timeout in seconds |
+| `ServerAliveInterval` | Interval for SSH-level liveness checks |
+| `ServerAliveCountMax` | Unanswered checks tolerated before disconnecting |
+| `ControlMaster`, `ControlPath`, `ControlPersist` | Connection sharing; see section 15 |
+
+Most options use the first value found: command line, user config, then system config.
+Put specific blocks before broad defaults. Multiple matching blocks can contribute values;
+`Host *` applies broadly rather than acting as an else branch. `IdentityFile` is a notable
+additive option. Prefer `ProxyJump` or `ProxyCommand` for a route, rather than combining both.
+[Client configuration reference](https://man.openbsd.org/ssh_config).
+
+On macOS/Linux, protect the config with `chmod 600 ~/.ssh/config`. It is a text file named
+`config`, with no `.txt` extension. Keep passwords and private-key contents out of it.
+
+## 9. Config examples
+
+The following examples are templates; replace the sample addresses and users.
+
+### Direct host, VM and interactive PowerShell
+
+```sshconfig
+Host build-host
+    HostName 192.168.1.50
+    User alex
+    IdentityFile ~/.ssh/id_ed25519_build
+    IdentitiesOnly yes
+
+Host build-host-debian1
+    HostName 127.0.0.1
+    Port 2201
+    User alex
+    ProxyJump build-host
+    IdentityFile ~/.ssh/id_ed25519_guest
+    IdentitiesOnly yes
+
+Host build-host-ps
+    HostName 192.168.1.50
+    User alex
+    IdentityFile ~/.ssh/id_ed25519_build
+    IdentitiesOnly yes
+    RequestTTY force
+    RemoteCommand powershell.exe -NoLogo -NoProfile
+    ControlPath none
+```
+
+The VM example assumes the host forwards its loopback port `2201` to the guest's SSH port.
+The host and guest keys may be different. Use the PowerShell alias for interactive sessions;
+use a plain alias for scripts and file transfers, because `RemoteCommand` can conflict with
+an explicit command or subsystem request. See [SSH command behavior](https://man.openbsd.org/ssh).
+
+### Explicit remote route
+
+```sshconfig
+Host build-host-remote
+    HostName build.example.net
+    User alex
+    IdentityFile ~/.ssh/id_ed25519_build
+    IdentitiesOnly yes
+```
+
+This assumes the hostname is reachable through your organization's approved setup. A DNS
+record alone does not make a private machine reachable. An access gateway may instead require
+a vendor-provided `ProxyCommand` and separate gateway authentication before SSH authentication.
+Keep local and remote aliases distinct when route selection must be explicit.
+
+### Inspect the resolved configuration
+
+```sh
+ssh -G build-host-debian1
+ssh -F ./example-ssh-config -G build-host-debian1
+```
+
+`-G` prints effective settings and exits without connecting. `-F` selects an alternate
+configuration file. This is a useful way to review examples before using them.
+
+## 10. Command options explained
+
+```sh
+ssh -i ~/.ssh/id_ed25519_build -p 2222 -o ConnectTimeout=10 alex@192.168.1.50
+```
+
+| Option | Use |
+| --- | --- |
+| `-i file` | Identity to use |
+| `-p number` | SSH destination port |
+| `-l user` | Login user; alternative to `user@host` |
+| `-o Key=Value` | A configuration option for this invocation |
+| `-J host` | Jump through another SSH host |
+| `-t` / `-tt` | Request / force terminal allocation |
+| `-T` | Disable terminal allocation |
+| `-N` | No remote command, typically for a tunnel |
+| `-v`, `-vv`, `-vvv` | Increasing diagnostic detail |
+| `-G` | Print effective settings |
+| `-S none` | Bypass connection-sharing socket reuse |
+| `-4` / `-6` | Force IPv4 / IPv6 |
+
+Options generally precede the destination; words after it form the remote command.
+`ssh build-linux -p 2222` can therefore mean a remote command rather than changing the port.
+Check the installed `man ssh` when using options from a newer online manual.
+
+## 11. Remote commands and quoting
+
+```sh
+ssh build-linux 'hostname; whoami'
+ssh build-linux 'cd ~/Projects/Example && git status --short'
+```
+
+The client sends the command for execution by the remote shell. `&&` runs the next command
+only after success; `;` runs the next command regardless. A failed `cd` followed by `;` can
+run a build in the wrong directory. Prefer `&&` for dependent steps.
+
+Local single quotes preserve literal `$variables`, `*` and command text until the remote
+shell interprets them. Local double quotes can expand client variables first:
+
+```sh
+ssh build-linux 'printf "%s\n" "$HOME"'
+```
+
+Here `$HOME` belongs to the remote shell. The remote command's exit code normally becomes
+the SSH command's exit code; SSH connection errors commonly return `255`.
+
+### Mac to Windows PowerShell
+
+Windows SSH may start `cmd.exe` by default. A pipe intended for PowerShell can be interpreted
+by that outer shell and produce “Select-Object is not recognized.” For simple checks:
+
+```sh
+ssh build-host powershell.exe -NoProfile -Command hostname
+```
+
+For complex scripts, create a reviewed `.ps1` on the Windows machine and invoke `-File`, or
+send a UTF-16LE Base64 `-EncodedCommand` generated from known script text. Base64 solves
+transport quoting; it does not encrypt secrets. See Microsoft's
+[PowerShell command-line reference](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe).
+
+For an interactive PowerShell session:
+
+```sh
+ssh -tt build-host powershell.exe -NoLogo -NoProfile
+```
+
+## 12. Copying files
+
+`scp` uses the same SSH aliases and authentication. Current OpenSSH uses SFTP for scp file
+transfer. Syntax is `scp source destination`; `host:path` identifies the remote side.
+
+```sh
+scp ./report.txt build-linux:/home/alex/Downloads/
+scp build-linux:/home/alex/report.txt ./
+scp -r build-linux:/home/alex/reports ./
+scp -P 2222 ./report.txt alex@192.168.1.50:/home/alex/Downloads/
+scp 'build-linux:/home/alex/builds/*.deb' ./
+```
+
+In order: upload, download, recursive folder copy, custom port, and matching remote files.
+Quote remote wildcards so the local shell does not expand or reject them. A destination
+file can be overwritten by scp; it is not a skip-existing or synchronization tool.
+`scp -P` sets the port; lowercase `scp -p` preserves timestamps and mode.
+[File-copy reference](https://man.openbsd.org/scp).
+
+For interactive transfers:
+
+```sh
+sftp build-linux
+```
+
+| SFTP command | Meaning |
+| --- | --- |
+| `pwd`, `ls`, `cd` | Remote directory operations |
+| `lpwd`, `lls`, `lcd` | Local directory operations |
+| `get report.txt` | Download a file |
+| `put report.txt` | Upload a file |
+| `reget large.zip` | Resume downloading; verify the partial local file belongs to the same remote file |
+| `bye` | Close SFTP |
+
+SFTP is separate from FTP/FTPS despite the similar name.
+[SFTP reference](https://man.openbsd.org/sftp).
+
+For integrity checks, compare a source SHA256 with the downloaded file using `sha256sum`
+on Linux, `shasum -a 256` on macOS, or `Get-FileHash -Algorithm SHA256` on PowerShell.
+A matching checksum verifies content equality; it is not a publisher signature.
+
+## 13. Jump hosts and VM connections
+
+```text
+Mac SSH client -> build host SSH -> host loopback port 2201 -> Debian guest port 22
+```
+
+```sh
+ssh -J build-host -p 2201 alex@127.0.0.1
+ssh build-host-debian1
+```
+
+These represent the same example route when section 9's config exists. In this route,
+`127.0.0.1` is reached from the jump host. The client authenticates both the host and guest;
+the guest's host key is checked separately. Agent forwarding is unnecessary for this pattern.
+
+A lower-level equivalent for the transport is:
+
+```sh
+ssh -o 'ProxyCommand=ssh -W %h:%p build-host' -p 2201 alex@127.0.0.1
+```
+
+`-W` forwards the proxy SSH process's standard input/output to the requested host/port.
+`%h` and `%p` expand to the final destination and port. A jump host must permit forwarding
+and reach the destination. Working SSH to the host alone does not prove guest reachability.
+
+An alias only exists on the client whose config defines it. Exit an existing guest session
+before running another Mac alias, or open a new Mac terminal tab.
+
+## 14. Port forwarding and tunnels
+
+A tunnel carries selected connections through SSH; it is not automatically a whole-device VPN.
+
+### Local forward: reach a remote-only service
+
+```sh
+ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:5005:127.0.0.1:5005 build-linux
+```
+
+The first address/port is the client's listener. The second destination is reached from the
+server. Connect your local debugger to `127.0.0.1:5005`; SSH carries it to the server's port
+5005. The remote debugger must already be listening. Leave this terminal running and press
+Ctrl+C to close the tunnel. `ExitOnForwardFailure` detects failure to establish the forwarding
+listener; it does not guarantee that each later destination connection succeeds.
+
+### Remote forward: expose a client service through the server
+
+```sh
+ssh -N -R 127.0.0.1:8080:127.0.0.1:3000 build-linux
+```
+
+The server listens on its loopback port 8080 and traffic travels to the client's port 3000.
+Server forwarding policy governs allowed listeners. Bind examples to loopback so access
+stays on the relevant machine.
+
+### Dynamic forward
+
+```sh
+ssh -N -D 127.0.0.1:1080 build-linux
+```
+
+This creates a local SOCKS proxy. Only applications configured to use that proxy send their
+traffic through it; DNS handling depends on the application's proxy settings.
+
+## 15. Connection reuse and keepalives
+
+```sh
+mkdir -p ~/.ssh/control
+chmod 700 ~/.ssh/control
+```
+
+This folder stores local connection-sharing sockets. It is needed only if your `ControlPath`
+uses it; creating it does not open a network port or grant remote access.
+
+```sshconfig
+Host build-linux
+    ControlMaster auto
+    ControlPath ~/.ssh/control/%C
+    ControlPersist 10m
+```
+
+`ControlMaster auto` reuses or creates a shared connection. `%C` gives a compact hashed socket
+name. `ControlPersist 10m` retains an idle master after the last session closes. Later
+commands may reuse its authentication rather than performing a fresh login.
+
+```sh
+ssh -O check build-linux
+ssh -O exit build-linux
+ssh -S none build-linux
+```
+
+These inspect the master, close it, or make a fresh connection. Closing a master can end its
+active channels. A broken-pipe error can result from a stale master; test with `-S none`.
+
+`ServerAliveInterval 30` and `ServerAliveCountMax 3` detect a silent connection after roughly
+90 seconds without replies. They cannot prevent VM reboots, repair routing, or resume killed
+builds. Use a managed job or a persistent terminal session for long-running remote work.
+
+## 16. Server setup and administration
+
+For a new Debian server, run **on that server**:
+
+```sh
+sudo apt-get update
+sudo apt-get install openssh-server
+sudo systemctl enable --now ssh
+systemctl status ssh
+```
+
+The client machine does not need the server package just to make outgoing connections.
+The SSH server must listen on the expected interface, and the network/firewall must permit
+the route. Windows OpenSSH Server setup uses Windows services and firewall rules instead;
+see the [project Windows setup guide](../project/20_SET_UP_WINDOWS_SSH.md).
+
+Client config affects outgoing connections; server `sshd_config` affects incoming ones:
+
+| Server setting | Controls |
+| --- | --- |
+| `Port`, `ListenAddress` | Listening port and interfaces |
+| `PubkeyAuthentication` | Acceptance of user public-key authentication |
+| `AuthorizedKeysFile` | Where allowed user public keys are read |
+| `PasswordAuthentication` | Password authentication method |
+| `KbdInteractiveAuthentication` | Separate interactive authentication method |
+| `AllowUsers` | Which accounts may log in |
+| `AllowTcpForwarding` | SSH TCP forwarding |
+| `Match` | Conditional settings, such as per-user rules |
+
+Before applying Linux server edits, validate syntax with `sudo sshd -t`. Keep a working
+session open and verify a second fresh login after reloading the service. Disabling only
+`PasswordAuthentication` may leave keyboard-interactive authentication enabled. Sudo policy
+is separate and belongs in reviewed sudoers rules. [Server configuration](https://man.openbsd.org/sshd_config).
+
+## 17. Troubleshooting in order
+
+Start with configuration, then reachability, host verification, authentication, and finally
+the remote command. This avoids changing keys to fix an unrelated network failure.
+
+```sh
+ssh -G build-linux
+ssh -vv -S none -o BatchMode=yes -o ConnectTimeout=10 build-linux hostname
+```
+
+| Symptom | Likely area and next check |
+| --- | --- |
+| Could not resolve hostname | Alias absent on this client, typo or DNS failure; inspect `ssh -G` |
+| Connection timed out | Offline guest, wrong IP, firewall drop or route; confirm power/address/port |
+| Connection refused | Often no listener or an active rejection; inspect server service and forwarding |
+| Banner exchange timeout | Gateway/proxy or handshake stalled; test the route in stages |
+| Host identification changed | Verify the host fingerprint after reinstall/address changes before updating trust |
+| Permission denied (publickey) | Wrong account, identity, authorization file or permissions; inspect offered key and server logs |
+| Too many authentication failures | Too many offered identities; set the intended IdentityFile and IdentitiesOnly |
+| Private-key passphrase prompt | Unlock that local key through the agent |
+| Sudo asks for password | Login succeeded; sudo requires separate authorization |
+| Address already in use | Local forward port is occupied; choose another local port |
+| Broken pipe | Connection ended or a reused socket is stale; test fresh with `-S none` |
+| Works interactively, fails in script | Noninteractive PATH, profile, quoting, prompts or terminal requirements |
+
+Linux server logs are available through `sudo journalctl -u ssh`; Windows exposes OpenSSH
+operational events in Event Viewer. Diagnostic output can reveal usernames, addresses and
+paths, so review it before sharing.
+
+After independently verifying a legitimate host-key replacement, remove only the affected
+entry, then reconnect and compare the new fingerprint:
+
+```sh
+ssh-keygen -F '[127.0.0.1]:2201' -f ~/.ssh/known_hosts
+ssh-keygen -R '[127.0.0.1]:2201' -f ~/.ssh/known_hosts
+```
+
+Use the actual configured `UserKnownHostsFile`. Deleting every known host entry loses trust
+records for unrelated machines.
+
+## 18. Everyday recipes
+
+| Goal | Command from the client |
+| --- | --- |
+| Remote shell | `ssh build-linux` |
+| Identify destination/account | `ssh build-linux 'hostname; whoami'` |
+| Inspect configuration without connecting | `ssh -G build-linux` |
+| Test fresh unattended login | `ssh -S none -o BatchMode=yes -o ConnectTimeout=10 build-linux hostname` |
+| Copy one file down | `scp build-linux:/home/alex/report.txt ./` |
+| Copy a folder down | `scp -r build-linux:/home/alex/reports ./` |
+| Guest shell | `ssh build-host-debian1` |
+| Interactive Windows PowerShell | `ssh -tt build-host powershell.exe -NoLogo -NoProfile` |
+| Local manual | `man ssh`, `man ssh_config`, `man scp` |
+
+For this project's real connections, use the [Legion guide](../project/02_BUILD_WINDOWS_ON_LEGION.md),
+[Mac VM setup](../project/29_SET_UP_MAC_LOCAL_BUILD_VMS.md),
+[home server setup](../project/24_SET_UP_HOME_SERVER_AND_WINDOWS_VM.md) and
+[remote Legion route](../project/31_SETUP_LEGION_VIA_HOME_SERVER_CLOUDFLARE.md).
+
+## 19. Official reference
+
+Reviewed on 21 November 2026. Commands here are explained examples, not a report that new
+servers, keys or tunnels were configured. Client versions vary; local manuals describe the
+features actually installed on your machine.
+
+- [SSH architecture, RFC 4251](https://www.rfc-editor.org/rfc/rfc4251)
+- [OpenSSH client](https://man.openbsd.org/ssh)
+- [Client configuration](https://man.openbsd.org/ssh_config)
+- [Server configuration](https://man.openbsd.org/sshd_config)
+- [Key generation and fingerprints](https://man.openbsd.org/ssh-keygen)
+- [Authentication agent commands](https://man.openbsd.org/ssh-add)
+- [File copying](https://man.openbsd.org/scp)
+- [Interactive SFTP](https://man.openbsd.org/sftp)
+- [Windows key management](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement)
+- [PowerShell command-line options](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe)

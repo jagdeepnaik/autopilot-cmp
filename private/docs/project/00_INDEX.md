@@ -60,7 +60,7 @@ Use `./dev build home-server-vm-win` to build the server Windows VM MSI and `./d
 | Why the Windows installer and app were blocked, and how that was verified | [15_WINDOWS_INSTALLER_DIAGNOSIS.md](15_WINDOWS_INSTALLER_DIAGNOSIS.md) |
 | Windows build and debug details, with recorded tests | [16_WINDOWS_BUILD_DEBUG_REFERENCE.md](16_WINDOWS_BUILD_DEBUG_REFERENCE.md) |
 | Server tests and earlier build results | [17_SERVER_BUILD_TESTS_AND_RESULTS.md](17_SERVER_BUILD_TESTS_AND_RESULTS.md) |
-| How SSH and its keys work | [18_UNDERSTAND_SSH_AND_KEYS.md](../common/18_UNDERSTAND_SSH_AND_KEYS.md) |
+| SSH theory, commands, keys, config, tunnels and troubleshooting | [18_UNDERSTAND_SSH_AND_KEYS.md](../common/18_UNDERSTAND_SSH_AND_KEYS.md) |
 | **Git: how it works, every important command, recipes and a cheat sheet** | [19_GIT_GUIDE.md](../common/19_GIT_GUIDE.md) |
 
 ## Reusable CMP standard

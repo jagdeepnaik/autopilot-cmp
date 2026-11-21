@@ -15,6 +15,7 @@ Start with the group you need. All links are local to this repository.
 - [Mac-local VM setup](project/29_SET_UP_MAC_LOCAL_BUILD_VMS.md)
 - [CMP project and dev standard](common/30_CMP_PROJECT_STANDARD_AND_MIGRATION.md)
 - [Git guide](common/19_GIT_GUIDE.md)
+- [Detailed SSH tutorial and config explanation](common/18_UNDERSTAND_SSH_AND_KEYS.md)
 
 Common guides describe reusable conventions; project guides hold actual machine names,
 paths and product behavior. Retain existing guide numbers when moving files, update every
