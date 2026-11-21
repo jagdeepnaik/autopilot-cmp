@@ -4,26 +4,26 @@
 
 **On this page:** [One line with the script](#one-line-with-the-script) · [Separately, by hand](#separately-by-hand) · [Recorded test](#recorded-test--11-november-2026) · [Detailed steps: monitor, Screen Sharing, troubleshooting](#11-windows-vm-connect-check-start-monitor-and-stop) · [Cancel, disconnect or shut down](#5-cancel-disconnect-or-shut-down--choose-the-right-action)
 
-The VM is a Windows guest on the home server. It uses 8 GB of the server's 16 GB, so start it only for a build and stop it afterwards. Starting or stopping it never touches Debian or the websites. `dev build server-vm-win` needs the VM running and stops with a hint if it isn't.
+The VM is a Windows guest on the home server. It uses 8 GB of the server's 16 GB, so start it only for a build and stop it afterwards. Starting or stopping it never touches Debian or the websites. `dev build home-server-vm-win` needs the VM running and stops with a hint if it isn't.
 
 ## One line with the script
 
-Run from the project root with `./dev vm …`:
+Run from the project root with `./dev home-server-vm-win …`:
 
 | Command | What happens |
 | --- | --- |
-| `./dev vm status` | Shows the server's uptime and memory, whether the VM process is running, and whether Windows answers over SSH |
-| `./dev vm test` | Signs in to Windows and shows the user, uptime, Java, Git, the checkout's commit, local changes and free disk space |
-| `./dev vm start` | Starts the VM. You type an 8-character VNC console password for Screen Sharing. It then waits for Windows and runs `test` |
-| `./dev vm start --headless` | Same, but the console password is random and never shown, so there's no prompt. Use this for builds; the console can't be opened until the next normal `start` |
-| `./dev vm stop` | Refuses while a Gradle build runs in the VM. Otherwise it shuts Windows down cleanly and waits until the VM process has ended |
-| add `--remote` | Force the Cloudflare route (`home-server-remote`, `home-server-build-remote`). Without it, the script tests `home-server` first and automatically falls back to the Cloudflare route when the local server SSH connection is unavailable. |
+| `./dev home-server-vm-win status` | Shows the server's uptime and memory, whether the VM process is running, and whether Windows answers over SSH |
+| `./dev home-server-vm-win test` | Signs in to Windows and shows the user, uptime, Java, Git, the checkout's commit, local changes and free disk space |
+| `./dev home-server-vm-win start` | Starts the VM. You type an 8-character VNC console password for Screen Sharing. It then waits for Windows and runs `test` |
+| `./dev home-server-vm-win start --headless` | Same, but the console password is random and never shown, so there's no prompt. Use this for builds; the console can't be opened until the next normal `start` |
+| `./dev home-server-vm-win stop` | Refuses while a Gradle build runs in the VM. Otherwise it shuts Windows down cleanly and waits until the VM process has ended |
+| add `--remote` | Explicitly use the Cloudflare route through `home-server-remote`. The script supplies the VM's port, user and jump internally; no VM SSH alias is required. |
 
 A typical VM build:
 
 ```sh
 cd /Users/jagdeep/Projects/AndroidStudio/AutoPilot
-./dev vm start --headless && ./dev build server-vm-win && ./dev vm stop
+./dev home-server-vm-win start --headless && ./dev build home-server-vm-win && ./dev home-server-vm-win stop
 ```
 
 The script never force-kills the VM. If Windows doesn't answer, or takes longer than 5 minutes to shut down (often because it's installing updates), the script stops and says to check it with Screen Sharing.
@@ -49,7 +49,7 @@ ssh -t home-server /srv/vms/windows-build/start.sh
 **Test the connection to Windows:**
 
 ```sh
-ssh home-server-build whoami
+ssh -J home-server -p 2222 builduser@127.0.0.1 whoami
 ```
 
 Expected: `jagdeep\builduser`. *Connection refused* or a timeout soon after starting means Windows is still booting: wait and try again.
@@ -57,7 +57,7 @@ Expected: `jagdeep\builduser`. *Connection refused* or a timeout soon after star
 **Stop it** after any build has finished. The VM's default shell is PowerShell, so this runs as is:
 
 ```sh
-ssh home-server-build Stop-Computer -Force
+ssh -J home-server -p 2222 builduser@127.0.0.1 powershell -NoProfile -Command "Stop-Computer -Force"
 ```
 
 The SSH connection closes as Windows shuts down. Then repeat the first command until it prints nothing. Don't use Debian's `shutdown`, `reboot` or `poweroff`: they stop the whole server, websites included. For resource monitoring, Screen Sharing and troubleshooting, see [the detailed steps below](#11-windows-vm-connect-check-start-monitor-and-stop).
@@ -66,10 +66,10 @@ The SSH connection closes as Windows shuts down. Then repeat the first command u
 
 | Command | Result |
 | --- | --- |
-| `dev vm status` | Server up 4 days, 5.6 GB memory available; VM running; Windows SSH answering |
-| `dev vm test` | Signed in as `jagdeep\builduser`; Java 21.0.13, Git 2.56.0; checkout clean at `ac90a44`; 59.4 GB free |
-| `dev vm stop` | No build running; Windows shut down cleanly; VM process ended after about 225 s |
-| `dev vm start --headless` | VM started without a prompt; Windows answered SSH after about 20 s; connection test passed |
+| `dev home-server-vm-win status` | Server up 4 days, 5.6 GB memory available; VM running; Windows SSH answering |
+| `dev home-server-vm-win test` | Signed in as `jagdeep\builduser`; Java 21.0.13, Git 2.56.0; checkout clean at `ac90a44`; 59.4 GB free |
+| `dev home-server-vm-win stop` | No build running; Windows shut down cleanly; VM process ended after about 225 s |
+| `dev home-server-vm-win start --headless` | VM started without a prompt; Windows answered SSH after about 20 s; connection test passed |
 
 The interactive `start` (typing the console password) runs `start.sh` through `ssh -t` and wasn't run in this test.
 
@@ -197,13 +197,13 @@ Open a **new Mac Terminal window** and connect to Windows using one route:
 **Local network:**
 
 ```sh
-ssh home-server-build
+ssh -J home-server -p 2222 builduser@127.0.0.1
 ```
 
 **Or Cloudflare:**
 
 ```sh
-ssh home-server-build-remote
+ssh -J home-server-remote -p 2222 builduser@127.0.0.1
 ```
 
 Confirm that the prompt is Windows PowerShell, such as `PS C:\Users\builduser>`. In that **Windows SSH window**, run:

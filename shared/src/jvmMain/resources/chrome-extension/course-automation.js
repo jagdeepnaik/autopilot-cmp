@@ -278,6 +278,16 @@
     // is false while Chrome's address bar is selected, but DOM clicks remain correctly targeted.
     if (!action || action.document !== documentId || handled.has(action.request)) return;
     handled.add(action.request); // At most once, even when delivery or acknowledgement fails.
+    if (action.kind === 'courseDashboard') {
+      // SMY course pages sometimes have no accessible dashboard link. Only allow this recovery
+      // on a top-level course detail URL on the expected origin; never navigate from a test or
+      // an embedded frame.
+      const onCoursePage = window === window.top && location.origin === 'https://sagarmeinyog.com' &&
+        /^\/dashboard\/courses\/[A-Za-z0-9_-]+$/.test(location.pathname);
+      await chrome.runtime.sendMessage({ type: 'courseAction', session, document: documentId, request: action.request, success: onCoursePage });
+      if (onCoursePage) location.assign('/dashboard');
+      return;
+    }
     const node = elements.get(action.element);
     let success = false;
     if (node?.isConnected && visible(node) && !node.matches(':disabled') && !node.closest('[inert],[aria-disabled="true"]')) {

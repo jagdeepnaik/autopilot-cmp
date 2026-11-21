@@ -75,7 +75,7 @@ The current MSI build normally uses `jpackage` from JDK 21. If Gradle reports th
 
 ### 0.3 Linux VM components
 
-Use Debian 13 ARM64 for the closest match to the existing Debian build server. After installation, run:
+Use Debian 13 ARM64 for the closest match to the existing Debian build home-server. After installation, run:
 
 ```sh
 sudo apt update
@@ -187,13 +187,13 @@ Use the repository’s normal Git authentication if required. Both checkouts mus
 Edit `~/.ssh/config` and replace the addresses, ports, and users with your VM values:
 
 ```sshconfig
-Host mac-windows-vm
+Host mac-vm-windows
     HostName 192.168.64.20
     User jagdeep
     Port 22
     IdentityFile ~/.ssh/id_ed25519
 
-Host mac-linux-vm
+Host mac-vm-debian
     HostName 192.168.64.21
     User jagdeep
     Port 22
@@ -205,8 +205,8 @@ If the VM software forwards ports through localhost, use a different port for ea
 Test the aliases:
 
 ```sh
-ssh mac-windows-vm powershell -NoProfile -Command "hostname"
-ssh mac-linux-vm 'hostname && uname -m'
+ssh mac-vm-windows powershell -NoProfile -Command "hostname"
+ssh mac-vm-debian 'hostname && uname -m'
 ```
 
 Use the existing [password-free SSH guide](21_SET_UP_PASSWORD_FREE_SSH.md). Never put passwords or private keys in `dev`.
@@ -240,8 +240,8 @@ Complete the key installation from [password-free SSH](21_SET_UP_PASSWORD_FREE_S
 repeat:
 
 ```sh
-ssh mac-windows-vm powershell -NoProfile -Command "hostname"
-ssh mac-linux-vm 'hostname && uname -m'
+ssh mac-vm-windows powershell -NoProfile -Command "hostname"
+ssh mac-vm-debian 'hostname && uname -m'
 ```
 
 Do not continue to build until both commands authenticate without asking for a password. If the
@@ -324,8 +324,8 @@ sudo systemctl restart ssh
 From the Mac, both commands must work without displaying a password prompt:
 
 ```sh
-ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no mac-windows-vm powershell -NoProfile -Command "hostname; whoami"
-ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no mac-linux-vm 'hostname && whoami && uname -m'
+ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no mac-vm-windows powershell -NoProfile -Command "hostname; whoami"
+ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no mac-vm-debian 'hostname && whoami && uname -m'
 ```
 
 The command may still ask for the Mac key's passphrase if the key is protected. That is local key
@@ -341,10 +341,10 @@ ssh-add --apple-use-keychain ~/.ssh/id_ed25519
 In the Mac Terminal, set the aliases and exact checkout paths:
 
 ```sh
-export MAC_WINDOWS_HOST='mac-windows-vm'
+export MAC_WINDOWS_HOST='mac-vm-windows'
 export MAC_WINDOWS_DIR='C:\Users\Jagdeep\Projects\AutoPilot'
 
-export MAC_LINUX_HOST='mac-linux-vm'
+export MAC_LINUX_HOST='mac-vm-debian'
 export MAC_LINUX_DIR='/home/jagdeep/Projects/AutoPilot'
 ```
 
@@ -448,14 +448,14 @@ If `packageReleaseDeb` ends with `Gradle build daemon disappeared unexpectedly`,
 If it still fails, check the VM's available memory and kernel OOM messages:
 
 ```sh
-ssh mac-linux-vm 'free -h; dmesg -T | tail -30'
+ssh mac-vm-debian 'free -h; dmesg -T | tail -30'
 ```
 
 Increase the VM's assigned memory, close other applications in the guest, and retry. Do not run multiple Gradle builds at the same time in the VM.
 
 | Problem | Check |
 | --- | --- |
-| `Could not resolve hostname` | The SSH alias is missing or the VM address changed. Test `ssh mac-windows-vm` or `ssh mac-linux-vm`. |
+| `Could not resolve hostname` | The SSH alias is missing or the VM address changed. Test `ssh mac-vm-windows` or `ssh mac-vm-debian`. |
 | VM has uncommitted changes | Enter the VM, inspect `git status`, and commit or stash the changes there before syncing. |
 | `java: command not found` | Add the full JDK 21 `bin` directory to the system PATH visible to SSH. |
 | MSI works in the VM but not on Legion | Check `os.arch`; an ARM64 MSI is not the same target as an x64 MSI. Build the final x64 MSI on Legion or with an x64 JDK/Windows environment. |

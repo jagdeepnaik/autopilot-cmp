@@ -772,85 +772,26 @@ icacls.exe $keyFile
 
 This authorizes a key for the Windows VM's administrator scope, not just one build command. Keep this VM dedicated to building; never place website secrets or personal data inside it. The key stays protected by its Mac passphrase/Keychain. We are not storing the Windows password in a script or disabling password recovery.
 
-### 10.1 Open the Mac SSH configuration file
+### 10.1 Connect from the Mac without extra VM SSH aliases
 
-These edits happen **on your Mac**, not in the Windows PowerShell or Debian SSH session. Leave those sessions alone and open a **new Mac Terminal window** with Command-N. The prompt should identify your Mac, not `builduser@...` or `jagdeep@jagdeep`.
-
-Run this command in that new Mac window:
-
-```sh
-nano ~/.ssh/config
-```
-
-Nano is a text editor. Use the Down Arrow to reach the end of the file. Keep every existing entry, including `home-server`, `ssh.naikio.in`, and the laptop’s SSH configuration. Add a blank line at the bottom.
-
-### 10.2 Add the two build-VM shortcuts
-
-Copy the complete configuration box below and paste it **at the bottom of the file inside nano**, using Command-V. These are file contents, not shell commands. Do not paste the Markdown backticks. If either `Host home-server-build` or `Host home-server-build-remote` is already present, stop for review instead of adding duplicate entries.
-
-Both shortcuts refer to the same Windows VM. The first goes through local Debian SSH; the second goes through Cloudflare. Add both so you can choose either later:
-
-
-```sshconfig
-Host home-server-build
-    HostName 127.0.0.1
-    Port 2222
-    User builduser
-    ProxyJump home-server
-    IdentityFile ~/.ssh/id_ed25519
-    IdentitiesOnly yes
-    ForwardAgent no
-    StrictHostKeyChecking yes
-    ServerAliveInterval 30
-    ServerAliveCountMax 3
-
-Host home-server-build-remote
-    HostName 127.0.0.1
-    Port 2222
-    User builduser
-    ProxyJump home-server-remote
-    IdentityFile ~/.ssh/id_ed25519
-    IdentitiesOnly yes
-    ForwardAgent no
-    StrictHostKeyChecking yes
-    ServerAliveInterval 30
-    ServerAliveCountMax 3
-```
-
-### 10.3 Save and close nano
-
-1. Press **Control + O** (the letter O, not zero).
-2. Nano shows the filename at the bottom. Press **Enter** to save to the same `~/.ssh/config` file.
-3. Press **Control + X** to exit nano.
-4. You should now be back at your **Mac Terminal prompt**.
-
-Run this one command on the Mac to keep the configuration file private:
-
-```sh
-chmod 600 ~/.ssh/config
-```
-
-### 10.4 Test from the Mac
-
-Do not run these tests inside Windows or Debian. Use the same Mac Terminal window after exiting nano.
-
-Choose either alias: `home-server-build` uses the local network; `home-server-build-remote` uses Cloudflare. Both refer to the same future Windows VM and therefore must present the same Windows host identity.
-
-Test a fresh key-only connection:
+The project deliberately does not add separate `home-server-build` aliases to `~/.ssh/config`.
+Use the explicit route when connecting manually:
 
 **Local network:**
 
 ```sh
-ssh -o ControlPath=none -o ControlMaster=no -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no home-server-build whoami
+ssh -J home-server -p 2222 builduser@127.0.0.1
 ```
 
 **Cloudflare / Internet:**
 
 ```sh
-ssh -o ControlPath=none -o ControlMaster=no -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no home-server-build-remote whoami
+ssh -J home-server-remote -p 2222 builduser@127.0.0.1
 ```
 
-This must succeed without the Windows password. If the private-key passphrase is needed, unlock it on the Mac with Apple's `ssh-add` command in section 2. Never send the private key or passphrase in chat.
+The `./dev` command supplies these same SSH options automatically for `home-server-vm-win`. The
+Windows VM uses its own `id_ed25519_server_vm` key, with the older general key retained only as a
+temporary fallback during migration. Never send a private key or passphrase in chat.
 
 ### 10.5 Make new SSH connections open PowerShell automatically — once only
 
@@ -875,13 +816,13 @@ Open a **new Mac Terminal window**. Run only one alternative:
 **Local network:**
 
 ```sh
-ssh home-server-build
+ssh -J home-server -p 2222 builduser@127.0.0.1
 ```
 
 **Cloudflare / Internet:**
 
 ```sh
-ssh home-server-build-remote
+ssh -J home-server-remote -p 2222 builduser@127.0.0.1
 ```
 
 After step 10.5, either connection should open directly at a Windows PowerShell prompt such as `PS C:\Users\builduser>`. You no longer need to type `powershell.exe -NoProfile` after every login. If a new connection still opens Command Prompt, send its output before continuing.
@@ -890,7 +831,7 @@ For the remaining guide, **Windows SSH window** means this Mac Terminal window c
 
 ## 11. Install Windows JDK 21 and Git
 
-**Windows SSH window** — connect using `ssh home-server-build` (local) or `ssh home-server-build-remote` (Cloudflare), as explained in 10.6:
+**Windows SSH window** — connect using the explicit local or Cloudflare jump command in section 10.1:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -960,7 +901,7 @@ No Android Studio, Chrome, Chrome extension or desktop automation permissions ar
 **Reported checkpoint — 10 November 2026:** the Windows checkout is at `C:\Build\autopilot-cmp`. The owner successfully ran `gradlew.bat --version`: Gradle 9.6.0, Eclipse Adoptium JDK 21.0.13, Windows 11 amd64. The default SSH shell setting was also applied successfully. This confirms Gradle startup, not compilation, tests, or MSI packaging. This preparation step is complete. Continue to section 13 only when preparing the Linux checkout for the first time; otherwise use Part B.
 
 
-**Windows SSH window** — connect using `ssh home-server-build` (local) or `ssh home-server-build-remote` (Cloudflare), as explained in 10.6:
+**Windows SSH window** — connect using the explicit local or Cloudflare jump command in section 10.1:
 
 ```powershell
 New-Item -ItemType Directory -Force C:\Build | Out-Null
@@ -1015,7 +956,7 @@ Create a destination:
 **Mac Terminal:**
 
 ```sh
-mkdir -p "$HOME/Downloads/AutoPilot-builds"
+mkdir -p "$HOME/Downloads/AutoPilot/Builds"
 ```
 
 Linux installer:
@@ -1023,13 +964,13 @@ Linux installer:
 **Local network:**
 
 ```sh
-scp 'home-server:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/AutoPilot-builds/"
+scp 'home-server:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/AutoPilot/Builds/"
 ```
 
 **Cloudflare / Internet:**
 
 ```sh
-scp 'home-server-remote:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/AutoPilot-builds/"
+scp 'home-server-remote:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/AutoPilot/Builds/"
 ```
 
 Windows installer:
@@ -1037,23 +978,23 @@ Windows installer:
 **Local network:**
 
 ```sh
-scp 'home-server-build:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/AutoPilot-builds/"
+scp -o ProxyJump=home-server -P 2222 'builduser@127.0.0.1:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/AutoPilot/Builds/"
 ```
 
 **Cloudflare / Internet:**
 
 ```sh
-scp 'home-server-build-remote:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/AutoPilot-builds/"
+scp -o ProxyJump=home-server-remote -P 2222 'builduser@127.0.0.1:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/AutoPilot/Builds/"
 ```
 
 Compare downloaded hashes against the same source artifacts:
 
 ```sh
-shasum -a 256 "$HOME/Downloads/AutoPilot-builds/"*.msi
+shasum -a 256 "$HOME/Downloads/AutoPilot/Builds/"*.msi
 ```
 
 ```sh
-shasum -a 256 "$HOME/Downloads/AutoPilot-builds/"*.deb
+shasum -a 256 "$HOME/Downloads/AutoPilot/Builds/"*.deb
 ```
 
 An MSI cannot be installed on the Mac. Transfer it to the Windows laptop for installation/UI/browser testing. The `.deb` is for a compatible Linux computer. These files are unsigned unless a separate signing step is configured.
@@ -1118,7 +1059,7 @@ Send “ready” once these are true:
 
 - Debian packages installed; existing websites still reachable.
 - Windows 11 Home or Pro installed and updated; Secure Boot and TPM checks pass.
-- You can run `ssh home-server-build whoami` (local), or `ssh home-server-build-remote whoami` (Cloudflare), from the Mac using the protected key.
+- You can run `ssh -J home-server -p 2222 builduser@127.0.0.1 whoami` (local), or replace the jump host with `home-server-remote` for Cloudflare.
 - Windows reports Java/Javac/Jpackage 21 and a working Git executable.
 - Windows checkout is `C:\Build\autopilot-cmp`.
 - Linux checkout is `/srv/build/autopilot-cmp`.

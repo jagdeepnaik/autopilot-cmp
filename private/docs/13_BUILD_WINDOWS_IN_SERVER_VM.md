@@ -11,13 +11,13 @@ Open a **new Mac Terminal window**. Choose one:
 **Local network:**
 
 ```sh
-ssh home-server-build
+ssh -J home-server -p 2222 builduser@127.0.0.1
 ```
 
 **Or Cloudflare:**
 
 ```sh
-ssh home-server-build-remote
+ssh -J home-server-remote -p 2222 builduser@127.0.0.1
 ```
 
 Expected: a Windows PowerShell prompt starting with `PS C:\Users\builduser>`. If it opens Command Prompt instead, run this once in that window:

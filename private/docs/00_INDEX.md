@@ -38,7 +38,7 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | Copy and verify build files on the Mac | [01 · Fetch and verify build artifacts](01_ONE_COMMAND_BUILDS.md#fetch-and-verify-build-artifacts) |
 | Fix installer errors: Error 1723, "Smart App Control blocked an app", "already installed" | [09_FIX_WINDOWS_INSTALLER.md](09_FIX_WINDOWS_INSTALLER.md) |
 
-**Usual order:** run `./dev run legion` (or `run mac`, `run server`, `run all`) from the Mac, then open the app on that machine and check it. `run all` includes the server Windows VM and both Mac-local VMs. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
+**Usual order:** run `./dev run legion` (or `run mac`, `run home-server`, `run all`) from the Mac, then open the app on that machine and check it. `run all` includes the server Windows VM and both Mac-local VMs. Use 02–04 when you want to do one step by hand. Legion is `ssh home-legion`, checkout `C:\Users\jagde\Projects\autopilot-cmp`.
 
 ## 10–13 · Home server — Linux DEB and the Windows VM
 
@@ -46,10 +46,11 @@ In Android Studio, Cmd+Click a link in the editor to follow it. To click links i
 | --- | --- |
 | Build the Linux DEB on Debian | [10_BUILD_LINUX_ON_SERVER.md](10_BUILD_LINUX_ON_SERVER.md) |
 | Copy server-built installers to the Mac, including the server VM MSI | [11_COPY_SERVER_INSTALLERS.md](11_COPY_SERVER_INSTALLERS.md) |
-| Start, stop, test or monitor the server's Windows VM (one line: `./dev vm`) | [12_START_STOP_WINDOWS_BUILD_VM.md](12_START_STOP_WINDOWS_BUILD_VM.md) |
+| Start, stop, test or monitor the server's Windows VM (`./dev home-server-vm-win status`) | [12_START_STOP_WINDOWS_BUILD_VM.md](12_START_STOP_WINDOWS_BUILD_VM.md) |
+| Check, start, stop or restart the Debian home server (`./dev home-server status`) | [01 · Home server controls](01_ONE_COMMAND_BUILDS.md#home-server-status-and-power) |
 | Build the MSI inside that VM (alternative to Legion) | [13_BUILD_WINDOWS_IN_SERVER_VM.md](13_BUILD_WINDOWS_IN_SERVER_VM.md) |
 
-Use `./dev build server-vm-win` to build the server Windows VM MSI and `./dev fetch all` to collect existing remote artifacts. `./dev run all` deliberately leaves the server DEB on the server. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.
+Use `./dev build home-server-vm-win` to build the server Windows VM MSI and `./dev fetch all` to collect existing remote artifacts. `./dev run all` deliberately leaves the server DEB on the server. The server is a headless website host: install and test the DEB on a Linux desktop, and MSIs on Legion.
 
 ## 14–19 · Background, reference and recorded evidence
 

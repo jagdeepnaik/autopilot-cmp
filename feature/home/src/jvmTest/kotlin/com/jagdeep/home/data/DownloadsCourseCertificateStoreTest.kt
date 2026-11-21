@@ -20,9 +20,9 @@ class DownloadsCourseCertificateStoreTest {
             assertFalse(store.collectDownloaded(target), "The first observation waits for Chrome to finish writing")
             assertTrue(store.collectDownloaded(target))
             assertTrue(store.hasCertificate(target))
-            assertTrue(downloads.resolve("AutoPilot/Jagdeep Shivdas Naik/10. Spiritual Wellness.pdf").isFile)
+            assertTrue(downloads.resolve("AutoPilot/Profile/Jagdeep Shivdas Naik/10. Spiritual Wellness.pdf").isFile)
             store.recordResultUrl(target, "https://sagarmeinyog.com/dashboard/courses/module/assessment/result/result")
-            assertTrue(downloads.resolve("AutoPilot/Jagdeep Shivdas Naik/passed-result-urls.txt").readText().contains("Spiritual Wellness"))
+            assertTrue(downloads.resolve("AutoPilot/Profile/Jagdeep Shivdas Naik/passed-result-urls.txt").readText().contains("Spiritual Wellness"))
         } finally {
             downloads.deleteRecursively()
         }
@@ -38,7 +38,7 @@ class DownloadsCourseCertificateStoreTest {
             store.confirmDownloaded(target)
 
             assertTrue(store.hasCertificate(target))
-            assertTrue(downloads.resolve("AutoPilot/Jagdeep Shivdas Naik/certificate-completions.txt").readText().contains("Emotional Wellness"))
+            assertTrue(downloads.resolve("AutoPilot/Profile/Jagdeep Shivdas Naik/certificate-completions.txt").readText().contains("Emotional Wellness"))
         } finally {
             downloads.deleteRecursively()
         }

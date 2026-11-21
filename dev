@@ -2,24 +2,31 @@
 # One command for all project development operations.
 #
 # Desktop workflows:
-#   ./dev.sh sync all
-#   ./dev.sh build legion
-#   ./dev.sh run mac
-#   ./dev.sh fetch all
-#   ./dev.sh debug legion
-#   ./dev.sh sync-data all
-#   ./dev.sh merge-answer-bank all
+#   ./dev sync all
+#   ./dev build legion
+#   ./dev run mac
+#   ./dev fetch all
+#   ./dev debug legion
+#   ./dev sync-database all
+#   ./dev sync-certificates all
+#   ./dev merge-answer-bank all
 #
 # Git:
-#   ./dev.sh git status
-#   ./dev.sh git push-all "Describe the change"
-#   ./dev.sh git pull
+#   ./dev git status
+#   ./dev git push-all "Describe the change"
+#   ./dev git pull
 #
 # Server Windows VM:
-#   ./dev.sh vm status
-#   ./dev.sh vm start --headless
-#   ./dev.sh vm test
-#   ./dev.sh vm stop
+#   ./dev home-server-vm-win status
+#   ./dev home-server-vm-win start --headless
+#   ./dev home-server-vm-win test
+#   ./dev home-server-vm-win stop
+#
+# Home server itself:
+#   ./dev home-server status
+#   ./dev home-server start
+#   ./dev home-server stop
+#   ./dev home-server restart
 #
 # Use the detailed help in the documentation: private/docs/01_ONE_COMMAND_BUILDS.md.
 set -euo pipefail
@@ -29,62 +36,139 @@ cd "$ROOT"
 
 dev_usage() {
     cat <<'EOF'
-Project development command
+AutoPilot development command
 
-Desktop workflows:
-  ./dev.sh <sync|build|run|fetch|debug|sync-data|merge-answer-bank> <target>
-  Add --no-tests or --remote before or after the action and target.
+DESKTOP WORKFLOWS
+  ./dev <action> <target> [options]
 
-Git:
-  ./dev.sh git <status|check|fetch|pull|diff|history|branches|push-all>
+  Actions:
+    sync                  Push committed Mac changes and pull them to the target.
+    sync-database         Copy progress databases and settings only.
+    sync-certificates     Copy user certificates only; never overwrite an existing copy.
+    build                 Sync, run focused tests and build the target artifact.
+    run                   Build, install and check where supported.
+    fetch                 Build/copy the target installer to Downloads/AutoPilot/Builds.
+    debug                 Sync and start a debug run on the target.
+    merge-answer-bank     Merge unique synced answer-bank entries (target: all).
 
-Server Windows VM:
-  ./dev.sh vm <status|test|start|stop> [--headless] [--remote]
+  Targets:
+    mac                   This Mac.
+    legion                Physical Legion Windows laptop.
+    home-server            Debian home server and Linux DEB build.
+    home-server-vm-win     Windows build VM hosted on home-server.
+    mac-vm-win             Windows VM running on this Mac.
+    mac-vm-linux           Linux VM running on this Mac.
+    local-all              Mac plus both Mac-local VMs.
+    all                   Every configured desktop target.
 
-Examples:
-  ./dev.sh sync all
-  ./dev.sh build legion
-  ./dev.sh run mac
-  ./dev.sh git push-all "Describe the change"
-  ./dev.sh vm start --headless
+  Options:
+    --remote              Use Cloudflare routes for home-server and Legion.
+    --no-tests            Skip focused tests during a build.
+    Options may appear anywhere; the preferred style is flag-last:
+      ./dev build home-server-vm-win --remote
+
+HOME SERVER
+  ./dev home-server status
+  ./dev home-server start
+  ./dev home-server stop
+  ./dev home-server restart
+  Add --remote to inspect/control it through Cloudflare.
+
+HOME SERVER WINDOWS VM
+  ./dev home-server-vm-win status
+  ./dev home-server-vm-win test
+  ./dev home-server-vm-win start
+  ./dev home-server-vm-win start --headless
+  ./dev home-server-vm-win stop
+  Add --remote to use Cloudflare.
+
+GIT
+  ./dev git status             Show branch and changed files.
+  ./dev git check              Show GitHub ahead/behind status.
+  ./dev git fetch              Download GitHub history without changing files.
+  ./dev git pull               Fast-forward clean main.
+  ./dev git diff               Show staged and unstaged changes.
+  ./dev git history            Show recent commits.
+  ./dev git branches           Show branches and tracking state.
+  ./dev git push-all [message] Commit all non-ignored changes and push main.
+
+VERSION RELEASE
+  ./dev version patch          Increment the bug-fix version.
+  ./dev version minor          Increment the feature version.
+  ./dev version major          Increment the breaking-change version.
+
+COMMON EXAMPLES
+  ./dev sync all
+  ./dev build home-server --remote
+  ./dev build home-server-vm-win --no-tests --remote
+  ./dev run legion
+  ./dev fetch all
+  ./dev sync-database all
+  ./dev sync-certificates all
+  ./dev debug mac
+  ./dev git push-all "Describe the change"
 EOF
+}
+
+# The server Windows VM is reached through the Debian host's SSH tunnel. Keep the route here
+# rather than adding another SSH config alias for the VM.
+windows_ssh() {
+    local host="$1"
+    shift
+    if [ "$host" = "$VM_HOST" ]; then
+        ssh -S none -o ConnectTimeout=10 -o ProxyJump="$VM_JUMP_HOST" -p "$VM_PORT" "$VM_USER@127.0.0.1" "$@"
+    else
+        ssh "$host" "$@"
+    fi
+}
+
+windows_scp() {
+    local host="$1" source="$2" destination="$3" recursive=()
+    [ "${4:-}" = recursive ] && recursive=(-r)
+    if [ "$host" = "$VM_HOST" ]; then
+        scp -o ConnectTimeout=10 -o ProxyJump="$VM_JUMP_HOST" -P "$VM_PORT" "${recursive[@]}" "$VM_USER@127.0.0.1:$source" "$destination"
+    else
+        scp "${recursive[@]}" "$host:$source" "$destination"
+    fi
 }
 
 desktop_main() {
 # One command from the Mac to sync, build, install and debug AutoPilot on every desktop machine.
 #
-#   ./dev.sh [--no-tests] [--remote] <action> <target>
+#   ./dev [--no-tests] [--remote] <action> <target>
 #
 #   Standard action-first examples:
-#     ./dev.sh sync all
-#     ./dev.sh build all
-#     ./dev.sh run all
-#     ./dev.sh fetch all
-#     ./dev.sh sync-data all
-#     ./dev.sh merge-answer-bank all
+#     ./dev sync all
+#     ./dev build all
+#     ./dev run all
+#     ./dev fetch all
+#     ./dev sync-database all
+#     ./dev sync-certificates all
+#     ./dev merge-answer-bank all
 #
 #   target   mac      this Mac: macOS app in /Applications
 #            legion   Windows laptop (ssh home-legion): MSI, installed on Legion
-#            server   Debian home server (ssh home-server): Linux DEB, copied to the Mac
-#            server-vm-win Windows VM on the home server (ssh home-server-build): MSI, copied to the Mac
+#            home-server   Debian home server (ssh home-server): Linux DEB, copied to the Mac
+#            home-server-vm-win Windows VM on the home server (SSH through home-server): MSI, copied to the Mac
 #            mac-vm-win  Windows VM on this Mac (SSH host/path supplied by environment variables)
 #            mac-vm-linux  Linux VM on this Mac (SSH host/path supplied by environment variables)
 #            local-all      this Mac plus its local Windows and Linux VMs
-#            all      every configured desktop target: mac, Legion, server and both VM pairs
+#            all      every configured desktop target: mac, Legion, home-server and both VM pairs
 #
 #   action   sync     push the Mac's commits and pull them on the target
-#            sync-data copy each machine's ~/.autopilot and ~/Downloads/AutoPilot to the Mac's
+#            sync-database copies each machine's ~/.autopilot; sync-certificates copies Profile certificates
 #                     ~/Downloads/AutoPilot/<machine> folder; it does not change Git or builds
 #            merge-answer-bank merge every synced answer bank into ~/Downloads/AutoPilot;
 #                               it does not change Git, build or install
 #            build    sync, focused tests, then build the installer
 #            run      build, then install/check the target
-#            fetch    copy existing installers to ~/Downloads/Builds/AutoPilot   (all, legion); build then copy one installer (server, server-vm-win)
+#            fetch    copy existing installers to ~/Downloads/AutoPilot/Builds   (all, legion); build then copy one installer (home-server, home-server-vm-win)
 #            debug    sync, start a debug run waiting on port 5005   (mac, legion, mac-vm-win, mac-vm-linux)
 #
 #   --no-tests  skip the focused tests
-#   --remote    force the home server through Cloudflare (home-server-remote, home-server-build-remote)
-#               Server targets otherwise try local SSH first and fall back automatically.
+#   --remote    explicitly use Cloudflare routes: home-server-remote and
+#               home-legion-remote. Without it, commands use direct local-network aliases and
+#               stop with a connection error if those aliases are unreachable.
 #
 #   Local VM configuration (defaults are examples; set these to your SSH aliases and checkout paths):
 #   MAC_WINDOWS_HOST, MAC_WINDOWS_DIR, MAC_LINUX_HOST, MAC_LINUX_DIR
@@ -94,22 +178,25 @@ desktop_main() {
 # never overwritten: the script stops and says what to do. See private/docs/01_ONE_COMMAND_BUILDS.md.
 set -euo pipefail
 
-SCRIPT="$ROOT/dev.sh"   # absolute, so it still works after cd
+SCRIPT="$ROOT/dev"   # absolute, so it still works after cd
 cd "$ROOT"
 
 LEGION_HOST="${LEGION_HOST:-home-legion}"
-LEGION_DIR='C:\Users\jagde\Projects\autopilot-cmp'
+LEGION_DIR='C:\Users\jagdeep\Projects\AutoPilot'
 SERVER_HOST="${SERVER_HOST:-home-server}"
 SERVER_DIR='/srv/build/autopilot-cmp'
-VM_HOST="${VM_HOST:-home-server-build}"
+VM_HOST='server-vm'
+VM_JUMP_HOST="$SERVER_HOST"
+VM_USER='builduser'
+VM_PORT=2222
 VM_DIR='C:\Build\autopilot-cmp'
-MAC_WINDOWS_HOST="${MAC_WINDOWS_HOST:-mac-windows-vm}"
+MAC_WINDOWS_HOST="${MAC_WINDOWS_HOST:-mac-vm-windows}"
 MAC_WINDOWS_DIR="${MAC_WINDOWS_DIR:-C:\Users\Jagdeep\Projects\AutoPilot}"
-MAC_LINUX_HOST="${MAC_LINUX_HOST:-mac-linux-vm}"
+MAC_LINUX_HOST="${MAC_LINUX_HOST:-mac-vm-debian}"
 MAC_LINUX_DIR="${MAC_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
-DOWNLOADS="$HOME/Downloads/Builds/AutoPilot"
+DOWNLOADS="$HOME/Downloads/AutoPilot/Builds"
 SYNC_DATA_ROOT="${SYNC_DATA_ROOT:-$HOME/Downloads/AutoPilot/Sync}"
-LEGION_HOME='C:/Users/jagde'
+LEGION_HOME='C:/Users/jagdeep'
 SERVER_HOME='/home/jagdeep'
 VM_HOME='C:/Users/builduser'
 MAC_WINDOWS_HOME="${MAC_WINDOWS_HOME:-C:\Users\Jagdeep}"
@@ -130,7 +217,7 @@ REMOTE_MODE=0
 for arg in "$@"; do
     case "$arg" in
         --no-tests) TESTS=0 ;;
-        --remote) REMOTE_MODE=1; SERVER_HOST=home-server-remote; VM_HOST=home-server-build-remote ;;
+        --remote) REMOTE_MODE=1; LEGION_HOST=home-legion-remote; SERVER_HOST=home-server-remote; VM_JUMP_HOST=home-server-remote ;;
         -h|--help) usage; exit 0 ;;
         *) POSITIONAL+=("$arg") ;;
     esac
@@ -138,14 +225,14 @@ done
 
 TARGET=''
 ACTIONS=()
-is_target() { case "$1" in mac|legion|server|server-vm-win|mac-vm-win|mac-vm-linux|local-all|all) return 0 ;; *) return 1 ;; esac; }
-is_action() { case "$1" in sync|sync-data|merge-answer-bank|build|run|fetch|debug) return 0 ;; *) return 1 ;; esac; }
+is_target() { case "$1" in mac|legion|home-server|home-server-vm-win|mac-vm-win|mac-vm-linux|local-all|all) return 0 ;; *) return 1 ;; esac; }
+is_action() { case "$1" in sync|sync-database|sync-certificates|merge-answer-bank|build|run|fetch|debug) return 0 ;; *) return 1 ;; esac; }
 
 if [ "${#POSITIONAL[@]}" -eq 2 ] && is_action "${POSITIONAL[0]}" && is_target "${POSITIONAL[1]}"; then
     ACTIONS=("${POSITIONAL[0]}")
     TARGET="${POSITIONAL[1]}"
 else
-    echo "Use exactly: ./dev.sh <action> <target> (see --help)." >&2
+    echo "Use exactly: ./dev <action> <target> (see --help)." >&2
     usage
     exit 2
 fi
@@ -153,22 +240,6 @@ fi
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 fail() { printf '\n\033[31mStopped: %s\033[0m\n' "$*" >&2; exit 1; }
 
-select_server_hosts() {
-    [ "$REMOTE_MODE" -eq 1 ] && return 0
-    if [[ "$TARGET" == server || "$TARGET" == all ]] && ! ssh -o BatchMode=yes -o ConnectTimeout=8 -o ConnectionAttempts=1 "$SERVER_HOST" true >/dev/null 2>&1; then
-        echo "Home server local SSH is unavailable; using home-server-remote."
-        SERVER_HOST=home-server-remote
-    fi
-    if [[ "$TARGET" == server-vm-win || "$TARGET" == all ]] && ! ssh -o BatchMode=yes -o ConnectTimeout=8 -o ConnectionAttempts=1 "$VM_HOST" true >/dev/null 2>&1; then
-        echo "Server VM local SSH is unavailable; using home-server-build-remote."
-        SERVER_HOST=home-server-remote
-        VM_HOST=home-server-build-remote
-    fi
-}
-
-case "$TARGET" in
-    server|server-vm-win|all) select_server_hosts ;;
-esac
 # PowerShell on a Windows machine. The script is sent base64-encoded, so no quoting breaks between
 # this shell, ssh, the remote default shell and PowerShell.
 windows_ps() {
@@ -176,7 +247,7 @@ windows_ps() {
     script="\$ErrorActionPreference = 'Stop'; \$ProgressPreference = 'SilentlyContinue'; Set-Location '$dir'
 $body"
     encoded=$(printf '%s' "$script" | iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n')
-    ssh "$host" "powershell -NoProfile -ExecutionPolicy RemoteSigned -EncodedCommand $encoded"
+    windows_ssh "$host" "powershell -NoProfile -ExecutionPolicy RemoteSigned -EncodedCommand $encoded"
 }
 
 # PowerShell on a Windows machine without assuming the project checkout exists. This is used for
@@ -185,7 +256,11 @@ windows_ps_raw() {
     local host="$1" body="$2" encoded
     encoded=$(printf '%s' "\$ErrorActionPreference = 'Stop'; \$ProgressPreference = 'SilentlyContinue'
 $body" | iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n')
-    ssh "${DATA_SSH_OPTS[@]}" "$host" "powershell -NoProfile -ExecutionPolicy RemoteSigned -EncodedCommand $encoded"
+    if [ "$host" = "$VM_HOST" ]; then
+        windows_ssh "$host" "powershell -NoProfile -ExecutionPolicy RemoteSigned -EncodedCommand $encoded"
+    else
+        ssh "${DATA_SSH_OPTS[@]}" "$host" "powershell -NoProfile -ExecutionPolicy RemoteSigned -EncodedCommand $encoded"
+    fi
 }
 
 # --- Git sync -----------------------------------------------------------------------------------
@@ -523,12 +598,12 @@ fetch_all_builds() {
 }
 
 fetch_legion_builds() {
-    fetch_artifact_group Legion "$LEGION_HOST" 'C:/Users/jagde/Projects/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi' msi
+    fetch_artifact_group Legion "$LEGION_HOST" 'C:/Users/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/msi' msi
 }
 
 # --- Machine data sync --------------------------------------------------------------------------
 # This copies app data, not source code: the hidden .autopilot folder contains local progress and
-# settings, while Downloads/AutoPilot contains downloaded certificates. Existing files in the Mac
+# settings, while Downloads/AutoPilot/Profile contains downloaded certificates. Existing files in the Mac
 # Sync folder are updated; nothing is deleted. Data collection is best-effort: an offline machine
 # is skipped after a short connection timeout and the next machine is processed.
 DATA_SSH_OPTS=(-o ConnectTimeout=8 -o ConnectionAttempts=1)
@@ -545,10 +620,11 @@ copy_local_downloads_tree() {
     [ -d "$source" ] || { echo "Not present: $source (skipped)"; return 0; }
     mkdir -p "$destination"
     # The per-machine folders live inside this source. Exclude them so a repeated sync cannot
-    # recurse into its own previous output.
+    # recurse into its own previous output; also omit installers and scratch answer-bank exports.
     tar -C "$source" \
-        --exclude='./Sync' --exclude='./mac' --exclude='./legion' --exclude='./server' \
-        --exclude='./server-vm-win' --exclude='./mac-vm-win' --exclude='./mac-vm-linux' \
+        --exclude='./Sync' --exclude='./mac' --exclude='./legion' --exclude='./home-server' \
+        --exclude='./home-server-vm-win' --exclude='./mac-vm-win' --exclude='./mac-vm-linux' \
+        --exclude='./Builds' --exclude='./Misc' \
         -cf - . | tar -C "$destination" -xf -
     echo "Copied $source (excluding machine folders) -> $destination"
 }
@@ -567,6 +643,20 @@ copy_unix_tree() {
     echo "$label: copied $source -> $destination"
 }
 
+copy_unix_downloads_tree() {
+    local label="$1" host="$2" source="$3" destination="$4"
+    if ! ssh "${DATA_SSH_OPTS[@]}" "$host" "test -d '$source'"; then
+        echo "$label: not present: $source (skipped)"
+        return 0
+    fi
+    mkdir -p "$destination"
+    if ! ssh "${DATA_SSH_OPTS[@]}" "$host" "tar -C '$source' --exclude='./Builds' --exclude='./Sync' --exclude='./Misc' -cf - ." | tar -C "$destination" -xf -; then
+        echo "$label: couldn't copy $source (skipped)"
+        return 0
+    fi
+    echo "$label: copied profile/download folders from $source -> $destination (excluding Builds, Sync and Misc)"
+}
+
 copy_windows_tree() {
     local label="$1" host="$2" source="$3" destination="$4" parent
     if ! windows_ps_raw "$host" "if (-not (Test-Path -LiteralPath '$source' -PathType Container)) { exit 3 }" >/dev/null; then
@@ -575,52 +665,149 @@ copy_windows_tree() {
     fi
     parent=$(dirname "$destination")
     mkdir -p "$parent"
-    if ! scp "${DATA_SSH_OPTS[@]}" -q -r "$host:$source" "$parent/"; then
+    if ! windows_scp "$host" "$source" "$parent/" recursive; then
         echo "$label: couldn't copy $source (skipped)"
         return 0
     fi
     echo "$label: copied $source -> $destination"
 }
 
-sync_data_local() {
+copy_windows_downloads_tree() {
+    local label="$1" host="$2" source="$3" destination="$4" names name
+    if ! windows_ps_raw "$host" "if (-not (Test-Path -LiteralPath '$source' -PathType Container)) { exit 3 }" >/dev/null; then
+        echo "$label: not present: $source (skipped)"
+        return 0
+    fi
+    names=$(windows_ps_raw "$host" "Get-ChildItem -LiteralPath '$source' -Directory | Where-Object { \$_.Name -notin @('Builds','Sync','Misc') } | ForEach-Object { \$_.Name }" | tr -d '\r') || {
+        echo "$label: couldn't list $source (skipped)"
+        return 0
+    }
+    mkdir -p "$destination"
+    while IFS= read -r name; do
+        [ -n "$name" ] || continue
+        if ! windows_scp "$host" "$source/$name" "$destination/" recursive; then
+            echo "$label: couldn't copy $name from $source (skipped)"
+            continue
+        fi
+    done <<< "$names"
+    echo "$label: copied profile/download folders from $source -> $destination (excluding Builds, Sync and Misc)"
+}
+
+sync_database_local() {
     local machine="$1" home="$2" destination="$SYNC_DATA_ROOT/$1"
-    step "$machine: copy AutoPilot data to Mac"
+    step "$machine: copy database and settings to Mac"
     copy_local_tree "$home/.autopilot" "$destination/Database"
-    copy_local_downloads_tree "$home/Downloads/AutoPilot" "$destination/AutoPilot"
 }
 
-sync_data_windows() {
+sync_database_windows() {
     local machine="$1" host="$2" home="$3" destination="$SYNC_DATA_ROOT/$1"
-    step "$machine: copy AutoPilot data to Mac"
+    step "$machine: copy database and settings to Mac"
     copy_windows_tree "$machine" "$host" "$home/.autopilot" "$destination/Database"
-    copy_windows_tree "$machine" "$host" "$home/Downloads/AutoPilot" "$destination/AutoPilot"
 }
 
-sync_data_linux() {
+sync_database_linux() {
     local machine="$1" host="$2" home="$3" destination="$SYNC_DATA_ROOT/$1"
-    step "$machine: copy AutoPilot data to Mac"
+    step "$machine: copy database and settings to Mac"
     copy_unix_tree "$machine" "$host" "$home/.autopilot" "$destination/Database"
-    copy_unix_tree "$machine" "$host" "$home/Downloads/AutoPilot" "$destination/AutoPilot"
 }
 
-sync_data_all() {
-    # Deliberately data-only: do not call mac_check_pushed or any source/Git sync helper here.
-    # Progress databases, settings and certificates are local machine state and do not require
-    # the project checkout to be committed or pushed.
-    step "Copy AutoPilot data only (no Git sync)"
-    sync_data_local mac "$HOME"
-    sync_data_windows legion "$LEGION_HOST" "$LEGION_HOME"
-    sync_data_linux server "$SERVER_HOST" "$SERVER_HOME"
-    sync_data_windows server-vm-win "$VM_HOST" "$VM_HOME"
-    sync_data_windows mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME"
-    sync_data_linux mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME"
-    echo "Machine data is in $SYNC_DATA_ROOT"
+sync_database_all() {
+    # Deliberately data-only: no Git sync is required for progress databases or settings.
+    step "Copy databases and settings only (no Git sync)"
+    sync_database_local mac "$HOME"
+    sync_database_windows legion "$LEGION_HOST" "$LEGION_HOME"
+    sync_database_linux home-server "$SERVER_HOST" "$SERVER_HOME"
+    sync_database_windows home-server-vm-win "$VM_HOST" "$VM_HOME"
+    sync_database_windows mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME"
+    sync_database_linux mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME"
+    echo "Database copies are in $SYNC_DATA_ROOT"
+}
+
+copy_local_certificates() {
+    local machine="$1" source="$2" destination="$SYNC_DATA_ROOT/$1/AutoPilot/Profile" file relative target copied=0 skipped=0
+    step "$machine: copy certificates only"
+    [ -d "$source" ] || { echo "$machine: no certificate folder: $source (skipped)"; return 0; }
+    while IFS= read -r -d '' file; do
+        relative="${file#"$source/"}"
+        target="$destination/$relative"
+        if [ -e "$target" ]; then
+            skipped=$((skipped + 1))
+            continue
+        fi
+        mkdir -p "$(dirname "$target")"
+        cp "$file" "$target"
+        copied=$((copied + 1))
+    done < <(find "$source" -type f -print0)
+    echo "$machine: copied $copied certificate(s), skipped $skipped existing file(s)"
+}
+
+copy_unix_certificates() {
+    local machine="$1" host="$2" source="$3" destination="$SYNC_DATA_ROOT/$1/AutoPilot/Profile" names relative target copied=0 skipped=0
+    step "$machine: copy certificates only"
+    if ! ssh "${DATA_SSH_OPTS[@]}" "$host" "test -d '$source'"; then
+        echo "$machine: no certificate folder: $source (skipped)"
+        return 0
+    fi
+    names=$(ssh "${DATA_SSH_OPTS[@]}" "$host" "find '$source' -type f -printf '%P\\n'" 2>/dev/null) || {
+        echo "$machine: couldn't list certificates (skipped)"
+        return 0
+    }
+    while IFS= read -r relative; do
+        [ -n "$relative" ] || continue
+        target="$destination/$relative"
+        if [ -e "$target" ]; then
+            skipped=$((skipped + 1))
+            continue
+        fi
+        mkdir -p "$(dirname "$target")"
+        if scp "${DATA_SSH_OPTS[@]}" -q "$host:$source/$relative" "$target"; then
+            copied=$((copied + 1))
+        fi
+    done <<< "$names"
+    echo "$machine: copied $copied certificate(s), skipped $skipped existing file(s)"
+}
+
+copy_windows_certificates() {
+    local machine="$1" host="$2" source="$3" destination="$SYNC_DATA_ROOT/$1/AutoPilot/Profile" names relative target copied=0 skipped=0
+    step "$machine: copy certificates only"
+    if ! windows_ps_raw "$host" "if (-not (Test-Path -LiteralPath '$source' -PathType Container)) { exit 3 }" >/dev/null; then
+        echo "$machine: no certificate folder: $source (skipped)"
+        return 0
+    fi
+    names=$(windows_ps_raw "$host" "\$root = '$source'; Get-ChildItem -LiteralPath \$root -File -Recurse | ForEach-Object { \$_.FullName.Substring(\$root.Length + 1) }" | tr -d '\r' | tr '\\' '/') || {
+        echo "$machine: couldn't list certificates (skipped)"
+        return 0
+    }
+    while IFS= read -r relative; do
+        [ -n "$relative" ] || continue
+        target="$destination/$relative"
+        if [ -e "$target" ]; then
+            skipped=$((skipped + 1))
+            continue
+        fi
+        mkdir -p "$(dirname "$target")"
+        if windows_scp "$host" "$source/$relative" "$target"; then
+            copied=$((copied + 1))
+        fi
+    done <<< "$names"
+    echo "$machine: copied $copied certificate(s), skipped $skipped existing file(s)"
+}
+
+sync_certificates_all() {
+    step "Copy certificates only (existing destination files are preserved)"
+    copy_local_certificates mac "$HOME/Downloads/AutoPilot/Profile"
+    copy_windows_certificates legion "$LEGION_HOST" "$LEGION_HOME/Downloads/AutoPilot/Profile"
+    copy_unix_certificates home-server "$SERVER_HOST" "$SERVER_HOME/Downloads/AutoPilot/Profile"
+    copy_windows_certificates home-server-vm-win "$VM_HOST" "$VM_HOME/Downloads/AutoPilot/Profile"
+    copy_windows_certificates mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME/Downloads/AutoPilot/Profile"
+    copy_unix_certificates mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME/Downloads/AutoPilot/Profile"
+    echo "Certificate copies are in $SYNC_DATA_ROOT"
 }
 
 merge_answer_bank() {
     [ "$TARGET" = all ] || fail "merge-answer-bank only supports the all target."
     local input_name='answer-banks.sagarmeinyog-ver-1.0.json'
-    local output="${ANSWER_BANK_OUTPUT:-$HOME/Downloads/AutoPilot/$input_name}"
+    local output="${ANSWER_BANK_OUTPUT:-$HOME/Downloads/AutoPilot/Misc/$input_name}"
     step "Merge synced answer banks"
     mkdir -p "$(dirname "$output")"
 
@@ -645,7 +832,7 @@ sources = sorted(
 if not sources:
     print(f"No synced answer banks found under {sync_root}/<machine>/Database/.", file=sys.stderr)
     print(f"Expected {input_name} or the app's stored sagarmeinyog-ver-1.0.json file.", file=sys.stderr)
-    print("Run: ./dev.sh sync-data all", file=sys.stderr)
+    print("Run: ./dev sync-database all", file=sys.stderr)
     raise SystemExit(1)
 
 def normalize(value):
@@ -717,7 +904,7 @@ PY
 vm_build() {
     step "Server VM: check it's running"
     ssh "$SERVER_HOST" "pgrep -f '^/usr/bin/qemu-system-x86_64 -name windows-build ' >/dev/null" \
-        || fail "the Windows VM isn't running. Start it with: ./dev.sh vm start --headless"
+        || fail "the Windows VM isn't running. Start it with: ./dev home-server-vm-win start --headless"
     windows_sync "Server VM" "$VM_HOST" "$VM_DIR"
     step "Server VM: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the MSI"
     windows_ps "$VM_HOST" "$VM_DIR" "& .\\private\\scripts\\windows\\Build-Distribution.ps1$( [ "$TESTS" -eq 1 ] || echo ' -SkipTests')" \
@@ -733,7 +920,7 @@ vm_fetch() {
     architecture=$(normalize_architecture "$(windows_ps_raw "$VM_HOST" '$env:PROCESSOR_ARCHITECTURE' | tr -d '\r')")
     destination_name=$(normalized_msi_name "$msi" "$architecture")
     mkdir -p "$DOWNLOADS"
-    scp -q "$VM_HOST:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/$msi" "$DOWNLOADS/$destination_name"
+    windows_scp "$VM_HOST" "C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/$msi" "$DOWNLOADS/$destination_name"
     remote=$(windows_ps "$VM_HOST" "$VM_DIR" "(Get-FileHash .\\desktopApp\\build\\compose\\binaries\\main-release\\msi\\$msi).Hash" | tr -d '\r' | tr 'A-F' 'a-f')
     local_hash=$(shasum -a 256 "$DOWNLOADS/$destination_name" | cut -d' ' -f1)
     [ "$remote" = "$local_hash" ] || fail "the copied $destination_name doesn't match the VM's (hash mismatch)."
@@ -747,27 +934,35 @@ run_action() {
     local action="$1"
     case "$action:$TARGET" in
         sync:mac) mac_sync ;;
-        sync-data:mac) sync_data_local mac "$HOME" ;;
+        sync-database:mac) sync_database_local mac "$HOME" ;;
+        sync-certificates:mac) copy_local_certificates mac "$HOME/Downloads/AutoPilot/Profile" ;;
         sync:legion) windows_sync Legion "$LEGION_HOST" "$LEGION_DIR" ;;
-        sync-data:legion) sync_data_windows legion "$LEGION_HOST" "$LEGION_HOME" ;;
-        sync:server) server_sync ;;
-        sync-data:server) sync_data_linux server "$SERVER_HOST" "$SERVER_HOME" ;;
-        sync:server-vm-win) windows_sync "Server VM" "$VM_HOST" "$VM_DIR" ;;
-        sync-data:server-vm-win) sync_data_windows server-vm-win "$VM_HOST" "$VM_HOME" ;;
+        sync-database:legion) sync_database_windows legion "$LEGION_HOST" "$LEGION_HOME" ;;
+        sync-certificates:legion) copy_windows_certificates legion "$LEGION_HOST" "$LEGION_HOME/Downloads/AutoPilot/Profile" ;;
+        sync:home-server) server_sync ;;
+        sync-database:home-server) sync_database_linux home-server "$SERVER_HOST" "$SERVER_HOME" ;;
+        sync-certificates:home-server) copy_unix_certificates home-server "$SERVER_HOST" "$SERVER_HOME/Downloads/AutoPilot/Profile" ;;
+        sync:home-server-vm-win) windows_sync "Server VM" "$VM_HOST" "$VM_DIR" ;;
+        sync-database:home-server-vm-win) sync_database_windows home-server-vm-win "$VM_HOST" "$VM_HOME" ;;
+        sync-certificates:home-server-vm-win) copy_windows_certificates home-server-vm-win "$VM_HOST" "$VM_HOME/Downloads/AutoPilot/Profile" ;;
         sync:mac-vm-win) windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR" ;;
-        sync-data:mac-vm-win) sync_data_windows mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME" ;;
+        sync-database:mac-vm-win) sync_database_windows mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME" ;;
+        sync-certificates:mac-vm-win) copy_windows_certificates mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME/Downloads/AutoPilot/Profile" ;;
         sync:mac-vm-linux) linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR" ;;
-        sync-data:mac-vm-linux) sync_data_linux mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME" ;;
+        sync-database:mac-vm-linux) sync_database_linux mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME" ;;
+        sync-certificates:mac-vm-linux) copy_unix_certificates mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME/Downloads/AutoPilot/Profile" ;;
         sync:local-all) local_all_sync ;;
-        sync-data:local-all) sync_data_local mac "$HOME"; sync_data_windows mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME"; sync_data_linux mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME" ;;
+        sync-database:local-all) sync_database_local mac "$HOME"; sync_database_windows mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME"; sync_database_linux mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME" ;;
+        sync-certificates:local-all) copy_local_certificates mac "$HOME/Downloads/AutoPilot/Profile"; copy_windows_certificates mac-vm-win "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_HOME/Downloads/AutoPilot/Profile"; copy_unix_certificates mac-vm-linux "$MAC_LINUX_HOST" "$MAC_LINUX_HOME/Downloads/AutoPilot/Profile" ;;
         sync:all) mac_check_pushed; windows_sync Legion "$LEGION_HOST" "$LEGION_DIR"; server_sync; windows_sync "Server VM" "$VM_HOST" "$VM_DIR"; windows_sync "Mac Windows VM" "$MAC_WINDOWS_HOST" "$MAC_WINDOWS_DIR"; linux_sync "Mac Linux VM" "$MAC_LINUX_HOST" "$MAC_LINUX_DIR" ;;
-        sync-data:all) sync_data_all ;;
+        sync-database:all) sync_database_all ;;
+        sync-certificates:all) sync_certificates_all ;;
         merge-answer-bank:all) merge_answer_bank ;;
 
         build:mac) mac_build ;;
         build:legion) legion_build ;;
-        build:server) server_build ;;
-        build:server-vm-win) vm_build ;;
+        build:home-server) server_build ;;
+        build:home-server-vm-win) vm_build ;;
         build:mac-vm-win) local_windows_build ;;
         build:mac-vm-linux) local_linux_build ;;
         build:local-all) local_all_build ;;
@@ -775,8 +970,8 @@ run_action() {
 
         run:mac) mac_build; mac_install ;;
         run:legion) legion_build; legion_install ;;
-        run:server) server_build ;;
-        run:server-vm-win) vm_build; vm_fetch ;;
+        run:home-server) server_build ;;
+        run:home-server-vm-win) vm_build; vm_fetch ;;
         run:mac-vm-win) local_windows_build; local_windows_install ;;
         run:mac-vm-linux) local_linux_build; local_linux_install ;;
         run:local-all) local_all_install ;;
@@ -784,8 +979,8 @@ run_action() {
 
         fetch:all) fetch_all_builds ;;
         fetch:legion) fetch_legion_builds ;;
-        fetch:server) server_build; server_fetch ;;
-        fetch:server-vm-win) vm_build; vm_fetch ;;
+        fetch:home-server) server_build; server_fetch ;;
+        fetch:home-server-vm-win) vm_build; vm_fetch ;;
         fetch:mac|fetch:mac-vm-win|fetch:mac-vm-linux|fetch:local-all)
             unsupported fetch "This target does not copy an installer to the Mac." ;;
 
@@ -793,7 +988,7 @@ run_action() {
         debug:legion) legion_debug ;;
         debug:mac-vm-win) local_windows_debug ;;
         debug:mac-vm-linux) local_linux_debug ;;
-        debug:server|debug:server-vm-win|debug:local-all|debug:all)
+        debug:home-server|debug:home-server-vm-win|debug:local-all|debug:all)
             unsupported debug "Debug one desktop at a time: use mac, legion, mac-vm-win or mac-vm-linux." ;;
 
         *) fail "'$action' isn't available for $TARGET. See --help." ;;
@@ -818,7 +1013,7 @@ usage() {
 Project Git script
 
 Usage:
-  ./dev.sh git <command> [arguments]
+  ./dev git <command> [arguments]
 
 Command                         What it does
 status                          Show the current branch and changed files.
@@ -991,23 +1186,91 @@ EOF
     echo "Released $next. The next desktop build keeps its increasing Git build number."
 }
 
+home_server_main() {
+    local action="${1:-}" host=home-server
+    case "$action" in status|start|stop|restart) shift ;; -h|--help|help|'')
+        cat <<'EOF'
+Home server control
+Usage: ./dev home-server <status|start|stop|restart> [--remote]
+status: detailed Debian, resource, service, Docker, port and Windows VM status
+start: check the server or wake it with SERVER_MAC and wakeonlan
+stop: power off Debian cleanly; refuses while the Windows VM is running
+restart: reboot Debian cleanly; refuses while the Windows VM is running
+EOF
+        [ -n "$action" ] && exit 0 || exit 2 ;;
+        *) echo "Unknown action: $action (see --help)" >&2; exit 2 ;;
+    esac
+    [ "${1:-}" = --remote ] && host=home-server-remote
+    ssh_server() { ssh -o ConnectTimeout=10 "$host" "$@"; }
+    reachable() { ssh -o BatchMode=yes -o ConnectTimeout=5 "$host" true >/dev/null 2>&1; }
+    status_server() {
+        printf '\n\033[1m== Home server: %s\033[0m\n' "$host"
+        ssh_server 'set -o pipefail
+echo "Hostname:       $(hostname)"
+echo "OS:             $(. /etc/os-release && printf "%s %s" "$PRETTY_NAME" "$VERSION")"
+echo "Kernel:         $(uname -srmo)"
+echo "Uptime:         $(uptime -p)"
+echo "Load:           $(cut -d" " -f1-3 /proc/loadavg)"
+echo "CPU:            $(nproc) logical CPUs; $(lscpu 2>/dev/null | awk -F: "/Model name/ {gsub(/^ +/, \"\", \$2); print \$2; exit}")"
+free -h | awk "/^Mem:/ {print \"Memory:         \" \$3 \" used / \" \$2 \" total; \" \$7 \" available\"}"
+df -h -P / /srv 2>/dev/null | tail -n +2 | awk "!seen[\$6]++ {print \"Disk:           \" \$6 \" \" \$3 \" used / \" \$2 \" total (\" \$5 \" used)\"}"
+echo "Addresses:      $(hostname -I 2>/dev/null | xargs)"
+echo "SSH:            $(systemctl is-active ssh 2>/dev/null || systemctl is-active sshd 2>/dev/null || true)"
+echo "Docker:         $(systemctl is-active docker 2>/dev/null || true)"
+failed=$(systemctl --failed --no-legend --plain 2>/dev/null | sed "/^$/d" | head -20); if [ -n "$failed" ]; then echo "Failed units:"; printf "%s\n" "$failed"; else echo "Failed units:   none"; fi
+echo "Docker containers:"; command -v docker >/dev/null && docker ps --format "  {{.Names}}  {{.Status}}  {{.Ports}}" 2>/dev/null || echo "  unavailable"
+echo "Listening ports:"; ss -H -ltn 2>/dev/null | awk "{print \"  \" \$4}" | head -30
+pgrep -af "qemu-system.*windows-build" >/dev/null 2>&1 && echo "Windows VM:      running" || echo "Windows VM:      stopped"
+if [ -d /srv/build/autopilot-cmp/.git ]; then echo "AutoPilot:       $(git -C /srv/build/autopilot-cmp log -1 --format="%h %s")"; else echo "AutoPilot:       checkout missing"; fi'
+    }
+    power_server() {
+        local operation="$1"
+        reachable || { echo "Can't reach $host. Check the network, or add --remote." >&2; exit 1; }
+        ssh_server 'pgrep -f "qemu-system.*windows-build" >/dev/null 2>&1' && { echo "Stop the Windows VM first with ./dev home-server-vm-win stop." >&2; exit 1; } || true
+        ssh -tt "$host" "sudo systemctl $operation"
+    }
+    case "$action" in
+        status) status_server ;;
+        start)
+            if reachable; then
+                status_server
+            else
+                [ -n "${SERVER_MAC:-}" ] && command -v wakeonlan >/dev/null 2>&1 || { echo "Set SERVER_MAC and install wakeonlan to start an offline server." >&2; exit 1; }
+                wakeonlan "$SERVER_MAC" >/dev/null
+                waited=0
+                until reachable; do
+                    [ "$waited" -ge 180 ] && { echo "The home server did not answer SSH within 3 minutes." >&2; exit 1; }
+                    sleep 5; waited=$((waited + 5)); printf '.'
+                done
+                echo
+                status_server
+            fi
+            ;;
+        stop) power_server poweroff ;;
+        restart) power_server reboot ;;
+    esac
+}
+
 vm_main() {
 # Start, stop, check or test the Windows build VM on the home server, from the Mac, in one line.
 #
-#   ./dev.sh vm status            # is the VM running, and does Windows answer?
-#   ./dev.sh vm test              # sign in to Windows and check the build tools
-#   ./dev.sh vm start             # start it; you type the VNC console password
-#   ./dev.sh vm start --headless  # start it with a random console password (no prompt)
-#   ./dev.sh vm stop              # shut Windows down cleanly and wait for the VM to end
-#   add --remote to force Cloudflare; without it, local SSH falls back automatically when needed
+#   ./dev home-server-vm-win status            # is the VM running, and does Windows answer?
+#   ./dev home-server-vm-win test              # sign in to Windows and check the build tools
+#   ./dev home-server-vm-win start             # start it; you type the VNC console password
+#   ./dev home-server-vm-win start --headless  # start it with a random console password (no prompt)
+#   ./dev home-server-vm-win stop              # shut Windows down cleanly and wait for the VM to end
+#   add --remote to explicitly use Cloudflare; without it, the local SSH route is used
 #
 # Only the Windows guest starts or stops; Debian and the websites are never touched. A stop is
 # refused while a Gradle build is running in the VM, and the VM is never force-killed.
 set -euo pipefail
 
-SCRIPT="$ROOT/dev.sh"
+SCRIPT="$ROOT/dev"
 SERVER_HOST=home-server
-VM_HOST=home-server-build
+VM_HOST=server-vm
+VM_JUMP_HOST=home-server
+VM_USER=builduser
+VM_PORT=2222
 VM_DIR='/srv/vms/windows-build'
 WINDOWS_CHECKOUT='C:\Build\autopilot-cmp'
 REMOTE_MODE=0
@@ -1019,16 +1282,10 @@ HEADLESS=0
 for arg in "$@"; do
     case "$arg" in
         --headless) HEADLESS=1 ;;
-        --remote) REMOTE_MODE=1; SERVER_HOST=home-server-remote; VM_HOST=home-server-build-remote ;;
+        --remote) REMOTE_MODE=1; SERVER_HOST=home-server-remote; VM_JUMP_HOST=home-server-remote ;;
         *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
     esac
 done
-
-if [ "$REMOTE_MODE" -eq 0 ] && ! ssh -o BatchMode=yes -o ConnectTimeout=8 -o ConnectionAttempts=1 "$SERVER_HOST" true >/dev/null 2>&1; then
-    echo "Home server local SSH is unavailable; using home-server-remote."
-    SERVER_HOST=home-server-remote
-    VM_HOST=home-server-build-remote
-fi
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 fail() { printf '\n\033[31mStopped: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -1036,12 +1293,12 @@ ok() { printf '\033[32m%s\033[0m\n' "$*"; }
 
 vm_running() { ssh "$SERVER_HOST" "pgrep -f '^/usr/bin/qemu-system-x86_64 -name windows-build ' >/dev/null"; }
 # A fresh connection each time (-S none), so a shared one can't hide that Windows went away.
-windows_answers() { ssh -S none -o BatchMode=yes -o ConnectTimeout=8 "$VM_HOST" "echo ready" 2>/dev/null | grep -q ready; }
+windows_answers() { windows_ssh "$VM_HOST" "echo ready" 2>/dev/null | grep -q ready; }
 windows_ps() {
     local encoded
     encoded=$(printf '%s' "\$ErrorActionPreference = 'Stop'; \$ProgressPreference = 'SilentlyContinue'
 $1" | iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n')
-    ssh -S none -o ConnectTimeout=10 "$VM_HOST" "powershell -NoProfile -EncodedCommand $encoded"
+    windows_ssh "$VM_HOST" "powershell -NoProfile -EncodedCommand $encoded"
 }
 
 status() {
@@ -1146,11 +1403,15 @@ case "$command" in
         shift
         version_main "$@"
         ;;
-    vm|server-vm)
+    home-server)
+        shift
+        home_server_main "$@"
+        ;;
+    home-server-vm-win)
         shift
         vm_main "$@"
         ;;
-    sync|sync-data|merge-answer-bank|build|run|fetch|debug|--no-tests|--remote)
+        sync|sync-database|sync-certificates|merge-answer-bank|build|run|fetch|debug|--no-tests|--remote)
         desktop_main "$@"
         ;;
     -h|--help|help|'')

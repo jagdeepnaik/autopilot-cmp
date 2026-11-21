@@ -9,7 +9,7 @@ import java.nio.file.StandardCopyOption
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-/** Moves PDFs Chrome has just downloaded into ~/Downloads/AutoPilot/<profile>/ by module. */
+/** Moves PDFs Chrome has just downloaded into ~/Downloads/AutoPilot/Profile/<profile>/ by module. */
 class DownloadsCourseCertificateStore(
     private val downloads: File = File(System.getProperty("user.home"), "Downloads"),
 ) : CourseCertificateStore {
@@ -18,7 +18,9 @@ class DownloadsCourseCertificateStore(
     override fun hasCertificate(target: CourseCertificateTarget): Boolean =
         (destination(target).isFile && destination(target).length() > 0) ||
             (legacyDestination(target).isFile && legacyDestination(target).length() > 0) ||
-            confirmed(target)
+            (previousFolderDestination(target).isFile && previousFolderDestination(target).length() > 0) ||
+            (previousLegacyDestination(target).isFile && previousLegacyDestination(target).length() > 0) ||
+            confirmed(target) || confirmedInPreviousFolder(target)
 
     override fun prepareDownload(target: CourseCertificateTarget) {
         startedAt[target] = System.currentTimeMillis()
@@ -77,6 +79,16 @@ class DownloadsCourseCertificateStore(
     private fun legacyDestination(target: CourseCertificateTarget): File = File(profileFolder(target), "${safe(target.module)}.pdf")
 
     private fun profileFolder(target: CourseCertificateTarget): File =
+        File(File(File(downloads, "AutoPilot"), "Profile"), safe(target.profileName))
+
+    /** Certificates saved by earlier app versions lived directly under Downloads/AutoPilot. */
+    private fun previousFolderDestination(target: CourseCertificateTarget): File =
+        File(previousProfileFolder(target), "${certificateFileStem(target)}.pdf")
+
+    private fun previousLegacyDestination(target: CourseCertificateTarget): File =
+        File(previousProfileFolder(target), "${safe(target.module)}.pdf")
+
+    private fun previousProfileFolder(target: CourseCertificateTarget): File =
         File(File(downloads, "AutoPilot"), safe(target.profileName))
 
     private fun certificateFileStem(target: CourseCertificateTarget): String {
@@ -86,6 +98,10 @@ class DownloadsCourseCertificateStore(
 
     private fun confirmed(target: CourseCertificateTarget): Boolean =
         File(destination(target).parentFile, "certificate-completions.txt").takeIf(File::isFile)
+            ?.readLines()?.any { it == target.module } == true
+
+    private fun confirmedInPreviousFolder(target: CourseCertificateTarget): Boolean =
+        File(previousProfileFolder(target), "certificate-completions.txt").takeIf(File::isFile)
             ?.readLines()?.any { it == target.module } == true
 
     private fun safe(value: String): String = value.trim().replace(Regex("[^A-Za-z0-9._ -]+"), "_").trim('.',' ').take(100).ifBlank { "Unknown profile" }

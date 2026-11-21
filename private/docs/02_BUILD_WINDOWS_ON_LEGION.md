@@ -8,6 +8,70 @@ From the Mac: `./dev run legion`. It pushes, pulls on Legion, builds with tests,
 
 The manual steps below do the same thing one command at a time.
 
+## Legion local Debian VMs
+
+Legion currently runs two VirtualBox Debian guests:
+
+| VM | Legion-only SSH forward | Mac connection route | Checkout |
+| --- | ---: | --- | --- |
+| Debian1 | `2201` | `ssh -J home-legion -p 2201 jagdeep@127.0.0.1` | `/home/jagdeep/Projects/AutoPilot` |
+| Debian2 | `2202` | `ssh -J home-legion -p 2202 jagdeep@127.0.0.1` | `/home/jagdeep/Projects/AutoPilot` |
+
+The forwards bind to Legion loopback only; they are not exposed directly to the LAN. The Mac uses
+the dedicated `id_ed25519_mac_vms` key and `legion_debian_known_hosts` file. Password-free SSH was
+verified on both guests on 21 November 2026:
+
+```sh
+ssh -J home-legion -p 2201 jagdeep@127.0.0.1 'hostname; whoami; uname -m'
+ssh -J home-legion -p 2202 jagdeep@127.0.0.1 'hostname; whoami; uname -m'
+```
+
+### One-time Debian VM setup
+
+Git and Java are not installed yet on either guest. Run the following **inside each Debian VM**
+(or through the corresponding SSH connection). `sudo` will ask for that VM's Debian password:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y git openjdk-21-jdk unzip
+mkdir -p ~/Projects
+git clone https://github.com/jagdeepnaik/autopilot-cmp.git ~/Projects/AutoPilot
+```
+
+If the checkout already exists, use:
+
+```sh
+cd ~/Projects/AutoPilot
+git status --short
+git pull --ff-only
+```
+
+### Build on Debian1 or Debian2
+
+From the Mac, replace `2201` with `2202` for Debian2:
+
+```sh
+ssh -J home-legion -p 2201 jagdeep@127.0.0.1 \
+  'cd ~/Projects/AutoPilot && ./gradlew --no-daemon --console=plain --max-workers=2 :desktopApp:packageReleaseDeb'
+```
+
+The DEB is created under:
+
+```text
+~/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/deb/
+```
+
+Copy it to the Mac with:
+
+```sh
+scp -o ProxyJump=home-legion -P 2201 \
+  'jagdeep@127.0.0.1:/home/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/deb/*.deb' \
+  "$HOME/Downloads/AutoPilot/Builds/"
+```
+
+Use port `2202` for Debian2. The Debian VM package setup is currently blocked until the VM sudo
+password is entered once on each guest.
+
 ## PART C — BUILD AN EXISTING PROJECT — repeat for each build
 
 ### C1. Connect to Legion
@@ -24,15 +88,15 @@ If the connected prompt does not start with `PS`, enter:
 powershell.exe -NoProfile
 ```
 
-Expected: `PS C:\Users\jagde>`. You are now in **Windows SSH PowerShell**. All remaining Part C commands run there.
+Expected: `PS C:\Users\jagdeep>`. You are now in **Windows SSH PowerShell**. All remaining Part C commands run there.
 
 ### C2. Open AutoPilot
 
 ```powershell
-Set-Location C:\Users\jagde\Projects\autopilot-cmp
+Set-Location C:\Users\jagdeep\Projects\AutoPilot
 ```
 
-Expected prompt: `PS C:\Users\jagde\Projects\autopilot-cmp>`. Stop if the folder is missing.
+Expected prompt: `PS C:\Users\jagdeep\Projects\AutoPilot>`. Stop if the folder is missing.
 
 ### C3. Check for local edits
 

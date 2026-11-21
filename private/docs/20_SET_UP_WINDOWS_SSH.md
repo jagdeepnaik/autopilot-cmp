@@ -11,8 +11,8 @@
 | `ssh home-legion` | **Physical Legion Windows laptop — use this guide** |
 | `ssh home-server` | Debian website/build host over the home network |
 | `ssh home-server-remote` | The same Debian host through Cloudflare |
-| `ssh home-server-build` | Separate Windows VM through Debian, local route |
-| `ssh home-server-build-remote` | The same Windows VM through Cloudflare |
+| `ssh -J home-server -p 2222 builduser@127.0.0.1` | Separate Windows VM through Debian, local route |
+| `ssh -J home-server-remote -p 2222 builduser@127.0.0.1` | The same Windows VM through Cloudflare |
 
 The laptop and VM are different build environments. This document's repeatable workflow uses **`home-legion`**, not either server/VM shortcut.
 

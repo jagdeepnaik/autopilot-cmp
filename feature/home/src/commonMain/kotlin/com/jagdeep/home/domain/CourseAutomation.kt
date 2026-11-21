@@ -995,7 +995,21 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val back = elements.firstOrNull { it.href in setOf("/dashboard", "/dashboard/courses") && !forbidden(it.label) }
                 ?: elements.firstOrNull { it.label.lowercase() in setOf("back to dashboard", "dashboard", "back to courses", "all courses") }
             if (back != null) { issue(back, message = "Videos finished. Returning to the dashboard."); blockedPath = pageId }
-            else { completed = true; detail = "Available videos finished. Quizzes and assessments remain yours to complete." }
+            else {
+                val missingSmyModules = if (isSmyCatalogueActive) missingSmyVideoModules() else emptyList()
+                if (missingSmyModules.isNotEmpty()) {
+                    // Some SMY course pages omit a dashboard link from the accessible inventory.
+                    // Return to the same site's dashboard instead of ending the routine after the
+                    // first page of modules; the dashboard can then expose the remaining modules.
+                    action = CourseAction(++sequence, snapshot.document, "", "courseDashboard")
+                    pendingAt = now
+                    detail = "Videos finished. Returning to the course list for: ${missingSmyModules.joinToString()}."
+                    blockedPath = pageId
+                } else {
+                    completed = true
+                    detail = "Available videos finished. Quizzes and assessments remain yours to complete."
+                }
+            }
             return
         }
         // This only retries loading the dashboard, never a failed assessment attempt.

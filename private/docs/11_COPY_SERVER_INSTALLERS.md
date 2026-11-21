@@ -11,7 +11,7 @@ Use a **new Mac Terminal window**, not a Windows or Debian SSH prompt.
 ### 3.1 Create the download folder
 
 ```sh
-mkdir -p "$HOME/Downloads/Builds/AutoPilot"
+mkdir -p "$HOME/Downloads/AutoPilot/Builds"
 ```
 
 ### 3.2 Download the Windows MSI — choose one route
@@ -19,13 +19,13 @@ mkdir -p "$HOME/Downloads/Builds/AutoPilot"
 **Local network:**
 
 ```sh
-scp 'home-server-build:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
+scp -o ProxyJump=home-server -P 2222 'builduser@127.0.0.1:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/AutoPilot/Builds/"
 ```
 
 **Or Cloudflare:**
 
 ```sh
-scp 'home-server-build-remote:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/Builds/AutoPilot/"
+scp -o ProxyJump=home-server-remote -P 2222 'builduser@127.0.0.1:C:/Build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/msi/*.msi' "$HOME/Downloads/AutoPilot/Builds/"
 ```
 
 ### 3.3 Download the Linux DEB — choose one route
@@ -33,25 +33,25 @@ scp 'home-server-build-remote:C:/Build/autopilot-cmp/desktopApp/build/compose/bi
 **Local network:**
 
 ```sh
-scp 'home-server:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/Builds/AutoPilot/"
+scp 'home-server:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/AutoPilot/Builds/"
 ```
 
 **Or Cloudflare:**
 
 ```sh
-scp 'home-server-remote:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/Builds/AutoPilot/"
+scp 'home-server-remote:/srv/build/autopilot-cmp/desktopApp/build/compose/binaries/main-release/deb/*.deb' "$HOME/Downloads/AutoPilot/Builds/"
 ```
 
 Wait for each transfer to finish. Compare the Mac hash with the source hash of the same file:
 
 ```sh
-shasum -a 256 "$HOME/Downloads/Builds/AutoPilot/"*.msi
+shasum -a 256 "$HOME/Downloads/AutoPilot/Builds/"*.msi
 ```
 
 For the Linux file, separately:
 
 ```sh
-shasum -a 256 "$HOME/Downloads/Builds/AutoPilot/"*.deb
+shasum -a 256 "$HOME/Downloads/AutoPilot/Builds/"*.deb
 ```
 
 Test the MSI on the Windows laptop. Test the DEB on a suitable Linux desktop, not the production website server. A successful package build does not prove the entire desktop/browser workflow. Installers remain unsigned unless separate signing has been configured.
