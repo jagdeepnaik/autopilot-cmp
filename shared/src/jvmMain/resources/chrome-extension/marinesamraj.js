@@ -88,7 +88,9 @@
       const id = `marine:${revision}:${controls.length}`;
       targets.set(id, node); controls.push({id, key});
     }
-    const isLoading = [...document.querySelectorAll('[role="progressbar"],[aria-busy="true"]')].some(visible);
+    // Subject cards expose permanent completion percentages as role=progressbar. They are
+    // content, not load state, so only an explicit busy marker may hold the collector back.
+    const isLoading = [...document.querySelectorAll('[aria-busy="true"]')].some(visible);
     const signature = JSON.stringify([question, answer, links, controls.map(node => node.key)]);
     if (signature !== stable) { stable = signature; stableAt = Date.now(); }
     // Subject tabs share one path and differ only by tabID. They are real public hierarchy

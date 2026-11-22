@@ -60,7 +60,7 @@ class MarineSamrajCollectorBrowserTest {
             while (readings.none { it["url"]?.jsonPrimitive?.content?.endsWith("/two") == true && it["ready"]?.jsonPrimitive?.boolean == true } && System.currentTimeMillis() < deadline) Thread.sleep(50)
             val first = readings.firstOrNull { it["question"]?.jsonPrimitive?.content == "First published question" && it["ready"]?.jsonPrimitive?.boolean == true }
             assertNotNull(first, "Must wait for asynchronous content and stable DOM")
-            assertEquals(answer.trim(), first["answer"]?.jsonPrimitive?.content)
+            assertEquals("${answer.trim()}\n\n[Source page]($origin/exam-prep/question/one)", first["answer"]?.jsonPrimitive?.content)
             assertEquals(1, acknowledgements.size, "Exactly one click, bound to the original route")
             assertTrue(readings.any { it["ready"]?.jsonPrimitive?.boolean == false })
             assertEquals(2, readings.filter { it["ready"]?.jsonPrimitive?.boolean == true }.map { it["document"] }.distinct().size)
