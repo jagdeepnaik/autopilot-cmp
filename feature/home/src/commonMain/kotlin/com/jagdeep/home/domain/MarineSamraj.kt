@@ -17,6 +17,8 @@ data class MarineSamrajRoutine(
     val maxPages: Int = 250,
     /** Wait after AutoPilot authorizes a public-page action and before the helper clicks it. */
     val clickDelayMillis: Long = 2_000,
+    /** Starts at the exam-preparation home hierarchy instead of the last saved page. */
+    val continueSavedCollection: Boolean = false,
     val includeBookmarks: Boolean = false,
     val answerBankFile: String = MARINESAMRAJ_ANSWER_BANK,
 ) : Routine {
@@ -53,6 +55,7 @@ internal data class MarineSamrajCommand(
     val action: MarineSamrajAction? = null,
     val clickDelayMillis: Long = 2_000,
     val includeBookmarks: Boolean = false,
+    val startFromHome: Boolean = true,
 )
 
 internal data class MarineSamrajCapture(val module: String, val question: String, val answer: String)
@@ -72,6 +75,7 @@ internal class MarineSamrajSession(
     val session: String,
     private val maxPages: Int,
     private val includeBookmarks: Boolean = false,
+    private val continueSavedCollection: Boolean = false,
 ) {
     private var request = 0L
     private var pending: MarineSamrajAction? = null
@@ -88,6 +92,7 @@ internal class MarineSamrajSession(
     private var baselinePages = 0
     private var resumeUrl: String? = null
     private var restoring = false
+    private var openingHome = !continueSavedCollection
     var progress = MarineSamrajProgress(); private set
     val action: MarineSamrajAction? get() = pending
     fun waitForRestore() { restoring = true }
@@ -130,12 +135,21 @@ internal class MarineSamrajSession(
     }
 
     fun read(reading: MarineSamrajReading) {
-        if (reading.session != session || !allowed(reading.url) || failed || progress.completed || restoring) return
+        if (reading.session != session || failed || progress.completed || restoring) return
         if (captureKey != null) return
         if (waitingForDocument == reading.document) return
         if (pending?.document == reading.document) return
         waitingForDocument = null
         lastReading = reading
+        if (openingHome) {
+            if (!marineSamrajIsHome(reading.url)) {
+                pending = MarineSamrajAction(++request, reading.document, MARINESAMRAJ_HOME_URL)
+                progress = progress.copy(detail = "Opening MarineSamraj home to begin the course hierarchy.")
+                return
+            }
+            openingHome = false
+        }
+        if (!allowed(reading.url)) return
         if (reading.error != null) { pending = null; progress = progress.copy(detail = reading.error); return }
         if (!reading.ready) { pending = null; progress = progress.copy(detail = "Waiting for the public page and its answer to finish loading."); return }
         val page = marineSamrajCanonicalUrl(reading.url, includeBookmarks) ?: return
@@ -214,3 +228,9 @@ internal fun marineSamrajCanonicalUrl(value: String, includeBookmarks: Boolean =
     return "https://marinesamraj.com" + (if (lower == "/ep_home") "/EP_Home" else path) +
         params.entries.sortedBy { it.key }.joinToString("&", prefix = if (params.isEmpty()) "" else "?") { "${it.key}=${it.value}" }
 }
+
+internal const val MARINESAMRAJ_HOME_URL = "https://marinesamraj.com/EP_Home"
+
+internal fun marineSamrajIsHome(value: String): Boolean = runCatching {
+    Regex("^https://(?:www\\.)?marinesamraj\\.com/ep_home(?:[?#].*)?$", RegexOption.IGNORE_CASE).matches(value)
+}.getOrDefault(false)

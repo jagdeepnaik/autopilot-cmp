@@ -17,15 +17,15 @@
     const box = node?.getBoundingClientRect?.(), style = node && getComputedStyle(node);
     return !!box && box.width > 0 && box.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && !node.closest('[aria-hidden="true"],[hidden]');
   };
-  let includeBookmarks = false;
-  const permitted = value => {
+  let includeBookmarks = false, startFromHome = true;
+  const permitted = (value, allowInitialBookmark = false) => {
     try {
       const url = new URL(value, location.href), path = url.pathname.toLowerCase();
       return ['https://marinesamraj.com', 'https://www.marinesamraj.com'].includes(url.origin) &&
         (path === '/ep_home' || path === '/sitemap.xml' || path.startsWith('/exam-prep/')) &&
         !/%|\\|(?:^|\/)\.\.(?:\/|$)/.test(url.pathname) &&
         !/\/(?:user|admin|notification|review-pipeline|support-the-creators)(?:\/|$)/.test(path) &&
-        (includeBookmarks || url.searchParams.get('tabID')?.toUpperCase() !== 'BOOKMARKS');
+        (includeBookmarks || allowInitialBookmark || url.searchParams.get('tabID')?.toUpperCase() !== 'BOOKMARKS');
     } catch { return false; }
   };
   const documentId = () => `${baseDocument}:${revision}`;
@@ -82,9 +82,16 @@
     targets.clear();
     const clickable = [...document.querySelectorAll('[tabindex="0"],button')].filter(node => visible(node) && node.getAttribute('aria-disabled') !== 'true' && !node.disabled);
     const next = questionPage ? clickable.find(node => /^NEXT(?:\s|[\uE000-\uF8FF])*$/.test(text(node))) : null;
-    const candidates = next ? [next] : (!questionPage && !answerRegion ? clickable.filter(node => /^Q\d+\s/.test(text(node))) : []);
+    const homePage = location.pathname.toLowerCase() === '/ep_home';
+    const homeSelector = node => {
+      if (!homePage || node.closest('a')) return false;
+      const label = text(node).replace(/\s+/g, ' ');
+      // These are course-hierarchy controls. Header/profile controls and subject cards stay out.
+      return /^(?:DGS India(?:\s+(?:MEO|ETO|2nd Mate).*)?|MCA UK Exams|Sri Lanka|MEO\s*-\s*Class\s*(?:I|II|IV)(?:\s*Steam)?|ETO|2nd Mate(?:\s+FG)?)$/i.test(label);
+    };
+    const candidates = next ? [next] : (!questionPage && !answerRegion ? clickable.filter(node => /^Q\d+\s/.test(text(node)) || homeSelector(node)) : []);
     for (const node of candidates.slice(0, 250)) {
-      const key = `${next ? location.pathname : 'question'}:${text(node).replace(/\s+/g, ' ')}`;
+      const key = `${next ? location.pathname : homePage ? `home:${location.href}` : 'question'}:${text(node).replace(/\s+/g, ' ')}`;
       const id = `marine:${revision}:${controls.length}`;
       targets.set(id, node); controls.push({id, key});
     }
@@ -109,7 +116,7 @@
     return {type:'marineSamrajReading',session,document:documentId(),url:location.href,question,answer,module,links:links.slice(0,1000),controls,ready,error};
   }
   async function execute(action) {
-    if (!action || action.document !== documentId() || handled.has(action.request) || !permitted(location.href)) return;
+    if (!action || action.document !== documentId() || handled.has(action.request) || !permitted(location.href, startFromHome)) return;
     if (!action.control && !permitted(action.url)) return;
     const target = action.control ? targets.get(action.control) : null;
     if (action.control && (!target || !visible(target))) return;
@@ -118,8 +125,13 @@
     await chrome.runtime.sendMessage({type:'marineSamrajAction',session,document:documentId(),request:action.request,success:true});
     const delay = Math.max(0, Math.min(60_000, Number((await chrome.runtime.sendMessage({type:'marineSamrajHello'}))?.clickDelayMillis || 0)));
     if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-    if (session === null || !permitted(location.href)) return;
-    if (target) target.click(); else location.assign(action.url);
+      if (session === null || !permitted(location.href, startFromHome)) return;
+    if (target) {
+      // Course pickers update a single-page application without changing its URL. Give the
+      // refreshed hierarchy a new document identity so the app can continue.
+      route = '';
+      target.click();
+    } else location.assign(action.url);
   }
   async function tick() {
     if (busy) return;
@@ -128,7 +140,7 @@
       const hello = await chrome.runtime.sendMessage({type:'marineSamrajHello'});
       if (!hello?.session) {session = null; status(hello?.reason || 'The collection helper did not authorize this page.'); return;}
       if (session !== hello.session) {handled.clear(); last = '';}
-      session = hello.session; includeBookmarks = hello.includeBookmarks === true;
+      session = hello.session; includeBookmarks = hello.includeBookmarks === true; startFromHome = hello.startFromHome === true;
       const value = reading(), encoded = JSON.stringify(value), now = Date.now();
       status(value.error || (value.ready ? 'Public page ready; sending to AutoPilot.' : 'Waiting for public page content to settle.'));
       if (encoded === last && now - lastAt < 2000) return;

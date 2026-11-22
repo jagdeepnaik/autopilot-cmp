@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class MarineSamrajTest {
     @Test
     fun given_public_question_when_reading_then_it_is_captured_and_next_public_link_is_opened() {
-        val session = MarineSamrajSession("session", 3)
+        val session = MarineSamrajSession("session", 3, continueSavedCollection = true)
         session.read(MarineSamrajReading(
             session = "session", document = "page", url = "https://marinesamraj.com/exam-prep/question/one",
             question = "What is the correct public answer?", answer = "This is the public answer.",
@@ -24,7 +24,7 @@ class MarineSamrajTest {
 
     @Test
     fun given_private_link_when_reading_then_it_is_never_queued() {
-        val session = MarineSamrajSession("session", 3)
+        val session = MarineSamrajSession("session", 3, continueSavedCollection = true)
         session.read(MarineSamrajReading(
             session = "session", document = "page", url = "https://marinesamraj.com/exam-prep/question/one",
             links = listOf("https://marinesamraj.com/admin/questions", "https://marinesamraj.com/user/profile"),
@@ -39,14 +39,14 @@ class MarineSamrajTest {
         links = listOf("https://marinesamraj.com/exam-prep/question/two"))
 
     @Test fun given_loading_page_when_read_then_no_capture_or_completion_occurs() {
-        val runner = MarineSamrajSession("session", 10)
+        val runner = MarineSamrajSession("session", 10, continueSavedCollection = true)
         runner.read(page(ready = false))
         assertNull(runner.takeCapture()); assertNull(runner.action)
         assertFalse(runner.progress.completed); assertEquals(0, runner.progress.pages)
     }
 
     @Test fun given_save_failure_when_confirmed_then_collection_pauses_without_navigation() {
-        val runner = MarineSamrajSession("session", 10)
+        val runner = MarineSamrajSession("session", 10, continueSavedCollection = true)
         runner.read(page()); assertNotNull(runner.takeCapture()); runner.captureSaved(false)
         runner.read(page("later"))
         assertNull(runner.action); assertEquals(0, runner.progress.questions)
@@ -54,14 +54,14 @@ class MarineSamrajTest {
     }
 
     @Test fun given_short_public_answer_when_saved_then_it_is_not_discarded() {
-        val runner = MarineSamrajSession("session", 1)
+        val runner = MarineSamrajSession("session", 1, continueSavedCollection = true)
         runner.read(page().copy(answer = "Yes.")); assertEquals("Yes.", runner.takeCapture()?.answer)
         runner.captureSaved(true)
         assertEquals(1, runner.progress.questions); assertTrue(runner.progress.completed)
     }
 
     @Test fun given_acknowledged_navigation_when_old_document_repeats_then_wait_for_destination() {
-        val runner = MarineSamrajSession("session", 10)
+        val runner = MarineSamrajSession("session", 10, continueSavedCollection = true)
         runner.read(page()); runner.takeCapture(); runner.captureSaved(true)
         val action = assertNotNull(runner.action)
         runner.acknowledge(action.request, true); runner.read(page())
@@ -69,13 +69,13 @@ class MarineSamrajTest {
     }
 
     @Test fun given_nonlink_question_control_when_ready_then_it_is_selected_once() {
-        val runner = MarineSamrajSession("session", 10)
+        val runner = MarineSamrajSession("session", 10, continueSavedCollection = true)
         runner.read(page().copy(question = null, answer = null, links = emptyList(), controls = listOf(MarineSamrajControl("row", "question-key"))))
         assertEquals("row", runner.action?.control)
     }
 
     @Test fun given_subject_tab_links_when_read_then_the_next_public_tab_is_queued() {
-        val runner = MarineSamrajSession("session", 10)
+        val runner = MarineSamrajSession("session", 10, continueSavedCollection = true)
         runner.read(page().copy(question = null, answer = null, links = listOf(
             "https://www.marinesamraj.com/exam-prep/subject/example?tabID=TOPICS",
             "https://www.marinesamraj.com/exam-prep/subject/example?tabID=NOTES",
@@ -83,23 +83,36 @@ class MarineSamrajTest {
         assertEquals("https://www.marinesamraj.com/exam-prep/subject/example?tabID=TOPICS", runner.action?.url)
     }
 
-    @Test fun given_checkpoint_when_restarted_elsewhere_then_resume_original_page_first() {
-        val runner = MarineSamrajSession("session", 10)
+    @Test fun given_checkpoint_when_continue_mode_restarts_elsewhere_then_resume_original_page_first() {
+        val runner = MarineSamrajSession("session", 10, continueSavedCollection = true)
         runner.restore(MarineSamrajCheckpoint(listOf(page().url), page().links, page().url))
         runner.read(page().copy(url = "https://marinesamraj.com/EP_Home", question = null, answer = null))
         assertEquals(page().url, runner.action?.url)
         assertEquals(page().url, runner.checkpoint()?.resumeUrl)
     }
 
+    @Test fun given_default_start_mode_when_opened_on_a_bookmark_then_home_opens_first() {
+        val runner = MarineSamrajSession("session", 10)
+        runner.read(page().copy(url = "https://marinesamraj.com/exam-prep/subject/example?tabID=BOOKMARKS", question = null, answer = null))
+        assertEquals(MARINESAMRAJ_HOME_URL, runner.action?.url)
+    }
+
+    @Test fun given_default_start_mode_when_home_is_open_then_the_hierarchy_is_read_without_redirect() {
+        val runner = MarineSamrajSession("session", 10)
+        runner.read(page().copy(url = "https://marinesamraj.com/EP_Home?examLevelID=example", question = null, answer = null,
+            links = listOf("https://marinesamraj.com/exam-prep/subject/example?tabID=PAPERS")))
+        assertEquals("https://marinesamraj.com/exam-prep/subject/example?tabID=PAPERS", runner.action?.url)
+    }
+
     @Test fun given_restored_pages_when_new_run_starts_then_page_limit_is_per_run() {
-        val runner = MarineSamrajSession("session", 2)
+        val runner = MarineSamrajSession("session", 2, continueSavedCollection = true)
         runner.restore(MarineSamrajCheckpoint(listOf("https://marinesamraj.com/exam-prep/question/old")))
         runner.read(page()); runner.takeCapture(); runner.captureSaved(true)
         assertFalse(runner.progress.completed); assertNotNull(runner.action)
     }
 
     @Test fun given_duplicate_question_when_page_repeats_then_it_is_saved_once() {
-        val runner = MarineSamrajSession("session", 10)
+        val runner = MarineSamrajSession("session", 10, continueSavedCollection = true)
         runner.read(page().copy(links = emptyList())); runner.takeCapture(); runner.captureSaved(true)
         runner.read(page("duplicate")); assertNull(runner.takeCapture()); assertEquals(1, runner.progress.questions)
     }
@@ -109,7 +122,7 @@ class MarineSamrajTest {
     }
 
     @Test fun given_bookmarks_are_explicitly_enabled_when_reading_then_they_are_queued() {
-        val runner = MarineSamrajSession("session", 10, includeBookmarks = true)
+        val runner = MarineSamrajSession("session", 10, includeBookmarks = true, continueSavedCollection = true)
         runner.read(page().copy(question = null, answer = null, links = listOf(
             "https://marinesamraj.com/exam-prep/subject/example?tabID=BOOKMARKS",
         )))
@@ -123,7 +136,7 @@ class MarineSamrajTest {
     }
 
     @Test fun given_public_alias_redirect_when_destination_arrives_then_alias_is_not_queued_again() {
-        val runner = MarineSamrajSession("session", 20)
+        val runner = MarineSamrajSession("session", 20, continueSavedCollection = true)
         val home = page().copy(url = "https://marinesamraj.com/EP_Home?examLevelID=one", question = null, answer = null,
             links = listOf("https://marinesamraj.com/EP_Home", "https://marinesamraj.com/exam-prep/subject/next"))
         runner.read(home)

@@ -89,6 +89,8 @@ data class RoutineDraft(
     val marineSamrajMaxPages: String = "250",
     /** Pause before each public page/control action. Zero keeps the old immediate behavior. */
     val marineSamrajClickDelaySeconds: String = "2",
+    /** Continue from the saved queue rather than beginning from the MarineSamraj home hierarchy. */
+    val marineSamrajContinueSavedCollection: Boolean = false,
     /** Explicit consent before copying signed-in bookmark rows into the local routine database. */
     val marineSamrajIncludeBookmarks: Boolean = false,
 )
@@ -142,7 +144,7 @@ fun Routine.toDraft(): RoutineDraft = when (this) {
     is DgsELearningRoutine -> RoutineDraft(kind=kind,name=name,requiredHours=requiredHours.toString(),creditedHours=creditedHours.toString(),pixelsPerSecond=pixelsPerSecond,playbackSpeed=playbackSpeed,waitAfterClickSeconds=(waitAfterClickMillis/1000).toString(),answerBankFile=com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile) ?: answerBankFile)
     is CourseAutomationRoutine -> RoutineDraft(kind = RoutineKind.CourseAutomation, name = name, waitAfterClickSeconds = (waitAfterClickMillis / 1000).toString(), playbackSpeed = playbackSpeed, answerAssessments = answerAssessments, assessmentMode = assessmentMode, learningOrder = learningOrder, answerBankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile) ?: answerBankFile, answerQuizzes = answerQuizzes, autoDownloadCertificates = autoDownloadCertificates)
     is OceanTGRoutine -> RoutineDraft(kind = kind, name = name, waitAfterClickSeconds = (waitAfterClickMillis / 1000).toString(), answerQuizzes = answerPracticeQuestions, answerBankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile) ?: answerBankFile, oceanCourseCodes = courseCodes.joinToString(", "))
-    is MarineSamrajRoutine -> RoutineDraft(kind = kind, name = name, answerBankFile = answerBankFile, marineSamrajMaxPages = maxPages.toString(), marineSamrajClickDelaySeconds = (clickDelayMillis / 1_000).toString(), marineSamrajIncludeBookmarks = includeBookmarks)
+    is MarineSamrajRoutine -> RoutineDraft(kind = kind, name = name, answerBankFile = answerBankFile, marineSamrajMaxPages = maxPages.toString(), marineSamrajClickDelaySeconds = (clickDelayMillis / 1_000).toString(), marineSamrajContinueSavedCollection = continueSavedCollection, marineSamrajIncludeBookmarks = includeBookmarks)
 }
 
 fun ClickRoutine.toDraft(): RoutineDraft {
@@ -291,6 +293,7 @@ fun RoutineDraft.toRoutine(id: String): Routine = when (kind) {
         name = name.trim(),
         maxPages = marineSamrajMaxPages.trim().toInt(),
         clickDelayMillis = marineSamrajClickDelaySeconds.trim().toLong() * 1_000,
+        continueSavedCollection = marineSamrajContinueSavedCollection,
         includeBookmarks = marineSamrajIncludeBookmarks,
         answerBankFile = requireNotNull(com.jagdeep.shared.answers.resolvedAnswerBankFileName(answerBankFile)),
     )

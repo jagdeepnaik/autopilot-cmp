@@ -4,12 +4,12 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.resolve(__dirname, '../../../shared/src/jvmMain/resources/chrome-extension/marinesamraj-background.js'), 'utf8');
-function fixture(focused = true, includeBookmarks = false) {
+function fixture(focused = true, includeBookmarks = false, startFromHome = false) {
   let listener;
   const events = [];
   const context = {
     URL, Date, JSON,
-    BASE:'http://127.0.0.1:47613', command:{enabled:true,marineSamraj:{session:'fixture',clickDelayMillis:4000,includeBookmarks}},
+    BASE:'http://127.0.0.1:47613', command:{enabled:true,marineSamraj:{session:'fixture',clickDelayMillis:4000,includeBookmarks,startFromHome}},
     activeTabId:async()=>7,
     chrome:{tabs:{update:async()=>{},query:async()=>[{id:7}]},windows:{getLastFocused:async()=>({focused})},runtime:{onMessage:{addListener:fn=>{listener=fn;}}}},
     fetch:async(url,options)=>{events.push(JSON.parse(options.body));return {ok:true};},
@@ -62,4 +62,13 @@ test('bookmarks require explicit routine consent',async()=>{
   assert.equal(hello.includeBookmarks,true);
   await permitted.send({type:'marineSamrajReading',session:'fixture',document:'bookmark',reading:bookmark});
   assert.ok(permitted.events.length>0);
+});
+
+test('a home-first run may leave a bookmark without collecting it',async()=>{
+  const f=fixture(false,false,true);
+  const bookmark={session:'fixture',document:'bookmark',url:'https://www.marinesamraj.com/exam-prep/subject/one?tabID=BOOKMARKS'};
+  const hello=await f.send({type:'marineSamrajHello'});
+  assert.equal(hello.session,'fixture');
+  await f.send({type:'marineSamrajReading',session:'fixture',document:'bookmark',reading:bookmark});
+  assert.equal(f.events.length,1);
 });

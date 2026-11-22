@@ -22,18 +22,22 @@ Sources: [robots](https://www.marinesamraj.com/robots.txt),
 [sitemap](https://marinesamraj.com/sitemap.xml),
 [public home](https://marinesamraj.com/home.html).
 
-## Run and resume
+## Start from home or continue
 
 1. Install the app and reload **AutoPilot Page Helper** to the version bundled with the app or
    newer. Refresh the MarineSamraj page after the reload.
-2. Open an exam-preparation page in Chrome. Select **MarineSamraj** in AutoPilot.
-3. Set the per-run page limit (1–1000) and the action delay (0–60 seconds), save, and start.
+2. Open any MarineSamraj page in Chrome. Select **MarineSamraj** in AutoPilot.
+3. Choose the start mode:
+   - **Continue saved collection** off (the default): AutoPilot opens the MarineSamraj
+     home page, enters the visible DGS India course hierarchy, then follows its study pages.
+   - **Continue saved collection** on: AutoPilot restores the saved queue and resume page
+     from the prior batch.
+4. Set the per-run page limit (1–1000) and the action delay (0–60 seconds), save, and start.
    The default two-second delay gives the page time to respond before each click. The helper selects and binds one
    collection tab when the run starts. Keep that collection tab selected
    in Chrome. This public read-only collector may continue while another application is
    in front; switching Chrome tabs pauses it. Stop remains available at any time.
-4. Restart the same routine/bank to restore its queue and resume page. A page-limit stop
-   means this batch ended, not that the entire website was extracted.
+   A page-limit stop means this batch ended, not that the entire website was extracted.
 
 The routine waits for stable, loaded content; it reads the answer editor rather than page
 headers, author widgets or footer text. It supports non-link question controls and Next.
@@ -59,11 +63,12 @@ a reference does not reload the entire bank into an assessment snapshot, avoidin
 snapshot's size limits as the reference collection grows. Database uniqueness handles
 repeated question/option sets; a changed reference may represent a different set.
 
-The checkpoint contains the visited URLs, remaining queue and resume page. Storage failure
-pauses collection. Large readings use bounded, ordered local chunks; incomplete, reordered
-or mixed chunks do not trigger navigation. Oversized content is reported instead of silently
-truncating an answer. The local bridge's existing event-size limit and extension permissions
-remain unchanged.
+The checkpoint contains the visited URLs, remaining queue and resume page. It is used only
+when **Continue saved collection** is enabled; the default home-first mode deliberately starts
+a new traversal from the home hierarchy. Storage failure pauses collection. Large readings use
+bounded, ordered local chunks; incomplete, reordered or mixed chunks do not trigger navigation.
+Oversized content is reported instead of silently truncating an answer. The local bridge's
+existing event-size limit and extension permissions remain unchanged.
 
 ## Coverage limits
 

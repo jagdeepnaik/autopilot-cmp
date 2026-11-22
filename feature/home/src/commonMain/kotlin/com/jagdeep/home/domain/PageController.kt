@@ -508,8 +508,8 @@ class PageController(
             is MarineSamrajRoutine -> {
                 val bankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(routine.answerBankFile) ?: routine.answerBankFile
                 activeAnswerBankStore = answerBankStore.forName(bankFile)
-                val runner = MarineSamrajSession("${newId()}:${now()}", routine.maxPages, routine.includeBookmarks)
-                if (progressRepository.available) runner.waitForRestore()
+                val runner = MarineSamrajSession("${newId()}:${now()}", routine.maxPages, routine.includeBookmarks, routine.continueSavedCollection)
+                if (routine.continueSavedCollection && progressRepository.available) runner.waitForRestore()
                 marineSamrajCheckpointJson = null
                 marineSamraj = runner
                 marineSamrajChunks.clear()
@@ -717,7 +717,7 @@ class PageController(
                     val bank = com.jagdeep.shared.answers.resolvedAnswerBankFileName(routine.answerBankFile) ?: routine.answerBankFile
                     val saved = progressRepository.records("marinesamraj:public").firstOrNull { it.key == bank && it.kind == "marinesamraj-crawl" }
                     val checkpoint = saved?.let { json.decodeFromString(MarineSamrajCheckpoint.serializer(), it.details) } ?: MarineSamrajCheckpoint()
-                    runner.restore(checkpoint)
+                    if (routine.continueSavedCollection) runner.restore(checkpoint)
                 } catch (error: CancellationException) { throw error }
                 catch (_: Exception) { runner.pauseForStorageFailure() }
             }
@@ -959,7 +959,7 @@ class PageController(
             oceanTG = oceanTG?.let { OceanCommand(it.session, it.action) },
             marineSamraj = marineSamraj?.let {
                 val routine = (state.value.activity as? PageActivity.MarineSamraj)?.routine
-                MarineSamrajCommand(it.session, it.action, routine?.clickDelayMillis ?: 2_000, routine?.includeBookmarks == true)
+                MarineSamrajCommand(it.session, it.action, routine?.clickDelayMillis ?: 2_000, routine?.includeBookmarks == true, routine?.continueSavedCollection != true)
             },
         )
         val encoded = json.encodeToString(HelperCommand.serializer(), command)

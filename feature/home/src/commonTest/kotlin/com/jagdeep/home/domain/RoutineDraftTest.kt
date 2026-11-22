@@ -13,12 +13,14 @@ class RoutineDraftTest {
 
     @Test
     fun given_marine_samraj_click_delay_when_saved_then_it_round_trips_and_rejects_invalid_values() {
-        val draft = RoutineDraft(kind = RoutineKind.MarineSamraj, name = "Public Q&A", marineSamrajMaxPages = "25", marineSamrajClickDelaySeconds = "4", marineSamrajIncludeBookmarks = true)
+        val draft = RoutineDraft(kind = RoutineKind.MarineSamraj, name = "Public Q&A", marineSamrajMaxPages = "25", marineSamrajClickDelaySeconds = "4", marineSamrajContinueSavedCollection = true, marineSamrajIncludeBookmarks = true)
         val routine = draft.toRoutine("marine") as MarineSamrajRoutine
         assertEquals(4_000, routine.clickDelayMillis)
         assertTrue(routine.includeBookmarks)
+        assertTrue(routine.continueSavedCollection)
         assertEquals("4", routine.toDraft().marineSamrajClickDelaySeconds)
         assertTrue(routine.toDraft().marineSamrajIncludeBookmarks)
+        assertTrue(routine.toDraft().marineSamrajContinueSavedCollection)
         assertFalse(draft.validate().hasAny)
         assertTrue(draft.copy(marineSamrajClickDelaySeconds = "61").validate().hasAny)
     }
