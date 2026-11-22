@@ -94,6 +94,15 @@ ordering and mixed sessions. These tests do not establish full live-site extract
 Background tests cover same-origin SPA navigation, tab binding while another app is in
 front, and rejection of other origins, private paths and an unselected bound tab.
 
+## Live validation
+
+On 22 November 2026, using a user-authorized signed-in DGS India tab, the Mac routine
+advanced from the MEO Class I overview through seven permitted pages, opened the
+**Auxiliary Engine** study note and saved it to the local MarineSamraj database. The explicit
+Bookmarks option also accepted the visible (empty) Engineering Management Bookmarks page;
+it did not open profile, notification or other account pages. This validates the navigation
+and storage path, not complete-site coverage.
+
 ```sh
 ./gradlew :feature:home:jvmTest --tests '*MarineSamraj*'
 node --test private/scripts/tests/marinesamraj-background.test.cjs

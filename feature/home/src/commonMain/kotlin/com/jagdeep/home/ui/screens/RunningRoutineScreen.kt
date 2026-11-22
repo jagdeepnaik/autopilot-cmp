@@ -94,7 +94,8 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                     Detail("Status", page.progress.detail)
                     Detail("Permitted pages visited", page.progress.pages.toString())
                     Detail("References saved this run", page.progress.questions.toString())
-                    Text("Only public exam-preparation pages are collected. Private, user, admin, review and notification pages are never opened.",
+                    Text(if (page.routine.includeBookmarks) "Public exam-preparation pages and the signed-in user's visible Bookmarks are collected. Private account, admin, review and notification pages are never opened."
+                        else "Only public exam-preparation pages are collected. Private, user, admin, review and notification pages are never opened.",
                         Modifier.padding(horizontal=16.dp), style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if(page !is PageActivity.Automation) {
