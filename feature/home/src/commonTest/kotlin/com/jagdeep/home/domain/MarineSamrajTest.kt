@@ -108,6 +108,15 @@ class MarineSamrajTest {
         listOf("https://evil.test/exam-prep/question/one", "https://marinesamraj.com/user/profile?next=/exam-prep/", "https://marinesamraj.com/ep_home-evil", "https://marinesamraj.com/exam-prep/%2fadmin", "https://marinesamraj.com/exam-prep/subject/one?tabID=BOOKMARKS").forEach { assertNull(marineSamrajCanonicalUrl(it), it) }
     }
 
+    @Test fun given_bookmarks_are_explicitly_enabled_when_reading_then_they_are_queued() {
+        val runner = MarineSamrajSession("session", 10, includeBookmarks = true)
+        runner.read(page().copy(question = null, answer = null, links = listOf(
+            "https://marinesamraj.com/exam-prep/subject/example?tabID=BOOKMARKS",
+        )))
+        assertEquals("https://marinesamraj.com/exam-prep/subject/example?tabID=BOOKMARKS", runner.action?.url)
+        assertNotNull(marineSamrajCanonicalUrl(runner.action?.url.orEmpty(), includeBookmarks = true))
+    }
+
     @Test fun given_tracking_variants_when_canonicalizing_then_content_identity_stays_stable() {
         assertEquals(marineSamrajCanonicalUrl("https://marinesamraj.com/exam-prep/question/one"), marineSamrajCanonicalUrl("https://www.marinesamraj.com/exam-prep/question/one?navigationData=ignored&tabID=ANSWER#top"))
         assertNotNull(marineSamrajCanonicalUrl("https://marinesamraj.com/sitemap.xml"))

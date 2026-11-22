@@ -4,9 +4,10 @@
 
 ## Scope and live site structure
 
-This independent routine collects publicly displayed MarineSamraj study references through
-the existing Chrome extension and app controller. It does not sign in, change bookmarks,
-submit answers, or open account/admin/review/notification areas.
+This independent routine collects MarineSamraj study references through the existing Chrome
+extension and app controller. It never changes bookmarks, submits answers, or opens
+account/admin/review/notification areas. It can also copy the signed-in user's visible
+**Bookmarks** only when the user explicitly enables that option.
 
 On 22 November 2026, the public robots file allowed `/` and `/exam-prep/` and excluded
 `/user/`, `/admin/`, `/notification/`, `/review-pipeline/` and `/support-the-creators/`.
@@ -23,12 +24,12 @@ Sources: [robots](https://www.marinesamraj.com/robots.txt),
 
 ## Run and resume
 
-1. Install the app and reload **AutoPilot Page Helper** to extension version `1.15.20` or
+1. Install the app and reload **AutoPilot Page Helper** to the version bundled with the app or
    newer. Refresh the MarineSamraj page after the reload.
-2. Open a public exam-preparation page in Chrome. Select **MarineSamraj** in AutoPilot.
+2. Open an exam-preparation page in Chrome. Select **MarineSamraj** in AutoPilot.
 3. Set the per-run page limit (1–1000) and the action delay (0–60 seconds), save, and start.
    The default two-second delay gives the page time to respond before each click. The helper selects and binds one
-   public collection tab when the run starts. Keep that collection tab selected
+   collection tab when the run starts. Keep that collection tab selected
    in Chrome. This public read-only collector may continue while another application is
    in front; switching Chrome tabs pauses it. Stop remains available at any time.
 4. Restart the same routine/bank to restore its queue and resume page. A page-limit stop
@@ -40,13 +41,15 @@ Sitemap discovery adds the public exam levels. URL identities ignore tracking/hi
 parameters while retaining content-changing exam, tab and question identifiers.
 
 The collector treats each public subject tab as a separate page. It visits Papers, Topics,
-Notes, Diagrams and Q Bank when present; Bookmarks is excluded because it is user-specific.
+Notes, Diagrams and Q Bank when present. **Include my Bookmarks** is off by default. When
+enabled, it additionally reads only bookmark records rendered for the signed-in user in the
+already-selected collection tab. It never changes those bookmarks.
 
 ## Storage and integrity
 
 | Data | Location |
 | --- | --- |
-| Collected reference text | `~/.autopilot/databases/qa/marinesamraj.db` |
+| Collected reference text, source-page URLs and editor-scoped image/attachment links | `~/.autopilot/databases/qa/marinesamraj.db` |
 | Logical bank name | `marinesamraj-public-ver-1.0.json` (a bank identifier inside SQLite) |
 | Crawl checkpoint | `~/.autopilot/databases/autopilot.db`, learning account `marinesamraj:public`, record kind `marinesamraj-crawl` |
 
@@ -77,7 +80,8 @@ offline asset archive must be verified separately.
 
 Runtime collection writes the local database. It does not automatically overwrite the
 reviewed `private/qa/marinesamraj.db` or its packaged resource copy. Review and export
-collected public data before updating the bundled bank.
+collected public data before updating the bundled bank. Never commit signed-in Bookmarks
+unless the account owner explicitly asks: they are personal data rather than a public bank.
 
 ## Validation
 

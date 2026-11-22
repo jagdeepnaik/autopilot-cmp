@@ -17,6 +17,7 @@
     const box = node?.getBoundingClientRect?.(), style = node && getComputedStyle(node);
     return !!box && box.width > 0 && box.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && !node.closest('[aria-hidden="true"],[hidden]');
   };
+  let includeBookmarks = false;
   const permitted = value => {
     try {
       const url = new URL(value, location.href), path = url.pathname.toLowerCase();
@@ -24,7 +25,7 @@
         (path === '/ep_home' || path === '/sitemap.xml' || path.startsWith('/exam-prep/')) &&
         !/%|\\|(?:^|\/)\.\.(?:\/|$)/.test(url.pathname) &&
         !/\/(?:user|admin|notification|review-pipeline|support-the-creators)(?:\/|$)/.test(path) &&
-        url.searchParams.get('tabID')?.toUpperCase() !== 'BOOKMARKS';
+        (includeBookmarks || url.searchParams.get('tabID')?.toUpperCase() !== 'BOOKMARKS');
     } catch { return false; }
   };
   const documentId = () => `${baseDocument}:${revision}`;
@@ -73,7 +74,10 @@
         answer = [...new Set(diagrams)].join('\n\n');
       }
     }
-    const module = subject ? `MarineSamraj · ${subject}` : 'MarineSamraj public references';
+    // Keep the page that supplied this record alongside editor-scoped image/attachment links.
+    // It gives later JSON export a stable origin without scraping author widgets or avatars.
+    if (answer) answer = `${answer}\n\n[Source page](${location.href})`;
+    const module = `MarineSamraj · ${subject || 'Study references'}${tab ? ` · ${tab}` : ''}`;
     const controls = [];
     targets.clear();
     const clickable = [...document.querySelectorAll('[tabindex="0"],button')].filter(node => visible(node) && node.getAttribute('aria-disabled') !== 'true' && !node.disabled);
@@ -122,7 +126,7 @@
       const hello = await chrome.runtime.sendMessage({type:'marineSamrajHello'});
       if (!hello?.session) {session = null; status(hello?.reason || 'The collection helper did not authorize this page.'); return;}
       if (session !== hello.session) {handled.clear(); last = '';}
-      session = hello.session;
+      session = hello.session; includeBookmarks = hello.includeBookmarks === true;
       const value = reading(), encoded = JSON.stringify(value), now = Date.now();
       status(value.error || (value.ready ? 'Public page ready; sending to AutoPilot.' : 'Waiting for public page content to settle.'));
       if (encoded === last && now - lastAt < 2000) return;

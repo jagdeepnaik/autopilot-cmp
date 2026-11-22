@@ -508,7 +508,7 @@ class PageController(
             is MarineSamrajRoutine -> {
                 val bankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(routine.answerBankFile) ?: routine.answerBankFile
                 activeAnswerBankStore = answerBankStore.forName(bankFile)
-                val runner = MarineSamrajSession("${newId()}:${now()}", routine.maxPages)
+                val runner = MarineSamrajSession("${newId()}:${now()}", routine.maxPages, routine.includeBookmarks)
                 if (progressRepository.available) runner.waitForRestore()
                 marineSamrajCheckpointJson = null
                 marineSamraj = runner
@@ -959,7 +959,7 @@ class PageController(
             oceanTG = oceanTG?.let { OceanCommand(it.session, it.action) },
             marineSamraj = marineSamraj?.let {
                 val routine = (state.value.activity as? PageActivity.MarineSamraj)?.routine
-                MarineSamrajCommand(it.session, it.action, routine?.clickDelayMillis ?: 2_000)
+                MarineSamrajCommand(it.session, it.action, routine?.clickDelayMillis ?: 2_000, routine?.includeBookmarks == true)
             },
         )
         val encoded = json.encodeToString(HelperCommand.serializer(), command)

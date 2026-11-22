@@ -203,9 +203,14 @@ fun RoutineEditorScreen(viewModel: RoutineEditorViewModel, onBack: () -> Unit) {
                 }
                 RoutineKind.MarineSamraj -> {
                     Group("MarineSamraj public Q&A")
-                    Text("Open a public MarineSamraj exam-preparation page in Chrome, then start. Collect public answers, study notes and diagram links. Account, admin, review, notification and bookmark pages are excluded.", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
+                    Text("Open a MarineSamraj exam-preparation page in Chrome, then start. Collect papers, topics, notes, diagrams and Q Bank references. Account, admin, review and notification pages are always excluded.", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
                     NumberField("Maximum public pages this run", draft.marineSamrajMaxPages, errors.points, { value -> update { it.copy(marineSamrajMaxPages = value) } }, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                     NumberField("Wait before each page action (seconds)", draft.marineSamrajClickDelaySeconds, errors.waitAfterClick, { value -> update { it.copy(marineSamrajClickDelaySeconds = value) } }, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                    ListItem(
+                        headlineContent = { Text("Include my Bookmarks") },
+                        supportingContent = { Text("Copies bookmark rows visible to this signed-in account into the local MarineSamraj database. This remains off by default.") },
+                        trailingContent = { Switch(draft.marineSamrajIncludeBookmarks, { checked -> update { it.copy(marineSamrajIncludeBookmarks = checked) } }) },
+                    )
                     AnswerBankOptions(state, viewModel)
                     Text("The page limit applies to this batch. The default two-second wait gives the site time to respond before the next page action. Restart to resume the saved queue. Keep the collection tab selected in Chrome; other apps may stay in front. Diagram links are saved, but offline asset downloads are not yet supported.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
                 }

@@ -5,7 +5,10 @@ import kotlinx.serialization.Serializable
 
 const val MARINESAMRAJ_ANSWER_BANK = "marinesamraj-public-ver-1.0.json"
 
-/** Public-page collector for MarineSamraj. It never signs in or visits private site areas. */
+/**
+ * MarineSamraj study collector. Bookmark collection is deliberately opt-in because those rows
+ * belong to the signed-in person rather than the site's public study hierarchy.
+ */
 @Serializable
 @SerialName("marineSamraj")
 data class MarineSamrajRoutine(
@@ -14,6 +17,7 @@ data class MarineSamrajRoutine(
     val maxPages: Int = 250,
     /** Wait after AutoPilot authorizes a public-page action and before the helper clicks it. */
     val clickDelayMillis: Long = 2_000,
+    val includeBookmarks: Boolean = false,
     val answerBankFile: String = MARINESAMRAJ_ANSWER_BANK,
 ) : Routine {
     override val kind: RoutineKind get() = RoutineKind.MarineSamraj
@@ -48,6 +52,7 @@ internal data class MarineSamrajCommand(
     val session: String,
     val action: MarineSamrajAction? = null,
     val clickDelayMillis: Long = 2_000,
+    val includeBookmarks: Boolean = false,
 )
 
 internal data class MarineSamrajCapture(val module: String, val question: String, val answer: String)
@@ -63,7 +68,11 @@ data class MarineSamrajProgress(
 )
 
 /** Keeps the navigation queue in the app; the page helper only reads public links and executes one URL. */
-internal class MarineSamrajSession(val session: String, private val maxPages: Int) {
+internal class MarineSamrajSession(
+    val session: String,
+    private val maxPages: Int,
+    private val includeBookmarks: Boolean = false,
+) {
     private var request = 0L
     private var pending: MarineSamrajAction? = null
     private val queued = ArrayDeque<String>()
@@ -85,14 +94,14 @@ internal class MarineSamrajSession(val session: String, private val maxPages: In
 
     fun restore(checkpoint: MarineSamrajCheckpoint) {
         restoring = false
-        visited += checkpoint.visited.mapNotNull(::marineSamrajCanonicalUrl)
+        visited += checkpoint.visited.mapNotNull { marineSamrajCanonicalUrl(it, includeBookmarks) }
         queued.addAll(checkpoint.queued.filter(::allowed).distinct())
         baselinePages = visited.size
         resumeUrl = checkpoint.resumeUrl?.takeIf(::allowed)
     }
 
     fun checkpoint(): MarineSamrajCheckpoint? = if (failed || captureKey != null) null else MarineSamrajCheckpoint(
-        visited.toList(), queued.filter { marineSamrajCanonicalUrl(it) !in visited }, resumeUrl ?: lastReading?.url)
+        visited.toList(), queued.filter { marineSamrajCanonicalUrl(it, includeBookmarks) !in visited }, resumeUrl ?: lastReading?.url)
 
     fun pauseForStorageFailure() {
         failed = true; pending = null
@@ -129,13 +138,13 @@ internal class MarineSamrajSession(val session: String, private val maxPages: In
         lastReading = reading
         if (reading.error != null) { pending = null; progress = progress.copy(detail = reading.error); return }
         if (!reading.ready) { pending = null; progress = progress.copy(detail = "Waiting for the public page and its answer to finish loading."); return }
-        val page = marineSamrajCanonicalUrl(reading.url) ?: return
+        val page = marineSamrajCanonicalUrl(reading.url, includeBookmarks) ?: return
         // A public alias may redirect to an already known canonical page. Remember the alias
         // too, otherwise the same navigation link is queued forever on every destination.
-        requestedUrl?.let { marineSamrajCanonicalUrl(it) }?.let(visited::add)
+        requestedUrl?.let { marineSamrajCanonicalUrl(it, includeBookmarks) }?.let(visited::add)
         requestedUrl = null
         resumeUrl?.let { resume ->
-            if (marineSamrajCanonicalUrl(resume) != page) {
+            if (marineSamrajCanonicalUrl(resume, includeBookmarks) != page) {
                 pending = MarineSamrajAction(++request, reading.document, resume)
                 progress = progress.copy(detail = "Resuming the last saved public page.")
                 return
@@ -143,9 +152,9 @@ internal class MarineSamrajSession(val session: String, private val maxPages: In
             resumeUrl = null
         }
         visited += page
-        reading.links.filter(::allowed).distinctBy(::marineSamrajCanonicalUrl)
-            .filterNot { marineSamrajCanonicalUrl(it) in visited }
-            .filterNot { candidate -> queued.any { marineSamrajCanonicalUrl(it) == marineSamrajCanonicalUrl(candidate) } }
+        reading.links.filter(::allowed).distinctBy { marineSamrajCanonicalUrl(it, includeBookmarks) }
+            .filterNot { marineSamrajCanonicalUrl(it, includeBookmarks) in visited }
+            .filterNot { candidate -> queued.any { marineSamrajCanonicalUrl(it, includeBookmarks) == marineSamrajCanonicalUrl(candidate, includeBookmarks) } }
             .forEach(queued::addLast)
         val question = reading.question?.trim().orEmpty()
         val answer = reading.answer?.trim().orEmpty()
@@ -164,7 +173,7 @@ internal class MarineSamrajSession(val session: String, private val maxPages: In
         }
         // Full-question links and Next controls take precedence over unrelated subject tabs.
         val fullQuestion = reading.links.firstOrNull {
-            "/exam-prep/question/" in it && marineSamrajCanonicalUrl(it) !in visited && allowed(it)
+            "/exam-prep/question/" in it && marineSamrajCanonicalUrl(it, includeBookmarks) !in visited && allowed(it)
         }
         val control = reading.controls.firstOrNull { it.key !in clicked }
         if (fullQuestion == null && control != null) {
@@ -173,7 +182,7 @@ internal class MarineSamrajSession(val session: String, private val maxPages: In
             progress = MarineSamrajProgress("Opening the next public question", visited.size, count)
             return
         }
-        val next = fullQuestion ?: queued.firstOrNull { marineSamrajCanonicalUrl(it) !in visited }
+        val next = fullQuestion ?: queued.firstOrNull { marineSamrajCanonicalUrl(it, includeBookmarks) !in visited }
         if (next == null) {
             pending = null
             progress = MarineSamrajProgress("No more permitted public links were found on the pages visited.", visited.size, count, true)
@@ -183,11 +192,11 @@ internal class MarineSamrajSession(val session: String, private val maxPages: In
         if (pending?.url != next || pending?.document != reading.document) pending = MarineSamrajAction(++request, reading.document, next)
     }
 
-    private fun allowed(url: String): Boolean = marineSamrajCanonicalUrl(url) != null
+    private fun allowed(url: String): Boolean = marineSamrajCanonicalUrl(url, includeBookmarks) != null
 }
 
 /** Canonical identity ignores navigation history and tracking, but keeps content-changing tabs. */
-internal fun marineSamrajCanonicalUrl(value: String): String? {
+internal fun marineSamrajCanonicalUrl(value: String, includeBookmarks: Boolean = false): String? {
     val match = Regex("^https://(?:www\\.)?marinesamraj\\.com(/[^?#]*)(?:\\?([^#]*))?(?:#.*)?$", RegexOption.IGNORE_CASE)
         .matchEntire(value) ?: return null
     val path = match.groupValues[1]
@@ -199,7 +208,7 @@ internal fun marineSamrajCanonicalUrl(value: String): String? {
         val pair = it.split('=', limit = 2)
         pair.takeIf { pair.size == 2 && pair[0] in setOf("examLevelID", "tabID", "questionID") }?.let { pair[0] to pair[1] }
     }.toMap().toMutableMap()
-    if (params["tabID"]?.uppercase() == "BOOKMARKS") return null
+    if (!includeBookmarks && params["tabID"]?.uppercase() == "BOOKMARKS") return null
     if (lower.startsWith("/exam-prep/subject/") && "tabID" !in params) params["tabID"] = "PAPERS"
     if (lower.startsWith("/exam-prep/question/")) params["tabID"] = "ANSWER"
     return "https://marinesamraj.com" + (if (lower == "/ep_home") "/EP_Home" else path) +

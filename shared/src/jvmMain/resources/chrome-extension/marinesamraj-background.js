@@ -12,7 +12,7 @@ async function marineSamrajAuthorized(sender) {
   if (!['https://marinesamraj.com', 'https://www.marinesamraj.com'].includes(url.origin)) return null;
   const path = url.pathname.toLowerCase();
   if (!(path === '/ep_home' || path === '/sitemap.xml' || path.startsWith('/exam-prep/'))) return null;
-  if (/\/(?:user|admin|notification|review-pipeline|support-the-creators)(?:\/|$)/.test(path) || url.searchParams.get('tabID')?.toUpperCase() === 'BOOKMARKS') return null;
+  if (/\/(?:user|admin|notification|review-pipeline|support-the-creators)(?:\/|$)/.test(path) || (!current.includeBookmarks && url.searchParams.get('tabID')?.toUpperCase() === 'BOOKMARKS')) return null;
   if (marineSamrajTab === null) {
     // Starting this routine explicitly authorizes selecting one public collection tab.
     // Use its own window: lastFocusedWindow may be absent while another app is in front.
@@ -34,7 +34,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (!['marineSamrajHello', 'marineSamrajReading', 'marineSamrajAction'].includes(message.type)) return false;
   (async () => {
     const current = await marineSamrajAuthorized(sender); if (!current) return message.type === 'marineSamrajHello' ? {reason:marineSamrajWaitingReason} : null;
-    if (message.type === 'marineSamrajHello') return { session: current.session, clickDelayMillis: current.clickDelayMillis };
+    if (message.type === 'marineSamrajHello') return { session: current.session, clickDelayMillis: current.clickDelayMillis, includeBookmarks: current.includeBookmarks === true };
     if (message.session !== current.session) return null;
     if (message.type === 'marineSamrajAction') {
       const action = current.action;
@@ -50,7 +50,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     let readingUrl; try { readingUrl = new URL(reading.url); } catch { return null; }
     if (reading.session !== current.session || readingUrl.origin !== new URL(sender.url).origin) return null;
     const path = readingUrl.pathname.toLowerCase();
-    if (!(path === '/ep_home' || path === '/sitemap.xml' || path.startsWith('/exam-prep/')) || /\/(?:user|admin|notification|review-pipeline|support-the-creators)(?:\/|$)/.test(path) || readingUrl.searchParams.get('tabID')?.toUpperCase() === 'BOOKMARKS') return null;
+    if (!(path === '/ep_home' || path === '/sitemap.xml' || path.startsWith('/exam-prep/')) || /\/(?:user|admin|notification|review-pipeline|support-the-creators)(?:\/|$)/.test(path) || (!current.includeBookmarks && readingUrl.searchParams.get('tabID')?.toUpperCase() === 'BOOKMARKS')) return null;
     const encoded = JSON.stringify(reading); if (encoded.length > 1000000) return null;
     const total = Math.ceil(encoded.length / 1000), snapshot = `${reading.document}:${Date.now()}`;
     for (let index = 0; index < total; index++) {
