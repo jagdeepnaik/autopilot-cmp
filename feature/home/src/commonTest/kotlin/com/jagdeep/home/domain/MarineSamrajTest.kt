@@ -74,6 +74,15 @@ class MarineSamrajTest {
         assertEquals("row", runner.action?.control)
     }
 
+    @Test fun given_subject_tab_links_when_read_then_the_next_public_tab_is_queued() {
+        val runner = MarineSamrajSession("session", 10)
+        runner.read(page().copy(question = null, answer = null, links = listOf(
+            "https://www.marinesamraj.com/exam-prep/subject/example?tabID=TOPICS",
+            "https://www.marinesamraj.com/exam-prep/subject/example?tabID=NOTES",
+        )))
+        assertEquals("https://www.marinesamraj.com/exam-prep/subject/example?tabID=TOPICS", runner.action?.url)
+    }
+
     @Test fun given_checkpoint_when_restarted_elsewhere_then_resume_original_page_first() {
         val runner = MarineSamrajSession("session", 10)
         runner.restore(MarineSamrajCheckpoint(listOf(page().url), page().links, page().url))

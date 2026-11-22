@@ -87,7 +87,14 @@
     const isLoading = [...document.querySelectorAll('[role="progressbar"],[aria-busy="true"]')].some(visible);
     const signature = JSON.stringify([question, answer, links, controls.map(node => node.key)]);
     if (signature !== stable) { stable = signature; stableAt = Date.now(); }
-    const contentLinks = links.filter(link => new URL(link).pathname !== location.pathname && /\/exam-prep\/(subject|topic|qp|note|question)\//.test(link));
+    // Subject tabs share one path and differ only by tabID. They are real public hierarchy
+    // pages (Papers, Topics, Notes, Diagrams and Q Bank), so they must make the page ready
+    // and be queued instead of leaving the collector indefinitely in its loading state.
+    const contentLinks = links.filter(link => {
+      const candidate = new URL(link);
+      return candidate.href !== location.href &&
+        (/\/exam-prep\/(subject|topic|qp|note|question)\//.test(candidate.pathname) || candidate.searchParams.has('tabID'));
+    });
     const empty = [...document.querySelectorAll('div,p')].filter(visible).some(node => /^(No (questions|notes|diagrams|papers|topics|results)( found| available| yet)?\.?|Nothing here yet)$/i.test(text(node)));
     const hasContent = sitemap ? links.length > 0 : questionPage ? !!question && (!!editor || empty) :
       notePage ? !!question && !!editor : contentLinks.length > 0 || controls.length > 0 || !!answer || empty;

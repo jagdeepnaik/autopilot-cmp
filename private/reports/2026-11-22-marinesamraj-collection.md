@@ -19,7 +19,7 @@ multiple exam levels.
   controls, ordered message assembly, persisted crawl checkpoint and reference-write API.
 - Existing SQLite repository implementation: reference saves write directly through core
   persistence without materializing a bounded assessment snapshot.
-- Shared extension: MarineSamraj collector/background only, plus manifest version 1.15.19.
+- Shared extension: MarineSamraj collector/background only, plus manifest version 1.15.20.
   No extension permission or core bridge-size limit was expanded.
 - MarineSamraj-specific UI copy and guide/index updates.
 - The extension permission regression expectation was stale relative to the unchanged
@@ -62,6 +62,10 @@ Diagram/attachment URLs are preserved, not downloaded as offline files.
 
 Version 1.15.19 also carries a routine-level configurable delay before each page or
 question-control action. The delay defaults to two seconds and permits zero to sixty seconds.
+
+Live inspection found that subject tabs share their subject URL and differ only by `tabID`.
+Version 1.15.20 now treats those tab URLs as a ready public hierarchy page; previously they
+could be mistaken for an unchanged/loading page, leaving the collection idle.
 Runtime data has not been copied into the reviewed or packaged source databases.
 
 Temporary baseline checkout: /private/tmp/autopilot-marine-baseline.xUTh3u. It is diagnostic

@@ -23,7 +23,7 @@ Sources: [robots](https://www.marinesamraj.com/robots.txt),
 
 ## Run and resume
 
-1. Install the app and reload **AutoPilot Page Helper** to extension version `1.15.19` or
+1. Install the app and reload **AutoPilot Page Helper** to extension version `1.15.20` or
    newer. Refresh the MarineSamraj page after the reload.
 2. Open a public exam-preparation page in Chrome. Select **MarineSamraj** in AutoPilot.
 3. Set the per-run page limit (1–1000) and the action delay (0–60 seconds), save, and start.
@@ -38,6 +38,9 @@ The routine waits for stable, loaded content; it reads the answer editor rather 
 headers, author widgets or footer text. It supports non-link question controls and Next.
 Sitemap discovery adds the public exam levels. URL identities ignore tracking/history
 parameters while retaining content-changing exam, tab and question identifiers.
+
+The collector treats each public subject tab as a separate page. It visits Papers, Topics,
+Notes, Diagrams and Q Bank when present; Bookmarks is excluded because it is user-specific.
 
 ## Storage and integrity
 
