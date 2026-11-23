@@ -1,6 +1,6 @@
 # *************************************** versions *********************************************
 [versions]
-jna = "5.15.0"
+jna = "5.19.1"
 # --> App Configuration
 # App Name to be changed inside settings.gradle.kts & IOS/Config.xcconfig
 appName = "AutoPilot"
@@ -17,9 +17,9 @@ logConfigProfile = "release"  # "debug" "release"
 logDebugConfig = "console=true,file=false,har=false,keepDisplayOn=true,harCapturePlugin=true"
 logReleaseConfig = "console=false,file=false,har=false,keepDisplayOn=false,harCapturePlugin=true"
 
-foundation = "1.12.1"
-runtime = "1.12.1"
-ui = "1.12.1"
+foundation = "1.12.2"
+runtime = "1.12.2"
+ui = "1.12.2"
 agp = "9.4.1"
 
 kotlin = "2.4.21"
@@ -29,10 +29,10 @@ kotlinx-coroutines-core = "1.11.0"
 core = "1.7.0"
 junit = "4.13.2"
 runner = "1.7.0"
-ksp = "2.3.12"
+ksp = "2.3.14"
 
-composeHotReload = "1.2.0"
-composeMultiplatform = "1.12.1"
+composeHotReload = "1.3.0"
+composeMultiplatform = "1.12.2"
 
 androidx-activity-compose = "1.13.0"
 androidx-appcompat = "1.8.0"
@@ -53,42 +53,42 @@ firebaseCrashlyticsKtx = "20.0.3"
 
 # --> Material design
 material3 = "1.12.0-alpha03"
-componentsResources = "1.12.1"
-uiToolingPreview = "1.12.1"
+componentsResources = "1.12.2"
+uiToolingPreview = "1.12.2"
 materialIconsExtended = "1.7.3"
 
 # --> Navigation
-androidx-navigation3 = "1.1.2"
+androidx-navigation3 = "1.2.0"
 androidx-adaptive = "1.3.0"
 androidx-navigation = "2.10.2"  # Nav 2 (Old)
 
 # --> Serialization
-kotlinx-serialization = "1.11.0"
-kotlinx-serialization-core = "1.11.0"
+kotlinx-serialization = "1.13.0"
+kotlinx-serialization-core = "1.13.0"
 kotlin-serialization-plugin = "2.4.21"
 
 # --> Persistance - Needs KSP
-androidx-datastore = "1.2.1"
+androidx-datastore = "1.3.0"
 room = "2.8.5"
 sqlite = "2.7.1"
 roomKtx = "2.8.5"
-workManager = "2.11.2"
+workManager = "2.12.0"
 # realm = "3.0.0"
 
 # --> Networking
-ktor = "3.6.0"
-jmdns = "3.5.10"
+ktor = "3.6.1"
+jmdns = "3.6.5"
 slf4j = "1.7.36"
 logback-android = "3.0.0"
-logback-classic = "1.6.5"
+logback-classic = "1.6.8"
 
 # --> Image loading
 coil-compose-version = "3.6.3"
 camerak = "1.2"
-zxing = "3.5.3"
-androidx-camera = "1.5.1"
+zxing = "3.5.4"
+androidx-camera = "1.7.0"
 qrcodeKotlin = "4.5.0"
-bouncyCastle = "1.86"
+bouncyCastle = "1.87"
 
 # --> Dependency Injection
 koin = "4.2.2"

@@ -14,6 +14,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.ui.Alignment
+import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
 
@@ -235,10 +236,10 @@ private fun Scene<NavKey>.topLevelRouteIndex(topLevelRoutes: List<NavKey>): Int?
 
 /**
  * Position of an entry's route among [topLevelRoutes], or null for a non-top-level entry.
- * Navigation 3's default content key is `Pair("$key", "${key::class}")`, not the key's name, so
- * comparing `contentKey.toString()` with the route never matched and every change slid forward.
+ * The entries use Navigation 3's default content key, whose format is the library's own
+ * (`Pair("$key", "${key::class}")` up to 1.1, `"$key:${key::class}"` from 1.2). So this asks the
+ * library for each route's default key instead of parsing it, and a format change can't silently
+ * make every change slide forward.
  */
-internal fun routeIndexOf(contentKey: Any, topLevelRoutes: List<NavKey>): Int? {
-    val name = ((contentKey as? Pair<*, *>)?.first ?: contentKey).toString()
-    return topLevelRoutes.indexOfFirst { route -> route.toString() == name }.takeIf { it >= 0 }
-}
+internal fun routeIndexOf(contentKey: Any, topLevelRoutes: List<NavKey>): Int? =
+    topLevelRoutes.indexOfFirst { route -> NavEntry(route) {}.contentKey == contentKey }.takeIf { it >= 0 }
