@@ -38,3 +38,5 @@ keystore.properties
 # Read-only reference copy of the current Android Studio CMP template
 /private/Test/
 /private/secrets/
+.env
+.env.*

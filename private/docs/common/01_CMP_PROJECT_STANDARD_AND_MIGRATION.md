@@ -343,8 +343,8 @@ android-compileSdk = "37"
 android-targetSdk = "37"
 agp = "9.4.1"
 kotlin = "2.4.21"
-composeMultiplatform = "1.12.1"
-composeHotReload = "1.2.0"
+composeMultiplatform = "1.12.2"
+composeHotReload = "1.3.0"
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -357,7 +357,7 @@ kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref =
 kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 ```
 
-The versions are AutoPilot's on 23 November 2026; take the current ones from the new Android Studio template.
+The versions are AutoPilot's on 24 November 2026. Take newer library versions from Maven, but keep `agp` at the version your Android Studio bundles (`plugins/android/lib/libagp-version.jar`, `buildVersion`): a newer AGP won't sync in an older Studio.
 
 ### 5.2 `settings.gradle.kts`
 
