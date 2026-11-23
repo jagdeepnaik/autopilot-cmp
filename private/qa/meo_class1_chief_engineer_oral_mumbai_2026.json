@@ -1,0 +1,1557 @@
+{
+  "title": "MEO Class 1 Chief Engineer Oral Question Bank (Mumbai)",
+  "completion_status": "incomplete_draft",
+  "question_source": "MEO Class 1 Chief Engineer Oral Question Bank (Mum_261121_232513.pdf",
+  "answer_source": "0. Oral Consolidated QnA.pdf",
+  "answer_policy": "This is a working draft. Candidate excerpts are unverified search suggestions. Only checked answers appear in answer; unanswered entries must not be used for oral preparation.",
+  "questions": [
+    {
+      "number": 1,
+      "question": "What are CBA and SEA? Explain your contractual and statutory rights if your vessel is transiting or entering a High-Risk Area (HRA).",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 2,
+      "question": "Define vicarious liability in maritime law. How do you establish vicarious liability onboard a vessel?",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 3,
+      "question": "Explain the Montreal Protocol and its relevance to marine refrigeration and air-conditioning systems.",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 4,
+      "question": "What is the Kigali Amendment, and how does it regulate hydrofluorocarbons (HFCs) on ships?",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 5,
+      "question": "What is the HART protocol in marine instrumentation and control systems?",
+      "question_page": 1,
+      "answer": "HART means Highway Addressable Remote Transducer. It overlays digital frequency-shift-keyed data on a conventional 4–20 mA analog instrument loop, allowing a control system or handheld communicator to read identification, diagnostics and configuration while retaining the analog process signal.",
+      "answer_source_page": 244,
+      "review_status": "source_checked",
+      "candidate": null
+    },
+    {
+      "number": 6,
+      "question": "Explain the structure of the ISM Code and enumerate all its chapters/parts.",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 7,
+      "question": "State and explain the fundamental principles of marine insurance.",
+      "question_page": 1,
+      "answer": "The core principles are insurable interest, utmost good faith and disclosure of material facts, indemnity, proximate cause, subrogation and contribution. The assured must have a legal or financial interest in the subject matter; the policy responds to a proximate insured peril and indemnifies the covered loss, while preventing double recovery.",
+      "answer_source_page": 5,
+      "review_status": "source_checked",
+      "candidate": null
+    },
+    {
+      "number": 8,
+      "question": "Define subrogation in marine insurance and explain the different types of subrogation.",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 9,
+      "question": "What is an Electronic Bunker Delivery Note (E-BDN), and how do you verify and prove that you have received a genuine E-BDN?",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 10,
+      "question": "Explain the Anti-Fouling Systems (AFS) Convention and the International Anti-Fouling System Certificate. What specific information do you get from the certificate?",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 227,
+        "source_excerpt": "H K C/ A F S/ N0ise Code\nQ1- AFS Convention. Applicability. Who issues the certfcte? How to ensure compliance?\n● International Convention on the Cntrl of Harmful Anti-fouling Systems on Ships\nAdoption: 5 October 2001; Entry into force: 17 September 2008\nApplicable to ships above 400 GT\nBelow 400GT but above 24m , Declaration by the ownr. Supporting Documnts- Invoice from the paint mfr.\n● The Convention prohibits the use of harmful org anotins in anti-fouling paints used on ships and\n● establishes a mechansm to prevent the potential future use of other harmful substances in anti-fouling\nsystems.\n● Under the terms of the A F S Convention, Parties to the Convention are required to prohibit and/or restrict\nthe use of harmful anti-fouling systems on ships flying their fIag, as well as ships not entitled to fly their fIag\nbut which operate under their authorty and all ships that enter a port, sh!pyard or offshore terminal of a\nParty.\n● all ships shall not apply or re-apply org anotins compounds which act as biocides in anti-fouling systems.\nThis applies to all ships (including fixed and floating platf0rms, floating storage units (FSUs), and Floating\nProduction Storage and Offtake units (",
+        "match_score": 0.715
+      }
+    },
+    {
+      "number": 11,
+      "question": "Explain the latest developments and full details regarding biofouling regulations and management guidelines.",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 12,
+      "question": "What is the Himalaya Clause in a Bill of Lading or Charter Party, and whom does it protect?",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 13,
+      "question": "As Chief Engineer, your vessel is transiting India's Exclusive Economic Zone (EEZ) and a crew member is injured onboard. How will you report the incident, and which legal jurisdiction applies?",
+      "question_page": 1,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 14,
+      "question": "What is a Note of Protest in a Charter Party? Who issues a Note of Protest, and how is it raised and served?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 15,
+      "question": "What are the specific obligations of a salvor under the Lloyd's Open Form (LOF)?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 16,
+        "source_excerpt": "Q56- Perils listed in P&l club?\nA – Liabilties of P&l stated in above q.\nQ57- Modern Salvage Law? Article 13 and 14?\nA – MSL came in 1989. Salvge claims for Environment protection was introduced. Earlier Salvge Convention Brussels\nConvention (1910) was based purely on No cure, No pay.\nArt 13- Criteria for fixing Reward-\n1. Salved value of the property\n2. Skill and efforts in protecting property and environment.\n3. Measure of success achieved.\n4. Nature of degree of danger.\n5. Time and skill, expenses and losses incurred by salvor.\n6. Promptness in rendering services.\n7. State of readiness of equipmnts and their value.\nArticle 14- Special Compensation- (When Salvor failed to earn any reward under ArticIe 13)\n1. Onus on proof of environmental salvge on salvor.\n2. Geographical restriction pertaining to- Coastal waters, Inland waters and areas adjacent to it.\n3. In case Environmental salvge is proved, Uplift can be ranging between 30%-100% of the Salvor’s\nexpenditure. 30%- confirmed, beyond 30%- by Arbitratn.\n4. Total compensati0n under articIe 14 must be greater than reward under articIe 13.\nQ58- Scopic? Why it came into picture?\nA – SCOPlC- Special Compensation P&l Club Clause.\nScopc",
+        "match_score": 0.565
+      }
+    },
+    {
+      "number": 16,
+      "question": "What constitutes \"clear grounds\" during a Port State Control (PSC) inspection?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 17,
+      "question": "What actions should a Port State Control Officer (PSCO) take once clear grounds are established?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 18,
+      "question": "What is an Interim Safety Management Certificate (Interim SMC), and how is it issued under the ISM Code? Who inspects a vessel for an Interim SMC? If a ship is in Japan while sailing under a different flag, how is its Interim SMC issued? What does the auditor inspect prior to issuance, and what is its validity?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 19,
+      "question": "What is the Special Trade Passenger (STP) Ships Agreement/Convention? Which certificates are issued to special trade passenger ships, and what is their validity?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 20,
+      "question": "How is a Tonnage Certificate issued for an existing/old ship under DG Shipping requirements, and what is the streamlined/shortcut procedure under DG Shipping?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 21,
+      "question": "What is dual class in ships? Why would a vessel require dual class, how does the arrangement operate, and what is the usual timeline for a dual-class arrangement?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 22,
+      "question": "Why is a Certificate of Class required when statutory ship certificates are already available onboard?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 135,
+        "source_excerpt": "lACS/ R O Code\nQ1- What is Condition of class? What is memorandum of Class? What is the difference between the two?\nA – COC or Recommendation: Is a recommendatn made in the case of a defective or damged C. Survy item which is\nnot so serious as to jeopardize class, but which is sufficiently serious to require rectification within a specified time\nas cannot be done now.\nMemoranda definition: are the notes from the class of the vesl for the ship ownrs. Docs related to Hull, Machinery,\nEquipmnt that does not require rectification. Any info to highlight to ownrs.\nEg: B W T S to be/or fitted in 2023\nCOC Mem0randa\n1. Requires rectification\n2. Time specified to rectify\n3. Given after defective/damge to H, M, E\n1. No rectification required\n2. No time period\n3. Info highlighted to ship ownrs\nQ2- Details of Class/ Stat certfctes.\nA -\nClassification surveys\nA classfication survy is a visual examination that normally consists of:\n• an overall examination of the items identified in the Rules for survy;\n• detailed chcks of selected parts, on a sampIing basis;\n• witnessing tests, measurements and trials where applicable.\nClass survy are:\nInitial survy\nAnnual survy\nIntermed!ate survy\nRenewal/specia",
+        "match_score": 0.676
+      }
+    },
+    {
+      "number": 23,
+      "question": "Define tabular freeboard under the International Convention on Load Lines.",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 24,
+      "question": "What is a \"standard ship\" under the Load Line Convention, and what are the standard requirements relating to superstructure?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 25,
+      "question": "What is the purpose of a torsion box in a container vessel? Why is it required, and where is it structurally located?",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 26,
+      "question": "How is oily bilge water/sludge tank capacity determined? State the formula for estimating sludge tank capacity when a ballast tank can carry fuel oil, and specify the governing MEPC regulation.",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 27,
+      "question": "What is progressive fuel injection in a MAN B&W ME engine, and which component/system controls progressive fuel injection? If figures do not tally, hold off signing the BDN until the company office advises; notify the company, charterers, and P&I correspondent immediately. Sound all barge tanks and ship tanks before and after bunkering, recording exact temperatures, flowmeter totaliser readings, and seal numbers; apply the BDN density for final mass calculation. Verify ship tank sounding tables and calibration certificates; if an independent surveyor is appointed, request them to trace the exact source of the discrepancy.",
+      "question_page": 2,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 28,
+      "question": "What is the purpose, composition, and membership structure of the National Shipping Board (NSB) under the Merchant Shipping Act? How many women members are represented?",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 29,
+      "question": "Differentiate between Virtual Reality (VR), Augmented Reality (AR), and Mixed Reality (MR). Explain their operational relevance in shipping and the regulatory provisions under the IMO MASS Code.",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 30,
+      "question": "What is a Green Passport (Inventory of Hazardous Materials)? Explain its practical use and how it facilitates safe ship recycling.",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 72,
+        "source_excerpt": "Q45- Green Passport\nA –\nGreen Passprt :\nIt is a notation given by class on its class certfcte. GP is an invntory of all the materials used on board a ship that\nmay be hazardous to peoples health or to the environment. This invntory is carried throughout the ships life. class\nreviews this periodically and renews every 5 years.\nBenefits :\n1. Awareness for ship staff for materials that require special handling\n2. Minimize impact on environment\n3. Helps recycling uard to make a safe and environmentally friendly way to scrap ship\nGP was initiated in 2003. I H M is the successor of GP.\nGP was prepared without any leg al statements such as SDOC and MD. It was based on ship yards and ownrs\ndeclaration.",
+        "match_score": 0.592
+      }
+    },
+    {
+      "number": 31,
+      "question": "What is the \"No More Favourable Treatment\" (NMFT) clause in IMO conventions, and why is it critical for maritime enforcement?",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 32,
+      "question": "Give the exact statutory definition of Special Trade Passenger Ships as per the Merchant Shipping Act. List the required certificates and their validity periods.",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 33,
+      "question": "As Chief Engineer, how will you prepare your vessel for safe and compliant ship recycling?",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 34,
+      "question": "Explain the IMO Instruments Implementation (III) Code, its core purpose, and the IMO Member State Audit Scheme (IMSAS).",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 274,
+        "source_excerpt": " HTW (Human Elemnt, Trainng & Watch Keeping) Sub- Committee\n- Deals with human side of shipping, including trainng & certification, review , updating & revision of IMO\nModel courses\n- Guidelines of fatigue\n III (Implementation of lMO instrumnts) Sub-committee\n- Brings together fIag, Port & CoastaI state to consider implementation issues with reg ards to lMO\ninstrumnts\n- Analysis of consolidated Aud!t summary reports from IMSAS (IMO Member State Aud!t Scheme) Key\nrole in casuaIty analysis & learning from Inc!dents.\n- Guidelines under HSSC.\n NCSR (Navig ation, Communicatn and Search & Rescue) Sub committee\n- L R I T, GMDSS\n- ICAO/IMO Joint working gr0up on Harmonization of aeronautical & marine search & rescue.\n PPR (Pollution Prevention & Response) Sub committee\n- MARPOL annxes, B W M, A F S, O P R C (International Convention on Oil Pollution Preparedness,\nResponse and Co-operation), H N S is under PPR\n Ship Design and construction Sub-Committee\n- Technical & operational matters related to ship design & construction including sub-division & stability.\ni.e. Load-line, t0nnage, IP.\n Ship System & Equipmnt Sub-Committee.\n- LSA, Fire Detection & fire Extinguishing Systems.\n CCC ",
+        "match_score": 0.599
+      }
+    },
+    {
+      "number": 35,
+      "question": "What is the IMO Net-Zero Framework, and what are the technical and economic basket of measures proposed under it?",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 36,
+      "question": "Introduce yourself, summarize your sea service, and state your current examination status.",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 37,
+      "question": "What is SCOPIC (Special Compensation P&I Clause), when is it invoked, and how does it modify Article 14 of the Salvage Convention?",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 16,
+        "source_excerpt": "Q56- Perils listed in P&l club?\nA – Liabilties of P&l stated in above q.\nQ57- Modern Salvage Law? Article 13 and 14?\nA – MSL came in 1989. Salvge claims for Environment protection was introduced. Earlier Salvge Convention Brussels\nConvention (1910) was based purely on No cure, No pay.\nArt 13- Criteria for fixing Reward-\n1. Salved value of the property\n2. Skill and efforts in protecting property and environment.\n3. Measure of success achieved.\n4. Nature of degree of danger.\n5. Time and skill, expenses and losses incurred by salvor.\n6. Promptness in rendering services.\n7. State of readiness of equipmnts and their value.\nArticle 14- Special Compensation- (When Salvor failed to earn any reward under ArticIe 13)\n1. Onus on proof of environmental salvge on salvor.\n2. Geographical restriction pertaining to- Coastal waters, Inland waters and areas adjacent to it.\n3. In case Environmental salvge is proved, Uplift can be ranging between 30%-100% of the Salvor’s\nexpenditure. 30%- confirmed, beyond 30%- by Arbitratn.\n4. Total compensati0n under articIe 14 must be greater than reward under articIe 13.\nQ58- Scopic? Why it came into picture?\nA – SCOPlC- Special Compensation P&l Club Clause.\nScopc",
+        "match_score": 0.862
+      }
+    },
+    {
+      "number": 38,
+      "question": "Distinguish clearly between a SIRE vetting inspection, a Classification Society survey, and an ISM audit.",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 39,
+      "question": "Which international legal regime and convention provisions grant Port State Control (PSC) the authority to inspect foreign-flagged vessels?",
+      "question_page": 3,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 40,
+      "question": "Differentiate between blue, green, and grey ammonia in the context of alternative marine fuels.",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 67,
+        "source_excerpt": "Q36- Green Ammon!a, Grey Ammon!a, Blue ammon!a.\nAns\nAmmon!a is typically produced by combining Hydr0gen and nitrogen through a method known as the Haber-Bosch\nprocess. This so-called “brown ammonia” uses fossil fuels both to provide the Hydr0gen and the energy source.\nEach tonne of ammon!a produces about 2 tonnes of greenhouse g as.\nGrey Ammonia:\n• Production Method: Grey ammon!a is produced using fossil fuels (usually natural g as) without any carbon\ncapture and storage (CCS) technologies.\n• Carbon Emissions: It results in significant carbon emissions due to the use of fossil fuels.\n• Common Method: Historically, most ammon!a production has followed the grey ammon!a route.\n• Environmental Impact: Grey ammon!a contributes to climate change and environmental pollution.\n• Market: It has been widely used in various applications, including fertilizers and industrial processes.\nBlue Ammonia:\n• Production Method: Blue ammon!a is essentially like conventional grey ammon!a but with an added\nstep: carbon capture and storage (CCS). It involves capturing the CO₂ emissions during ammon!a production.\n• Carbon Emissions Reduction: By implementing CCS, blue ammon!a can reduce its carbon emissions",
+        "match_score": 0.698
+      }
+    },
+    {
+      "number": 41,
+      "question": "A crack develops on the ship's side shell above the waterline during cargo discharge operations. Detail your immediate and follow-up actions as Chief Engineer.",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 108,
+        "source_excerpt": "Q25- Hole on vessel’s side above waterline, action.\n*As the h0le is above waterIine, it is not an emergncy situation.\n*We don’t know from question as it is from ER or De ck side shell\n*Considering 2 scenarios our action plan will modify\n*now as C/E I will take 2/E/CO to assess the damge location and severity of the damge by h0le.\n*With shell expansion plan I will locate the position of the h0le and chck on the opposite side i.e if h0le found on\nPort side then chck on Stbd side also.\n*Strake number, height from the keel, thickness and steel grade, influenced area and area under consideration of\nthe plating will be determined.\n*With the detailed report of the damge report to the tech superintendent through MASTER.\n*defect report in SMS.\n*Report must include the damge summary, Corective action plan and Risk assessmnt.\n*With the compny’s advice we will have to report to the fIag and p0rt state about the damge.\n*If at sea temporary repair by doubler welding till we reach the repair port has to be done.\n*Once at port same work has to be inspected and permnent repair of the plate in front of class survyor is needed.\n(need to arrange class society survyor appointment at next port)\nFor Plat",
+        "match_score": 0.556
+      }
+    },
+    {
+      "number": 42,
+      "question": "Define CIF (Cost, Insurance, and Freight) under Incoterms, and explain the minimum level of insurance cover the seller is obligated to procure.",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 43,
+      "question": "Describe the organizational structure of the IMO (Assembly, Council, Committees) and identify India's current category and role within the IMO Council.",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 44,
+      "question": "What are PSC Deficiency Action Codes 30 and 17, and why must a Chief Engineer prevent a Code 30 at all costs?",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 162,
+        "source_excerpt": "MOUs aim to encourage harmonization and coordination of P S C activities and the development of practical\nrecommendatns which can be forwarded to IMO for further examination by the Org anization's relevant\nCommittees and Sub-Committees.\nMOUs were f0rmed to discourage shipownrs to misuse FOC, or to cut costs for their benefit which may result in\nsubstandard ships especially in terms of safety and pollution prevention.\nA typical org anizational structure of a regional P S C regime has three components:\n the P0rt State Cntrl Committee,\n the Secretariat, and\n the database or inf0rmation system.\nEach regional P S C regime holds its Committee meeting annually with its member Authorities, co-operating\nmember Authorities, and observer org anizations. IMO is an observer org anization to all regional P S C regimes.\nSeveral technical cooperation activities are implemented in cooperation with P S C regimes in the context of\noutreach partnership\nQ11- Effect on Flag state if PSC detention?\nA –As per MS notice 9 of 2013,\nIn the event of a detntion, it is the responsibility of the FIag state to carry out a full survy of the vessel itself or deleg\nate to the R O until all defciencies are rectifi",
+        "match_score": 0.818
+      }
+    },
+    {
+      "number": 45,
+      "question": "How many Quality/Safety Management Manuals are maintained onboard, and how is document control enforced?",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 46,
+      "question": "What action will you take as Chief Engineer if a spare part is physically available onboard but is missing from the Critical Spare Parts list?",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 47,
+      "question": "Introduce yourself, your rank experience, and the types of vessels you have sailed on.",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 48,
+      "question": "Explain Protection and Indemnity (P&I) Clubs in full detail—mutuality, underwriting calls, club cover, and relationship with Hull & Machinery underwriters.",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 49,
+      "question": "You receive bunkers whose laboratory analysis reveals sulphur content of 0.55% (exceeding the 0.50% global cap). As Chief Engineer, what are your actions and to whom do you report?",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 50,
+      "question": "What is a Close-Up Survey report for ballast tank inspections under the Enhanced Survey Programme (ESP)?",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 51,
+      "question": "Explain all inputs and outputs of the Oil Discharge Monitoring Equipment (ODME) on an oil tanker.",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 52,
+      "question": "What is the Coating Technical File (CTF)? Name all its sections and state the exact number of sections required under SOLAS/PSPC.",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 53,
+      "question": "What are the major international standards governing ship construction (Goal-Based Standards / IACS Common Structural Rules)?",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 153,
+        "source_excerpt": "QUES:  Why Delegation of Authority by a flag to Classfication Society is required (Need for ROs)?\nAns. Many FIag Administrations do not have adequate technical experience, manpower or global coverage to\nundertake all the necessary statutry inspections and survys using its own staff.\nQ25- Can one R O tell another RO to carry out survey on its behalf?\nAns. Yes, a recognized org anization (RO) under a FIag state can deleg ate its duties to another\nrecognized org anization, but this deleg ation is subject to the FIag state's regulations and approval.\nwhile a recognized org anization can deleg ate its duties to another recognized org anization, this\nprocess involves strict regulatory Ovrsight by the FIag state, mutual agreements as per R O cod,\nand adherence to international maritime conventions.\nQ26 – Class Survey vs Statutory Survey\nStatutry Survy Class Survy\nPurpose Ensures Compliance with international\nregulations and conventions and also national\nregulations complementing mandatory\nInternational lMO instrumnts\nEnsures vessel meets Class rules & standards.\nAuthorty Conducted by or on behalf of Flg state or R O\nauthorized by Flg State\nConducted by class that shipownr has chosen for",
+        "match_score": 0.652
+      }
+    },
+    {
+      "number": 54,
+      "question": "State your vessel types sailed and your INDOS number.",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 55,
+      "question": "Explain cargo liquefaction, Transportable Moisture Limit (TML), Flow Moisture Point (FMP), and what checks and maintenance procedures you carry out to keep bulk cargo safe.",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 56,
+      "question": "How will you proceed to prepare for and conduct a periodical electrical survey onboard?",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 57,
+      "question": "Explain modern marine inventory management principles, including lead time, safety stock, and Re-Order Point (ROP).",
+      "question_page": 4,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 58,
+      "question": "Define the \"critical period\" during dry-docking. What precautions do you take as Chief Engineer during docking, and what happens to the vessel's metacentric height (GM)?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 59,
+      "question": "Your vessel has completed cargo discharge alongside and you observe a two-foot crack on the port side shell plating around midship, approximately two metres above the waterline. What actions will you take?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 108,
+        "source_excerpt": "Q25- Hole on vessel’s side above waterline, action.\n*As the h0le is above waterIine, it is not an emergncy situation.\n*We don’t know from question as it is from ER or De ck side shell\n*Considering 2 scenarios our action plan will modify\n*now as C/E I will take 2/E/CO to assess the damge location and severity of the damge by h0le.\n*With shell expansion plan I will locate the position of the h0le and chck on the opposite side i.e if h0le found on\nPort side then chck on Stbd side also.\n*Strake number, height from the keel, thickness and steel grade, influenced area and area under consideration of\nthe plating will be determined.\n*With the detailed report of the damge report to the tech superintendent through MASTER.\n*defect report in SMS.\n*Report must include the damge summary, Corective action plan and Risk assessmnt.\n*With the compny’s advice we will have to report to the fIag and p0rt state about the damge.\n*If at sea temporary repair by doubler welding till we reach the repair port has to be done.\n*Once at port same work has to be inspected and permnent repair of the plate in front of class survyor is needed.\n(need to arrange class society survyor appointment at next port)\nFor Plat",
+        "match_score": 0.675
+      }
+    },
+    {
+      "number": 60,
+      "question": "What are the different sections/headings in the Coating Technical File (CTF), and how many sections exist?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 61,
+      "question": "Define edge corrosion in ballast tanks and explain why coating breakdown initiates at sharp structural edges.",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 62,
+      "question": "Your main engine daily fuel oil consumption suddenly rises from 30 tonnes/day to 33 tonnes/day under steady sea conditions. How do you systematically investigate and resolve this?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 63,
+      "question": "How do you differentiate operationally and analytically between hull fouling and propeller fouling?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 64,
+      "question": "Your ship is en route to Japan with four or five scheduled port calls. At the first port, your oily bilge holding tank is full and port authorities confirm no reception facilities are available. What actions will you take?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 65,
+      "question": "What are the statutory responsibilities of the Master and Chief Engineer when adequate port reception facilities are unavailable (IMO Advance Notification & Alleged Inadequacy reporting)?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 66,
+      "question": "Why are marine machinery and equipment subjected to shop trials before installation and sea trials after installation onboard?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 67,
+      "question": "What are the combustion and operational problems associated with LNG in marine dual-fuel engines other than methane slip (e.g., knocking, pre-ignition, misfiring, flame quenching)?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 68,
+      "question": "Which IMO Code governs gas-fueled / dual-fuel ships (IGF Code), and what is its parent SOLAS chapter and main regulatory framework?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 69,
+      "question": "What are the different types of fixed and portable gas detectors used onboard dual-fuel and gas-carrying vessels, and what are their sensing principles?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 70,
+      "question": "As Chief Engineer, how do you detect an oil spill early during bunkering or internal transfer operations, and what immediate containment actions follow?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 71,
+      "question": "State the functional requirements of the ISPS Code (Part A, Section 1.3).",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 72,
+      "question": "What are the different types of marine salvage (contract salvage, pure salvage, statutory salvage)?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 73,
+      "question": "What are addressable fire detectors/sensors, and how do they differ from conventional zone-based fire detection loops?",
+      "question_page": 5,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 74,
+      "question": "Differentiate between a Voyage Charter, Time Charter, and Bareboat (Demise) Charter with respect to fuel supply, machinery maintenance, and off-hire clauses.",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 75,
+      "question": "What is General Average under the York-Antwerp Rules? Give two engine-room examples that qualify as a General Average act and one that does not.",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 1,
+        "source_excerpt": "Q4- What are the conditions for GA ? / GA Definition / GA principles.\nA – There is a General Average Act when, and only when-\n1. An extraordinary Sacrifice or Expenditure\n2. Is Intentionally &\n3. reasonably made or incurred\n4. For the common safety\n5. For the purpose of preserving from peril the property involved in common maritime adventure.\nQ.4a A. Q4b- A. What is “extraordinary” in York Antwerp rules?\n1. Abuse of machinry (e.g. fire pmp running continuously in case of fire)\n2. Which is not contrctual.\nWhat is difference between Clause Paramount vs Rule Paramount?\nRuleParamount – It is a CriticaI leg al principIe in Maritme law that appear in “YA rules”\n It establishes leg al standard ot rules that take precedence and ensure consistency in interpretation\nof liabilties or making allowance for sacrifice.\n It states “in no case shall there be any allowance for sacrifice or expenditure unless reasonably\nmade or incurred”.\nClauseParamount – often found in B/L or contrct of cariage or Charter Party\n It makes internationally accepted carg0 liabilty regime (like Hage or Hage Visby). It is paramount or\n“overriding” above local or national law. This ensures a consistent leg al approach ",
+        "match_score": 0.558
+      }
+    },
+    {
+      "number": 76,
+      "question": "Explain the 3/4ths Collision Liability Clause (Running Down Clause) in Hull & Machinery policies. Who covers the remaining 1/4th liability and wreck removal?",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 77,
+      "question": "What is the difference between Actual Total Loss (ATL), Constructive Total Loss (CTL), and Particular Average in marine insurance?",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 4,
+        "source_excerpt": "2. Depreciation is observed.\n3. Insured may not be in the possession of\nsubject matter (Insurable interest)\n4. New for Old repIacement.\n5. Tail0r made/ customized policies.\n6. Policy duration is generally annual basis.\n3. Insured must be in possession of subject\nmatter.\n4. 5. 6. No repIacement, only repair/ rectification.\nGeneral policies for all customers.\nPolicy duration may or may not be annual. E.g-\nlife Insurnce.\nQ16- What is the role of an underwriter?\nA – 1. He will appoint Loss Survyor/ Damge Survyor who will further assess the loss/ damge and cost of repair shall\nbe decided.\n2. He prepares policies evaluating the risks associated with the property.\n3. Decides premium for the subject matter.\n4. Communicates with the brokr while selling policy to the ownr.\n5. Arranges reInsurnce in case the risk is higher than his paying capacity.\nUnderwriter qualifications\n- A marne insrnce undrwritr typically requires a bachelor’s degree in fields such as business, accounting,\nfinance, economics, maritme studies, law, or a related subject.\n- Some employrs may accept associate degree or relevnt professional experience in liew of a degree.\n- Additionally, professnl certificatn like certified",
+        "match_score": 0.744
+      }
+    },
+    {
+      "number": 78,
+      "question": "Explain the warranty of seaworthiness in a Voyage Policy versus a Time Policy under the Marine Insurance Act. How does a Chief Engineer uphold seaworthiness?",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 79,
+      "question": "What are Advance Calls, Supplementary Calls, and Release Calls in a P&I Club?",
+      "question_page": 6,
+      "answer": "An advance or estimated call is the member contribution budgeted for the policy year. A supplementary call is an additional contribution when the original calls do not meet claims and expenses. A release call is a final amount paid when a member leaves or closes an open policy year, releasing that member from future supplementary calls for it, subject to the club rules.",
+      "answer_source_page": 12,
+      "review_status": "source_checked",
+      "candidate": null
+    },
+    {
+      "number": 80,
+      "question": "Explain the Nairobi International Convention on the Removal of Wrecks, 2007. What certificate is required onboard, and what is the tonnage threshold?",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 81,
+      "question": "What is the Bunker Convention (International Convention on Civil Liability for Bunker Oil Pollution Damage, 2001), and what compulsory insurance certificate must be carried?",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 82,
+      "question": "Compare the Civil Liability Convention (CLC 1992) and the IOPC Fund Conventions regarding oil pollution liability limits and shipowner strict liability.",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 83,
+      "question": "Explain the Convention on Limitation of Liability for Maritime Claims (LLMC 1976 / 1996 Protocol). When does a shipowner lose the right to limit liability?",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 84,
+      "question": "What is a Bill of Lading (B/L)? Explain its three legal functions and the risks of issuing a Clean B/L against a Letter of Indemnity (LOI).",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 85,
+      "question": "Define Laytime, Demurrage, and Despatch in a Charter Party. How can an engine-room breakdown affect laytime or place a time-chartered vessel off-hire?",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 86,
+      "question": "Explain the difference between Arbitration and Court Litigation in maritime disputes. Is an arbitral award binding under the New York Convention?",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 17,
+        "source_excerpt": "Q61- What is Arbitratn? Arbitration vs mediation?\nA – ADR – is Alternate Dispute Redressal Mechansm to settle disputes outside of the courtroom with the help\nof an impartial 3rd party.\nAdvantages of ADR – Lower Costs, Greater flexibility of process, Higher Confidentiality, Greater likelihood of\nsettlement, Choice of Forum, Choice of solutions\nArbitrtion- It is a f0rm of ADR Mechansm, where a neutral third party called an arbitrator hears arguments of\nparties in dispute, collects evidence & then decides on the outcome of the dispute, similar to a court ruling.\n- Arbitration Agreement Elements –\na. Consent\nb. Presiding Authorty – This is similar to a judge that presides over a court of law.\nc. Seat of Arbtration – It determines the courts which would exercise jurisdiction over the arbitral\nprocedings\nd. Party autonomy & procedings – Choice to select applicable laws, especially in case of International\nCommercial Arbitratn.\ne. Finality of Outcome – No appeal ag ainst an arbitral award except in certain exceptional circumstances.\nE.g. fraud\n- Arbitration types – International Commercial Arbitratn (Under High Court) & Domestic Arbitratn (District\nCourt &High Court)\n- In case of a disput",
+        "match_score": 0.627
+      }
+    },
+    {
+      "number": 87,
+      "question": "What is the SUA Convention (Suppression of Unlawful Acts against the Safety of Maritime Navigation), and what are the Master's and Chief Engineer's obligations during a security threat?",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 88,
+      "question": "Differentiate between UNCLOS maritime zones: Internal Waters, Territorial Sea, Contiguous Zone, Exclusive Economic Zone (EEZ), and High Seas, specifying coastal state versus flag state jurisdiction in each.",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 278,
+        "source_excerpt": "Q12- E E Z , Contiguos zone, ContinentaI shelf.\nA –\n Article 3 : Breadth of the Territorial sea – every state has the right to establish the breadth of its territoriaI\nsea up to a limit not exceding 12 NM, measured from baseIines determined in accordance with this convntn\n Article 4 : Outer limit of the Territorial sea – The outer limit of the terrritoriaI sea is the line every point of\nwhich is at a distance from the nearest point of the BaseIine equal to the breadth of the territoriaI sea.\n Article 5  Baseline Definition– The normal baseIine for measuring the breadth of the Teritorial sea is the\nlow-watr line along the coast as markd on large scale charts oficialy recognized by the costal state.\n Contiguous Zone:\no The contiguos zone extends seaward up to 24 nm from its baseIines.\no It is an intermediary zone between the territoriaI sea and the high seas.\no The CoastaI state has the right to both prevent and punish infringement of fiscal, immigration,\nsanitary, and customs laws within its territory and territoriaI sea.\no Unlike the territoriaI sea, the contiguos zone only gives jurisdiction to a state on the ocean’s surface\nand floor. It does not provide air and space rights",
+        "match_score": 0.589
+      }
+    },
+    {
+      "number": 89,
+      "question": "What is the difference between an \"Unseaworthy Ship\" and an \"Unsafe Ship\" under the Indian Merchant Shipping Act, 1958 (as amended)?",
+      "question_page": 6,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 90,
+      "question": "Explain the procedure for ship registration in India, provisional certificates of registry, and deletion from registry under the Merchant Shipping Act.",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 91,
+      "question": "What are the statutory entries a Chief Engineer must ensure are recorded in the Official Log Book (OLB) versus the Engine Room Log Book?",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 92,
+      "question": "Explain the principle of \"Utmost Good Faith\" (Uberrimae Fidei) and \"Insurable Interest\" in marine insurance contracts.",
+      "question_page": 7,
+      "answer": "Utmost good faith requires both parties, particularly the assured, to disclose material facts accurately when arranging marine cover. Insurable interest means the assured has a legally recognized financial stake in the preservation of the ship, cargo or other insured subject matter and can suffer loss from the insured peril.",
+      "answer_source_page": 5,
+      "review_status": "source_checked",
+      "candidate": null
+    },
+    {
+      "number": 93,
+      "question": "Compare EEDI, EEXI, CII, and SEEMP (Parts I, II, and III). What happens if a vessel receives a CII rating of D for three consecutive years or E for a single year?",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 94,
+      "question": "What are the differences between the IMO Data Collection System (IMO DCS) and the European Union Monitoring, Reporting, and Verification (EU MRV) regulation?",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 95,
+      "question": "Explain the EU Emissions Trading System (EU ETS) and FuelEU Maritime regulations as they apply to commercial shipping.",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 96,
+      "question": "What is the Fuel Oil Non-Availability Report (FONAR)? When can it be submitted, and does a FONAR exempt a vessel from MARPOL Annex VI compliance?",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 121,
+        "source_excerpt": "Q12- What is FONAR? What are the steps?\nANS:- Regulation 18 of Anx VI of the MARPOL Convention sets out factors to be taken into consideration by a\nMember State Party in situations where a ship is found not to be compliant with the suIfur limits.\nIf, despite best efforts, a ship is unable to obtain compliant fuel, the ship’s FIag state as well as the competent\nauthorty of the port of destination should be notified . This notification is commonly referred to as a Fuel Oil Non-\nAvailability Report (F0NAR).\nA copy of the F0NAR should be kept on board for inspection for at least 36 months.\nIF using non compliant fuel, following steps to be taken :\n1. Fill up F0NAR F0rm and submitted to port authorty where bunkr operation going to take place and get\nF0NAR F0RM signed and stamped.(in case compliant fuel is not available in port)\n2. 3. 4. 5. 6. Inf0rm FIag state and p0rt state of your next port of destination.\nTake dispensatn from fIag sate for using non compliance fuel.\nMake letter of protest for supplier.\nShip’s FIag state to inf0rmed IMO via GISIS.\nFIag state lies with port of bunkring authorty to carry out investig ation and submit the same to IMO.",
+        "match_score": 0.713
+      }
+    },
+    {
+      "number": 97,
+      "question": "Detail the exact fuel oil changeover procedure before entering an Emission Control Area (ECA) and the mandatory entries required in the Engine Room Log Book / dedicated changeover log.",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 98,
+      "question": "What are the differences between open-loop, closed-loop, and hybrid Exhaust Gas Cleaning Systems (EGCS / scrubbers), and what washwater discharge criteria apply?",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 99,
+      "question": "What action will you take as Chief Engineer if your scrubber's continuous emission monitoring system (CEMS) or washwater sensor fails during a voyage?",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 100,
+      "question": "Explain the NOx Technical Code 2008, the Engine International Air Pollution Prevention (EIAPP) Certificate, and the onboard NOx verification methods (Engine Parameter Check, Simplified Measurement, Direct Measurement).",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 60,
+        "source_excerpt": "Q12- Briefly explain NOx code, what are N0x technical file contents?\nA - The Technical Code on Cntrl of Emission of Nitrogen Oxides from Marine Diesel Engines adopted by IMO\n- Adopted: 10 oct 2008\n- The N0x code purpose is to provide mandatory procedures for the testing, survy and certificatn of marine\ndiesel engines that will enable engine manufacturers, shipownrs and Administrations/ Classifiction societies\nto ensure that all applicable marine diesel engines comply with the relevant limiting emission values of N0x\nas specified within regulation 13 of Anx VI, Chapter-3.\n- This Code applies to all marine diesel engines with a power output of more than 130 kW\n- For the purpose of the application of this Code, Administratns are entitled to deleg ate all functns to an org\nanizatn authorized to act on behalf of the Administratn.\n- First Engine is tested on the testbed, basis on which ElAPP certfcte is obtained.\n- As per NOx Code, First Survey is Engine certification in Yard.  Oral Q.\n- Testing cycle is maintained-\nE3 cycle – for ME\nD 2 cycle – for AE\n- Exemptns- <130KW and Emcy equipmnt engines.\n- Chcking for compliance-\n1. IMO numbr of components\n2. Limits of Engine settings\n3. Engin",
+        "match_score": 0.606
+      }
+    },
+    {
+      "number": 101,
+      "question": "What are the key parameter limits in ISO 8217:2024 compared to ISO 8217:2017 for marine residual and distillate fuels (e.g., cat fines, viscosity, flashpoint, stability)?",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 102,
+      "question": "After bunkering, your laboratory report shows catalytic fines (Al + Si) at 85 mg/kg. As Chief Engineer, how do you manage purifier operation, settling/service tank temperatures, and engine protection?",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 103,
+      "question": "Differentiate between Regulation D-1 (Ballast Water Exchange) and Regulation D-2 (Ballast Water Performance Standard) under the BWM Convention.",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 44,
+        "source_excerpt": "Q1a- BWM Latest amendments. BW Convention, why not ratified in Ind!a?\nA – Latest-\n1. Guidelines for B W T S Operation in chalIenging water.\n2. Treated sewage / grey water can be stored in the Ballast Water tanks if required with entry in BWRB, and\nlater the discharge to comply with Annex 4 discharge criteria\n[Note: Dmax = 0.000926VDB]\nE- Ballast Water Record books can be used, editorial change in the B W M convention, Regulation A1 and\nB2. Wef 1 Oct 2025.\nNew f0rmat stating codification of BWRB wef 1 Feb 2025.\nGuidance for modifications for t ype approved B W T S.\n3. 4. 5. BWM Convention EIF criteria- 30 states, comprising not less than 35% of world’s t0nnage.\n1. 2. All new vesls built after 8 Sept 2017 should comply with D 2 standards.\nAll existing ships for whom their 1st IOPP renewal survy lies between 8 Sept 2017- 8 Sept 2019 can comply\nwith D 2 standards after their 2nd lOPP renewal survy.\n3. All existing ships for whom their 1st lOPP renewal survy lies after 8 Sept 2019 must comply with D 2\nstandardsafter their 1st lOPP renewal survy.\n4. All ships should comply before 8 Sept 2024.\nWhy B W M not ratified in India-\n1. 3. Area for BW exchange not dedicated.\n2. Reception faciliti",
+        "match_score": 0.628
+      }
+    },
+    {
+      "number": 104,
+      "question": "What actions must a Chief Engineer take if the Ballast Water Management System (BWMS) fails at a port where ballasting or deballasting is urgently required (contingency measures)?",
+      "question_page": 7,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 105,
+      "question": "Explain the Hong Kong International Convention for the Safe and Environmentally Sound Recycling of Ships, 2009. Differentiate between Part I, Part II, and Part III of the Inventory of Hazardous Materials (IHM).",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 230,
+        "source_excerpt": "Q4a- HKC Hong Kong convention. Types of survys as per H K C? As a CE, prepare your ship for recycling. When is\nthe H K C EIF?\nThe Hong Kong International Convention for the Safe and Environmentally Sound Recycling\nof Ships, -2009 ,IND!A ratified-2019, EIF- JUNE 2025\nTo ensure that ships, when being recycled after reaching the end of their operational lives, do not pose any\nunnecessary risks to human health, safety and to the environment.\nRegulations in the new Convention cover: The design, construction, operation and preparation of ships so as to\nfacilitate safe and environmentally sound recycling without compromising the safety and operational efficiency of\nships;\nThe operation of sh!p recycling facilities in a safe and environmentally sound manner; and the establishment of an\nappropriate enforcement mechansm for sh!p recycling, incorporating certification and reporting requiremnts.\nApplication – 500GT and Above\nHKC survey types\n1. Initial survy before the ship is put in service, or before the International Certfcte on Invntory of Hazardous\nMaterials is issued. This survy shall verify that Part I of the Invntory\n2. Renewal survy at intervals specified by the Administration, but no",
+        "match_score": 0.894
+      }
+    },
+    {
+      "number": 106,
+      "question": "Under MARPOL Annex I, what are the exact discharge criteria for engine-room bilge water outside and inside Special Areas, and what alarms/stopping devices must the 15 ppm bilge alarm possess?",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 107,
+      "question": "What is a missing or erroneous entry discovered in the Oil Record Book (ORB) Part I after you take over as Chief Engineer? How do you rectify it legally without falsifying records?",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 108,
+      "question": "Explain MARPOL Annex IV (Sewage) discharge regulations regarding comminuted/disinfected sewage versus untreated sewage, and the operation of a Sewage Treatment Plant (STP).",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 109,
+      "question": "Explain MARPOL Annex V (Garbage) disposal rules, including cargo residues harmful to the marine environment (HME), food waste, and incinerator ash, plus Garbage Record Book requirements.",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 110,
+      "question": "What is the Polar Code (International Code for Ships Operating in Polar Waters), and what machinery, fuel tank protection, and winterization requirements apply to Category A, B, and C ships?",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 252,
+        "source_excerpt": "Q25- Why is Polar code required. Tell about P0\nlar code required. Tell about P0lar code in brief.\nA – MV Explorer sank after hitting an iceberg in 2007. All passengers n\nMV Explorer sank after hitting an iceberg in 2007. All passengers n cre w rescued.\nRequiremnets :\nBecause of the increased maritime traffic in Artic and Antarctic areas\no Because of the increased maritime traffic in Artic and Antarctic areas\no Need for Modern and effective regulations\nfor Modern and effective regulations at international level in order To miti\nat international level in order To mitig ate the risks in\nPolar areas as they were not adequately addressed by oth\ner instruments.\nPolar areas as they were not adequately addressed by other instruments.\no PWOM- Polar Water Operating manual.\nPolar Water Operating manual.\nPrincipal aspects that attributed for maritime traffic in Polar area where:\nPrincipal aspects that attributed for maritime traffic in Polar area where:\n1.The Artic shipping Sea Routes\n1.The Artic shipping Sea Routes\n2.Reduced ice cover\n3.Antartic and artic area tour\n3.Antartic and artic area tour!sm\n4.Artic destination Shipping\n4.Artic destination Shipping\nThe purpose of the P0lar Code is\n- to",
+        "match_score": 0.573
+      }
+    },
+    {
+      "number": 111,
+      "question": "Differentiate between a Non-Conformity (NC), Major Non-Conformity (MNC), and Observation under the ISM Code. How is an MNC downgraded during an external audit?",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 31,
+        "source_excerpt": "11. Fire line pressure on br!dge wing.\nQ27- Incident report as CE- ETO fell down during crane repair.\nA – 1. First aid, inf0rm Master and seek medical shore assistance. Provision to divert and helicopter evacuation or\nrepatriate if needed.\n2. Collection of evidences, statements- witness, Master, CE, prime facie.\n3. Preparation of Inc!dent Report- Date, Time, Location, Brief discussion, Human Factor, Ship Factor, Management\nFactor, Job Factors.\n4. Report to Compny, Class, FIag, P&l club, Entry to Official Logbook, Intimation to next port, P&l correspondent.\n5. Permit, Rest hours, PPE, Equipmnt failure, Safety familiarization f0rm etc.\nQ28- Is lSM Internal Audit mandatory? Where is it written?\nA – Yes, it is given in Elemnt 12. Compny should be carried out at intervals not exceding 12 months or as stated in\nSMS. In exception, extendable to 3 more months.\nQ29- What is observati0n, NC, MNC?\nA – Observation – means a Statement of Fact made during a safety management Aud!t and substantiated by\nobjectve evidence. E.g. Inconsistence use of PPE\nNon Conf0rmity- means an observed situation where the objectve evidence indicates non-fulfillment of specified\nrequiremnt. Not posing a serious thre",
+        "match_score": 0.616
+      }
+    },
+    {
+      "number": 112,
+      "question": "What are the specific duties and authority of the Designated Person Ashore (DPA) under Section 4 of the ISM Code?",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 113,
+      "question": "Explain the Harmonized System of Survey and Certification (HSSC). Detail the survey windows for Annual, Intermediate, Periodical, and Renewal surveys.",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 114,
+      "question": "Differentiate between a Condition of Class (CoC), a Statutory Condition/Exemption, and a Class Memorandum.",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 135,
+        "source_excerpt": "lACS/ R O Code\nQ1- What is Condition of class? What is memorandum of Class? What is the difference between the two?\nA – COC or Recommendation: Is a recommendatn made in the case of a defective or damged C. Survy item which is\nnot so serious as to jeopardize class, but which is sufficiently serious to require rectification within a specified time\nas cannot be done now.\nMemoranda definition: are the notes from the class of the vesl for the ship ownrs. Docs related to Hull, Machinery,\nEquipmnt that does not require rectification. Any info to highlight to ownrs.\nEg: B W T S to be/or fitted in 2023\nCOC Mem0randa\n1. Requires rectification\n2. Time specified to rectify\n3. Given after defective/damge to H, M, E\n1. No rectification required\n2. No time period\n3. Info highlighted to ship ownrs\nQ2- Details of Class/ Stat certfctes.\nA -\nClassification surveys\nA classfication survy is a visual examination that normally consists of:\n• an overall examination of the items identified in the Rules for survy;\n• detailed chcks of selected parts, on a sampIing basis;\n• witnessing tests, measurements and trials where applicable.\nClass survy are:\nInitial survy\nAnnual survy\nIntermed!ate survy\nRenewal/specia",
+        "match_score": 0.741
+      }
+    },
+    {
+      "number": 115,
+      "question": "Which machinery surveys can a Chief Engineer carry out under the Continuous Machinery Survey (CMS) scheme, what are the eligibility requirements for the Chief Engineer, and which items are strictly excluded?",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 116,
+      "question": "Explain the Enhanced Survey Programme (ESP) under SOLAS Chapter XI-1. What is the difference between an Overall Survey and a Close-Up Survey?",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 117,
+      "question": "What is the Condition Assessment Scheme (CAS) versus the Condition Assessment Programme (CAP), and when is each required?",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 118,
+      "question": "What are the requirements for an In-Water Survey (IWS) in lieu of intermediate dry-docking, and what hull markings/arrangements must the vessel have?",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 119,
+      "question": "Explain the difference between a Recognized Organization (RO) and a Recognized Security Organization (RSO) under the RO Code and SOLAS.",
+      "question_page": 8,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 120,
+      "question": "What is the Continuous Synopsis Record (CSR) under SOLAS Chapter XI-1, who issues it, and what information does it contain?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 121,
+      "question": "Explain ISPS Security Levels 1, 2, and 3. What specific engine-room security measures are implemented when escalating from Level 1 to Level 2?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 41,
+        "source_excerpt": "If the maintenance makes the pump operational, then we can report back to the Compny about the same.\nIf we cannot repair the pump,\nCarry out RCA, RA\nReport to the Compny, fIag, Class, [next Port of caIl (if mid-sea)]\nSeek dispensatn and COC.\nSuggest CA/ PA\nPortable Emergncy pump connected to ESBD, can be used a temporary measure, we need to prepare an M0C.\n[capacity of the portable pump to be either identical to onboard emcy pump or in compliance with FFA code]\nSuction can be taken from Aft Peak Tank.\nP M S overhaul interval for testing/ overhaul period to be reconsidered.\nJob responsibility can be shifted to a senior engineer.\nSufficient spares to be retained all the time.\nAfter permnent repair is done, same to be reported back to lift up the dispensatn and COC.\nQ – What do you mean by ‘Fully conversnt’?\nFully conversant with SMS means the ability to navig ate through the wh0le SMS without any difficulty.\nIt indicates high level of proficiency and competency in understanding and adhering to the SMS to safety of ship, its\ncre w and marine environment.\nKey aspects-\n1. Knowledge of SMS\n2. Understanding safety procedures\n3. Awareness of regulatory requiremnts\n4. Competence in implemen",
+        "match_score": 0.626
+      }
+    },
+    {
+      "number": 122,
+      "question": "What are the five Titles of the Maritime Labour Convention (MLC), 2006? Differentiate between DMLC Part I and DMLC Part II.",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 123,
+      "question": "How do you handle repeated MLC/STCW rest hour violations in the engine department during intense port operations or machinery breakdowns?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 124,
+      "question": "As Chief Engineer, how do you manage a complaint of workplace harassment, bullying, or interpersonal conflict between a Second Engineer and junior engineers onboard?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 125,
+      "question": "What is the Tacit Acceptance Procedure at the IMO, and why was it introduced for technical conventions such as SOLAS and MARPOL?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 276,
+        "source_excerpt": "The Archipelgc state itself draws & declares archpilgc BaseIins following UNCLO$ criteria & then deposits the\nrelevant charts with The UN secretary General.\nThis Archplgc doctrine all0ws a nation made up of islands to treat the water enclosed by the islands as internl,\nproviding increased cntrl over natural resources, national securty & navig atn while still allowing for Intrntnl navig\nation & certain freedoms for other states.\nQ5- Explict and Tact acceptance. Examples.\nA - Explicit acceptance – In this the Amendments come into force only after a percentage of Contrcting States,\nusually 2/3rd , had accepted them.\n- Definiti0n as per MARPOL 73/78 article 16 - An amendment to an article of the conventn shall be\ndeemed to have been accepted on the date on which it is accepted by two thirds of the parties, the\ncombined merchant fleets of which constitute not less than 50 % of the GT of the world’s merchant\nfleet\nTacit Acceptance – In this the amendmnt shall enter into force at a particular time unless before the date,\nobjections to the amendmnt are received from a specified number of parties.\n- Definiti0n as per MARPOL 73/78 article 16 - An amendmnt to an appendx to an annx to the conv",
+        "match_score": 0.55
+      }
+    },
+    {
+      "number": 126,
+      "question": "Explain the difference between a Convention, a Protocol, a Mandatory Code (e.g., ISM, IGF, IGC), and a Recommendatory Code/Resolution.",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 127,
+      "question": "What are IACS Unified Requirements (UR), Unified Interpretations (UI), and Procedural Requirements (PR)? Explain IACS UR E26 and E27 on cyber resilience.",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 128,
+      "question": "If a Port State Control Officer detains your vessel in a foreign port, what immediate steps must you take as Chief Engineer to rectify deficiencies and lift the detention?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 129,
+      "question": "What documents, certificates, and physical checks do you prioritize during a 4-hour handover when joining a vessel as Chief Engineer?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 130,
+      "question": "Explain the contents and statutory purpose of the Damage Control Plan and Damage Control Booklet under SOLAS Chapter II-1.",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 131,
+      "question": "Your main engine turbocharger rotor suffers severe blade damage mid-ocean. Detail your step-by-step technical, operational, and reporting actions as Chief Engineer.",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 132,
+      "question": "What is engine derating? Differentiate between propeller-law derating and mean effective pressure (MEP) derating, and explain their impact on SFOC and NOx emissions.",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 133,
+      "question": "What are the operational hazards of prolonged slow steaming on a two-stroke marine diesel engine, and what preventive measures do you institute?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 134,
+      "question": "Explain \"torque-rich\" operation on the engine-propeller layout diagram. What are its causes, cylinder/exhaust indications, and corrective actions?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 135,
+      "question": "How do you calculate main engine shaft power without using indicator cards (e.g., torsion meter, fuel index/rack position, scavenge air pressure correlations)?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 136,
+      "question": "What happens if both Engine Control Units (ECU A and ECU B) fail on an electronically controlled MAN B&W ME engine, or if an EICU fails?",
+      "question_page": 9,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 137,
+      "question": "Explain the causes, early detection indicators (oil mist detector, bearing temperature sensors), and emergency response to a main engine crankcase explosion.",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 138,
+      "question": "A scavenge fire breaks out in Unit No. 4 while at full sea speed. Detail your immediate actions, engine load management, and post-fire inspection checklist before resuming normal power.",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 139,
+      "question": "During a voyage, you discover water ingress into the main engine lubricating oil sump (lube oil turning milky). How do you trace the source and restore the system safely?",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 140,
+      "question": "Your vessel experiences a total electrical blackout in congested coastal waters, and the Emergency Generator fails to start automatically. What are your immediate priorities?",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 141,
+      "question": "Compare High Voltage (HV — 6.6 kV / 11 kV) and Low Voltage (440 V) marine distribution systems. What specific safety procedures and permits are required before working on HV switchgear?",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 142,
+      "question": "An earth fault alarm appears on the 440 V main switchboard during a night watch. Explain the risks of an unrectified earth fault on an insulated neutral system and the step-by-step isolation procedure.",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 143,
+      "question": "Explain the operation, testing, and statutory maintenance schedule (weekly, monthly, annual, 5-yearly) of a fixed CO2 engine-room fire extinguishing system.",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 88,
+        "source_excerpt": "Q3- What all chcks/maintenance for a CO2 system checks?\nAns:\nWeekly:\nswitch\nMSC 1 / Circ 1432-2012- revised guidelines for maintenance & inspection of fire protection system & appliances.\n1. Verify all fixed fire extinguishing system cntrl panel indicators are functional by operating the lamp/ indicator test\n2. Verify all cntrl / section valves are in the correct position.\nAs per MSC.1/ Circ 1318/ Rev1\nRevised guidelines for the maintenance & inspection of fixed C02 fire extinguishing system\nMonthly Inspection -\n* At least every 30 days a general visual inspection of overall system condition for damge.\n* All stop valves are in closed position.\n* All releasing cntrls are in the proper position and readily accessible for immediate use.\n* Discharge piping & pneumatic tubing is intact & has not been damged.\n* All high pressure cylinders are in place & properly secured.\n* The alarm devices are in place & do not appear damged.\nAnnual Inspection -\n* Minimum level of maintenance & inspection should be carried out in accordance of manufacturers instructions.\n* Boundaries of protected space to be visually inspected & confirm that no modifications have been made to the\nenclosure\n* All storage",
+        "match_score": 0.648
+      }
+    },
+    {
+      "number": 144,
+      "question": "Why is a fixed local-application water-mist (Hyper-Mist) fire-fighting system required in addition to the main total-flooding system, and what triggers its automatic or manual release?",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 145,
+      "question": "How do you test the Emergency Fire Pump in front of a Class or PSC surveyor? State the required number of water jets, locations, and minimum pressure/throw requirements under SOLAS.",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 146,
+      "question": "While testing the steering gear prior to departure, one hydraulic ram cylinder cracks in a 4-ram steering gear system. How do you isolate the damaged ram and continue safe operation?",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 147,
+      "question": "Your auxiliary boiler safety valve lifts prematurely, or fails the accumulation of pressure test during survey. Explain the boiler safety valve setting and sealing procedure in front of a surveyor.",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 148,
+      "question": "You detect oil in the boiler cascade (hotwell) tank. How do you systematically trace the source of contamination and clean the steam/condensate system?",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 149,
+      "question": "What is the difference between a watertight door and a weathertight door under the Load Line Convention, and how do you verify their integrity during a Load Line survey?",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 237,
+        "source_excerpt": "Q5a. f. i) ii) i) ii) iii) At or above the level of superstructure De ck.\nAt or near the centerline of the ship\nA permanent walkway located at the freeb0ard De ck level, at or near the centerline of the ship.\nAt or near the centerline of the ship\nFitted on each side of ship\nFitted on one side only.\nShip types as per LL Convntn?\nType A ships\n2. A t ype ‘A’ ship is a ship which:\na) Is designed to carry only liquid carg0es in bulk;\nb) has a high integrity of the exposed De ck with only small access openings to carg0 compartments,\nclosed by watertight g asketed covers of steel or equivalent material; and\nc) Has low permeability of loaded carg0 compartments.\n3. A t ype 'A' ship, if over 150 m in length, when loaded, shall be able to withstand the flooding of any\ncompartment or compartments, with an assumed permeability of 0.95 and the machinery space shall be\ntreated as a floodable compartment, but with a permeability of 0.85.\nType B ships – in general assigned freeb0ard as per table 28.2\n5. All ships which do not come within the provisions reg arding t ype 'A' ships, shall be considered as t\nype ‘B’ ships.\n7. t ype 'B' ships, which in position 1 have hatchways fitted with hatch covers ",
+        "match_score": 0.592
+      }
+    },
+    {
+      "number": 150,
+      "question": "Explain the contents of a Dry-Docking Specification and Docking Plan. Who decides the keel and bilge block arrangement, and how do you verify block alignment before flooding the dock?",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 151,
+      "question": "During dry-docking, ultrasonic thickness measurement (UTM) reveals localized wastage exceeding permissible diminution limits in a topside ballast tank. What is your course of action with Class and the shipyard?",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 152,
+      "question": "Explain the phenomenon of angle of loll versus angle of heel, and why correcting an angle of loll by filling a high-side tank can cause the ship to capsize.",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 153,
+      "question": "What is Free Surface Effect (FSE), which tanks create the largest free surface moment, and how do you minimize FSE during bunkering and ballast operations?",
+      "question_page": 10,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 154,
+      "question": "How do you prepare for and execute shore power connection (Alternative Maritime Power / Cold Ironing) in port, including phase sequence and earth bonding checks?",
+      "question_page": 11,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 155,
+      "question": "Explain the working principle and safety interlocks of an Inert Gas (IG) system on an oil tanker, including the deck water seal and P/V breaker.",
+      "question_page": 11,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 156,
+      "question": "On a LNG dual-fuel vessel, explain bunkering custody transfer procedures, nitrogen purging, cool-down, and emergency shutdown (ESD-1 and ESD-2) links.",
+      "question_page": 11,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 157,
+      "question": "How do you audit and verify the effectiveness of your ship's Planned Maintenance System (PMS) and Condition-Based Maintenance (CBM) program?",
+      "question_page": 11,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": {
+        "source_page": 146,
+        "source_excerpt": "Q15- Condition Monitoring Scheme?\nA – Ref URZ27 deals with Condition Monitring Scheme and Condition basd maintenance where the condition\nmonitring results influence the sc0pe/freqncy of class survy.\nThese req. are applied to vessel using approved P M S survy.\nApproved by individual society\n1.3 Condition Monitring (CM)- Resposibility CE\n1.3.1 Where an approved condition monitring system is fitted, credit for survy may be\nbased on acceptable condition monitring results. The condition monitring results are to be\nreviewed during the annual Aud!t.\n1.3.2 Limiting parameters are to be based on the Original Equipmnt Manufacturers\nguidelines (OEM), or a recognised international standard.\n1.3.3 The condition monitring system is to provide an equivalent or greater degree of\nconfidence in the condition of the machinery to traditional survy techniques.\n1.3.4 The condition monitring system shall be approved in accordance with each Member\nSociety’s procedures.\n1.3.5 A condition monitring system may be used to provide a greater understanding of\nequipmnt condition, and a condition basd maintenance scheme may be used to obtain\nmaintenance efficiency. Class approval is required where ownrs wish to ch",
+        "match_score": 0.612
+      }
+    },
+    {
+      "number": 158,
+      "question": "What is Risk Assessment (RA) and Permit-to-Work (PTW) integration for high-risk engine-room jobs such as enclosed space entry, hot work, and working aloft?",
+      "question_page": 11,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 159,
+      "question": "As Chief Engineer, how do you structure onboard training, drills, and mentoring for Fourth Engineers and Junior Engineers to build watchkeeping competence?",
+      "question_page": 11,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    },
+    {
+      "number": 160,
+      "question": "You are involved in a major machinery breakdown or grounding incident. How do you preserve Voyage Data Recorder (VDR) data, engine logs, and physical evidence for the Marine Safety Investigation?",
+      "question_page": 11,
+      "answer": null,
+      "answer_source_page": null,
+      "review_status": "unanswered",
+      "candidate": null
+    }
+  ]
+}
