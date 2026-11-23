@@ -2,19 +2,25 @@
 
 [All guides](../00_INDEX.md) · [Git guide](02_GIT_GUIDE.md) · [One-command builds](../project/20_ONE_COMMAND_BUILDS.md)
 
-This is the standard layout for every Compose Multiplatform (CMP) project from now on, and the procedure for moving an older project to it. It follows the structure Android Studio's current CMP template generates (`shared` + `androidApp` + `desktopApp` + `iosApp`), extended with this template's `core:*` and `feature:*` modules and the `private/` folder. AutoPilot was migrated with this procedure on 13 November 2026; the recorded result is at the end.
+This is the standard layout for every Compose Multiplatform (CMP) project, and the procedure for moving an older project to it. It follows the structure that Android Studio's current CMP template generates (`shared` + `androidApp` + `desktopApp` + `iosApp`). It extends that structure with this template's `core:*` and `feature:*` modules, its phone and desktop UI layout, a small fixed set of run configurations, and the `private/` folder.
+
+AutoPilot is the reference implementation. It was migrated on 13 November 2026, and the structure below was read from its source on 23 November 2026. Where this guide shows AutoPilot names (`com.jagdeep.autopilot`, `AutoPilot`), substitute your project's.
+
+**Copy this file into the project you're migrating, then paste the [prompt in section 12](#12-migration-prompt-for-the-agent) into the coding agent.**
 
 **On this page:**
-[1 Standard structure](#1-standard-project-structure) ·
-[2 Module rules](#2-module-roles-and-rules) ·
-[3 Package layout](#3-package-layout-inside-modules) ·
-[4 Gradle setup](#4-gradle-setup) ·
-[5 Private folder](#5-the-private-folder) ·
-[6 Migration steps](#6-migration-procedure) ·
-[7 Verification](#7-verification-checklist) ·
-[8 Pitfalls](#8-pitfalls-found-during-the-autopilot-migration) ·
-[9 Prompt](#9-reusable-prompt-for-claude) ·
-[10 AutoPilot record](#10-recorded-migration--autopilot-13-november-2026)
+[1 Structure](#1-standard-project-structure) ·
+[2 Module roles](#2-module-roles-and-rules) ·
+[3 Packages](#3-package-layout-inside-modules) ·
+[4 Core UI layout](#4-core-ui-layout-phone-and-desktop) ·
+[5 Gradle](#5-gradle-setup) ·
+[6 Private folder](#6-the-private-folder-and-dev-command) ·
+[7 Run configurations](#7-run-configurations) ·
+[8 Migration steps](#8-migration-procedure) ·
+[9 Verification](#9-verification-checklist) ·
+[10 Pitfalls](#10-pitfalls) ·
+[11 AutoPilot record](#11-recorded-migration--autopilot) ·
+[12 Prompt](#12-migration-prompt-for-the-agent)
 
 ---
 
@@ -22,53 +28,127 @@ This is the standard layout for every Compose Multiplatform (CMP) project from n
 
 ```text
 <project>/
-  settings.gradle.kts         # includes :shared, :androidApp, :desktopApp, :core:*, :feature:*
-  build.gradle.kts            # plugins (apply false), values every module needs (rootProject.extra), boundary checks
-  gradle.properties           # Gradle, Kotlin and Android flags
-  gradle/libs.versions.toml   # the one version catalog
-  gradle/wrapper/             # Gradle wrapper
-  shared/                     # the shared app (KMP library, every target) and composition root
-  androidApp/                 # Android application shell
-  desktopApp/                 # desktop shell and MSI/DMG/DEB packaging
-  iosApp/                     # Xcode project; links the Shared framework
-  core/<name>/                # reusable technical modules (KMP libraries), product-neutral
-  feature/<name>/             # one concrete feature each (KMP libraries)
-  feature/shared/             # cross-feature contracts only
-  .run/                       # shared Android Studio run/debug configurations
-  .github/workflows/          # CI (only what the Mac can't build)
-  AGENTS.md                   # instructions for coding agents (Part A global, Part B product)
-  README.md                   # what the app is, how to run it, the module list
-  dev                         # executable, extension-free development command: ./dev <action> <target>
-  private/                    # guides, scripts, plans, data, scratch (section 5)
+  settings.gradle.kts           # rootProject.name; includes :shared, :androidApp, :desktopApp, :core:*, :feature:*
+  build.gradle.kts              # every plugin with apply false; shared values in extra; verifyFeatureModuleBoundaries
+  gradle.properties             # Gradle, Kotlin and Android flags (no android.builtInKotlin=false)
+  gradle/libs.versions.toml     # the one version catalog, including versionName/versionCode and the application ID
+  gradle/wrapper/               # Gradle wrapper
+  gradlew, gradlew.bat
+  dev                           # executable root command: ./dev <action> <target> (section 6.2)
+  AGENTS.md                     # agent instructions: Part A common, Part B product
+  README.md                     # what the app is, how to run it, the module list
+  .gitignore                    # template ignores + the private/ block (section 6.1)
+  .run/                         # the shared run configurations, and nothing else (section 7)
+  .github/workflows/            # CI, only for what the Mac can't build
+  shared/                       # the app: KMP library, every target, composition root
+  androidApp/                   # Android application shell
+  desktopApp/                   # desktop shell and MSI/DMG/DEB packaging
+  iosApp/                       # Xcode project linking the Shared framework
+  core/<name>/                  # reusable technical modules, product-neutral
+  feature/shared/               # cross-feature contracts only
+  feature/<name>/               # one concrete feature each
+  private/                      # guides, scripts, reports, data, plans, scratch (section 6)
 ```
 
-### 1.1 Each module's source sets
+### 1.1 Full tree, with the files each module must have
+
+```text
+shared/
+  build.gradle.kts
+  src/
+    commonMain/kotlin/com/jagdeep/<app>/
+      App.kt                              # root composable for every platform
+      di/AppServices.kt                   # app-scoped services, created once
+      data/                               # app-level implementations (for example MemoryLiveLog)
+      platform/Xxx.kt                     # expect declarations, one capability per file
+      presentation/navigation/            # AppNavHost, NavigationState (remember + saved state), AppTransitions
+      presentation/shell/                 # DesktopShell, its model, sidebar pieces (common code, desktop use)
+    commonMain/composeResources/          # drawables, strings (generated Res)
+    androidMain/kotlin/com/jagdeep/<app>/
+      platform/AndroidPlatform.kt         # holds the application Context; init(context)
+      platform/Xxx.android.kt             # actuals
+    iosMain/kotlin/com/jagdeep/<app>/
+      MainViewController.kt               # fun MainViewController() = ComposeUIViewController { App() }
+      platform/Xxx.ios.kt
+    jvmMain/kotlin/com/jagdeep/<app>/
+      desktop/DesktopApp.kt               # fun runDesktopApp(): the window, title bar and shell
+      desktop/…                           # title bar, toolbar, window controls, window preferences
+      platform/Xxx.jvm.kt, DesktopDataPaths.kt
+    jvmMain/resources/                    # classpath resources (icons, bundled data)
+    commonTest/, jvmTest/ (+ iosTest/, androidHostTest/ when needed)
+androidApp/
+  build.gradle.kts
+  src/main/AndroidManifest.xml
+  src/main/kotlin/com/jagdeep/<app>/MainActivity.kt      # enableEdgeToEdge(); setContent { App() }
+  src/main/kotlin/com/jagdeep/<app>/MainApplication.kt   # AndroidPlatform.init(applicationContext)
+  src/main/res/                                          # launcher icons, themes
+desktopApp/
+  build.gradle.kts
+  src/main/kotlin/com/jagdeep/<app>/main.kt              # fun main() = runDesktopApp()
+  app-icons/                                             # .icns, Linux PNG (the .ico may live in shared resources)
+iosApp/
+  iosApp.xcodeproj/                                      # build phase runs :shared:embedAndSignAppleFrameworkForXcode
+  iosApp.xcodeproj/xcshareddata/xcschemes/iosApp.xcscheme  # shared scheme, tracked
+  iosApp/iOSApp.swift, ContentView.swift                 # import Shared; MainViewControllerKt.MainViewController()
+  Configuration/Config.xcconfig
+core/<name>/
+  build.gradle.kts
+  src/commonMain/kotlin/com/jagdeep/<name>/…, src/<platform>Main/…, src/commonTest/…
+feature/<name>/
+  build.gradle.kts
+  src/commonMain/kotlin/com/jagdeep/<name>/{data,domain,ui/screens,ui/components,ui/navigation,ui/util}
+  src/commonTest/, src/jvmTest/ (+ jvmMain/ only when the feature has desktop-only code)
+```
+
+### 1.2 Source sets per module
 
 | Module | Source sets |
 | --- | --- |
-| `shared` | `commonMain`, `androidMain`, `iosMain`, `jvmMain`, `commonTest`, `jvmTest` (plus `iosTest` / `androidHostTest` when needed) |
+| `shared` | `commonMain`, `androidMain`, `iosMain`, `jvmMain`, `commonTest`, `jvmTest` (plus `iosTest` or `androidHostTest` when needed) |
 | `androidApp` | `main` (`kotlin/`, `res/`, `AndroidManifest.xml`) |
 | `desktopApp` | `main` (`kotlin/`); `app-icons/` beside `src/` |
-| `core:*`, `feature:*` | `commonMain` and whichever platform and test source sets the module needs |
+| `core:*` | `commonMain` plus each platform it implements (`androidMain`, `iosMain`, `jvmMain`); `commonTest`, `jvmTest`, `androidHostTest`, `androidDeviceTest` as needed |
+| `feature:*` | `commonMain`, `commonTest`, `jvmTest`; `jvmMain` only for desktop-only code |
+
+### 1.3 The module catalog
+
+AutoPilot's modules. A new project keeps the template core modules even if it doesn't use them yet, and adds its own product core modules beside them.
+
+| Module | Package | Concern | Kind |
+| --- | --- | --- | --- |
+| `core:common` | `com.jagdeep.common` (`platform/`, `time/`) | Platform name, clock | Template |
+| `core:logger` | `com.jagdeep.logger` | Napier logging setup | Template |
+| `core:ui` | `com.jagdeep.ui` (`components/`, `navigation/`, `platform/`, `themes/`, `util/`) | Design system, navigation infrastructure, adaptive scaffold (section 4) | Template |
+| `core:persistence` | `com.jagdeep.persistence` (`preferences/`, `room/<domain>/`) | DataStore preference stores, the Room database, DAOs, entities, schemas | Template |
+| `core:network` | `com.jagdeep.network` (`connectivity/`, `discovery/`, `speed/`, `util/`) | Connectivity, mDNS discovery | Template |
+| `core:notifications` | `com.jagdeep.notifications` | System notifications | Template |
+| `core:transfer` | `com.jagdeep.transfer` (`protocol/`, `runtime/`) | Socket transfer runtime | Template |
+| `core:automation` | `com.jagdeep.automation` | Mouse, keyboard state, front app, Accessibility | Product |
+| `core:localbridge` | `com.jagdeep.localbridge` | Loopback link to the browser extension | Product |
+| `feature:shared` | `com.jagdeep.shared.<capability>` | Contracts used by two or more features | Template |
+| `feature:home`, `feature:activity`, `feature:settings` | `com.jagdeep.<feature>` | One feature each | Template skeleton, product content |
 
 ## 2. Module roles and rules
 
 | Module | Plugins | Owns | Never contains |
 | --- | --- | --- | --- |
-| `shared` | `kotlinMultiplatform`, `androidKotlinMultiplatformLibrary`, `composeMultiplatform`, `composeCompiler` (+ `serialization` if used) | `App()`, app-scoped wiring, navigation assembly, every `expect` and its `actual`s, the desktop window, classpath resources, Compose resources, the iOS framework `Shared` | Feature business logic |
+| `shared` | `kotlinMultiplatform`, `androidKotlinMultiplatformLibrary`, `composeMultiplatform`, `composeCompiler` (plus `serialization` if used) | `App()`, app-scoped wiring, navigation assembly, every `expect` and its `actual`s, the desktop window, classpath and Compose resources, the iOS framework `Shared` | Feature business logic |
 | `androidApp` | `androidApplication`, `composeCompiler` (AGP built-in Kotlin) | `MainActivity`, `MainApplication`, manifest, launcher icons, application ID, versions, signing | App logic. It only calls `App()` and `AndroidPlatform.init(...)` |
-| `desktopApp` | `kotlinJvm`, `composeMultiplatform`, `composeCompiler` (+ `composeHotReload`) | `main()` (one line: `runDesktopApp()`), `compose.desktop { application { … } }`, package names and upgrade IDs, icons, packaging hooks | App logic |
-| `iosApp` | Xcode | Swift `@main` app, `ContentView` calling `MainViewControllerKt.MainViewController()`, the build phase running `:shared:embedAndSignAppleFrameworkForXcode` | Kotlin |
-| `core:*` | `kotlinMultiplatform`, `androidKotlinMultiplatformLibrary` | One reusable technical concern; product-neutral names | Dependencies on `feature:*`, `shared` or another technical core module |
-| `feature:*` | same as core (+ Compose) | One product feature: `data`, `domain`, `ui` | Dependencies on another concrete feature |
+| `desktopApp` | `kotlinJvm`, `composeMultiplatform`, `composeCompiler`, `composeHotReload` | `main()` (one line), `compose.desktop { application { … } }`, package name, bundle ID, MSI upgrade UUID, icons, packaging hooks | App logic |
+| `iosApp` | Xcode | Swift `@main` app, `ContentView`, the framework build phase, the shared scheme | Kotlin |
+| `core:*` | `kotlinMultiplatform`, `androidKotlinMultiplatformLibrary`, `androidLint` (plus Compose or Room plugins if needed) | One reusable technical concern, with product-neutral names | A dependency on `feature:*`, `shared`, an app shell, or another technical core module |
+| `feature:*` | Same as core, plus Compose | One product feature: `data`, `domain`, `ui` | A dependency on another concrete feature |
 
 Dependency direction:
 
 ```text
 androidApp / desktopApp / iosApp -> shared -> feature:* -> core:common / core:logger / independent core:*
                                                    \-> feature:shared
+independent core:* -> core:common and/or core:logger only
 core:* -X-> feature:*, shared or an app shell
 ```
+
+`verifyFeatureModuleBoundaries` (root build) fails the build when a concrete feature depends on another concrete feature.
 
 **Why the platform folders stay in `shared`, not in the shells:**
 
@@ -77,7 +157,7 @@ core:* -X-> feature:*, shared or an app shell
 - iOS has no Kotlin shell module of its own.
 - Most of these classes are `internal`, and their tests rely on that.
 
-The shells hold only what the operating system needs to start the app and package it.
+The shells hold only what the operating system needs to start and package the app. Make public only what a shell calls: `App`, `runDesktopApp`, `AndroidPlatform`, `MainViewController`.
 
 ## 3. Package layout inside modules
 
@@ -88,11 +168,11 @@ com.jagdeep.<app>/
   App.kt                      # root composable, used by every platform
   MainViewController.kt       # iosMain only: the iOS entry point
   di/                         # AppServices: app-scoped dependency wiring (the composition root)
-  data/                       # app-level implementations (for example an in-memory log)
-  platform/                   # one capability per file pair: Xxx.kt (expect) + Xxx.android.kt / Xxx.ios.kt / Xxx.jvm.kt
-                              #   plus AndroidPlatform.kt (androidMain) and desktop data paths (jvmMain)
-  presentation/navigation/    # AppNavHost, NavigationState, transitions, top-level routes
-  presentation/shell/         # adaptive scaffold, desktop shell, sidebar (+ per-platform actuals)
+  data/                       # app-level implementations
+  platform/                   # one capability per file set: Xxx.kt (expect) + Xxx.android.kt / Xxx.ios.kt / Xxx.jvm.kt
+                              #   plus AndroidPlatform.kt (androidMain) and DesktopDataPaths.kt (jvmMain)
+  presentation/navigation/    # AppNavHost, rememberNavigationState, decorated stacks, transitions
+  presentation/shell/         # DesktopShell, ShellModel, sidebar helpers (+ per-platform actuals)
   desktop/                    # jvmMain only: runDesktopApp(), title bar, toolbar, window controls, window state
 ```
 
@@ -106,26 +186,170 @@ com.jagdeep.<feature>/
   domain/          # models, repository interfaces, use cases, ViewModels
   ui/screens/      # composable screens only
   ui/components/   # feature-private composables only
-  ui/navigation/   # Navigation 3 entry provider(s)
+  ui/navigation/   # Navigation 3 entry provider(s): <feature>EntryProvider / <Feature>NavEntries.kt
   ui/util/         # optional: non-composable UI helpers
+```
+
+An entry provider is an extension on `EntryProviderScope<NavKey>`. It receives its dependencies as parameters and creates the ViewModel; the screen gets only the ViewModel and callbacks:
+
+```kotlin
+fun EntryProviderScope<NavKey>.settingsEntryProvider(navigator: Navigator, preferencesStore: PreferencesStore<AppPreferences>, /* … */) {
+    entry<RouteTopLevel.Settings> {
+        val viewModel: SettingsViewModel = viewModel(factory = viewModelFactory {
+            initializer { SettingsViewModel(preferencesStore, /* … */) }
+        })
+        SettingsScreen(viewModel, onBack = navigator::goBack)
+    }
+}
 ```
 
 ### 3.3 Entry points
 
 | Platform | Shell file | Calls |
 | --- | --- | --- |
-| Android | `androidApp/.../MainActivity.kt` | `setContent { App() }` |
-| Android | `androidApp/.../MainApplication.kt` | `AndroidPlatform.init(applicationContext)` (in `shared` `platform/`: stores the context, starts logging) |
+| Android | `androidApp/.../MainActivity.kt` | `enableEdgeToEdge()`, then `setContent { App() }` |
+| Android | `androidApp/.../MainApplication.kt` | `AndroidPlatform.init(applicationContext)`: stores the context and starts logging (in `shared` `platform/`) |
 | Desktop | `desktopApp/.../main.kt` | `fun main() = runDesktopApp()` (in `shared` `desktop/`) |
-| iOS | `iosApp/iosApp/ContentView.swift` | `import Shared` → `MainViewControllerKt.MainViewController()` |
+| iOS | `iosApp/iosApp/ContentView.swift` | `import Shared`, then `MainViewControllerKt.MainViewController()` in a `UIViewControllerRepresentable` with `.ignoresSafeArea()` |
 
-## 4. Gradle setup
+## 4. Core UI layout: phone and desktop
 
-### 4.1 Catalog plugins (`gradle/libs.versions.toml`)
+The app has one composable tree. `isDesktopPlatform()` (`core:ui` `platform/PlatformFormFactor.kt`, an `expect` that is true only on JVM) chooses the shell. Screens never branch on the platform for navigation; they set the top bar and render content.
+
+### 4.1 What `core:ui` provides
+
+| Package | File | Role |
+| --- | --- | --- |
+| `navigation` | `RouteTopLevel.kt` | `interface RouteTopLevel : NavKey` with `@Serializable data object` top-level destinations (`Home`, `Activity`, `Settings`, …) |
+| | `RouteFlow.kt` | `interface RouteFlow : NavKey`: non-top-level destinations several features may open. The owning feature registers the entry; others navigate by key |
+| | `SavedStateConfiguration.kt` | `topLevelSavedStateSerializer()`: registers every route's serializer for saved state |
+| | `NavigationState.kt` | `startRoute`, the current `topLevelRoute`, one `NavBackStack` per top-level route; `stacksInUse` = start stack, plus the current one when it isn't the start |
+| | `Navigator.kt` | `navigate(route)`: a top-level route switches tabs, anything else is pushed on the current stack. `goBack()`: pops, and at the root of a non-start route returns to the start route |
+| | `TopLevelPager.kt` | Phones: the top-level routes as horizontal pages (section 4.3) |
+| | `MainNavigationItem.kt` | `title` + `icon` for a navigation entry |
+| `components` | `AdaptiveNavigationScaffold.kt` | The standard shell: desktop sidebar or phone bottom bar (sections 4.3–4.4) |
+| | `DesktopNavigationSidebar.kt` | Material 3 wide navigation rail: 96 dp collapsed (icons, named for screen readers), 180 dp expanded (icon + label) |
+| | `AppBarBottom.kt`, `AppBarTop.kt` | Bottom navigation bar; top app bar with a 48 dp navigation-icon slot (back button, or the app icon on the start screen) |
+| | `TopAppBarManager.kt` | `TopAppBarState(ownerRoute, modifier, content)` and `LocalTopAppBarManager` (a `MutableStateFlow`). Each screen publishes its own top bar; the shell draws it |
+| | `ToastManager.kt`, `SnackbarManager.kt` | `ToastHostState`, `LocalToastManager`, `ToastHost`, snackbars |
+| | `AppIcon.kt`, `AppStartupSplash.kt`, `StartupProgressIndicator.kt`, `PlatformLazyListScrollbar.kt`, drop targets, list items | Reusable composables only |
+| `platform` | `PlatformFormFactor.kt`, `DeviceDisplay.kt` | `isDesktopPlatform()`, display helpers (expect/actual) |
+| `themes` | `AppTheme.kt`, `Palette.kt` + `Palette<Name>.kt`, `Typography.kt`, `Shape.kt`, `SystemBars.kt` | `AppTheme(darkTheme, palette)`; one file per palette; `Palette.Default` is product-neutral; system bar colours per platform |
+| `util` | `MessageText.kt`, `ByteFormatting.kt` | Non-composable helpers |
+
+### 4.2 `App()`: the composition order
+
+`shared/.../App.kt` builds the UI in this order:
+
+1. Get the app-scoped services once (`remember { AppServices.get() }`). They outlive the composition, so recreating an activity never stops work.
+2. Create the UI state once: the top-app-bar `MutableStateFlow(TopAppBarState())`, `rememberToastHostState()`, the navigation items (`linkedMapOf<NavKey, MainNavigationItem>`), `rememberNavigationState(startRoute, topLevelRoutes)` and `Navigator(navigationState)`.
+3. Read the saved theme and palette. Render nothing until they arrive (`?: return`), so the wrong theme never flashes.
+4. `AppTheme(darkTheme, palette)` → `Surface(Modifier.fillMaxSize())` → `CompositionLocalProvider(LocalTopAppBarManager, LocalToastManager)`.
+5. Build `AppNavHost(...)` with every dependency the entry providers need.
+6. Desktop: wrap it in the desktop shell (section 4.4). Phone: wrap it in `AdaptiveNavigationScaffold(selectedRoute, navigationItems, onNavigate, topBar = { topAppBar.content() })` and pad the host with the scaffold's padding.
+7. `ToastHost(toastHost)` last, above everything.
+
+`App()` takes optional desktop-window parameters, with defaults so Android and iOS call plain `App()`: `onThemeApplied(dark, background, content)` (colours the title bar), `toolbarStartInset`, `toolbarDragArea`, `toolbarHeight`, `windowControls`, `windowIdentity` and `toolbarBlankAreaModifier`.
+
+### 4.3 Phone layout (Android and iOS)
+
+```text
+┌──────────────────────────────┐
+│ Top app bar (screen's own)    │  ← start screen: app icon in the nav slot; others: back
+├──────────────────────────────┤
+│                              │
+│  TopLevelPager               │  ← one page per top-level route, swipe between them
+│   └ NavDisplay per route     │  ← that route's own back stack
+│                              │
+├──────────────────────────────┤
+│ Bottom navigation (AppBarBottom) │
+└──────────────────────────────┘
+```
+
+- `AdaptiveNavigationScaffold` (non-desktop branch): a Material 3 `Scaffold` with `topBar` and `bottomBar = AppBarBottom(...)`.
+- `AppNavHost` uses `TopLevelPager(navigationState, navigator, topLevelRoutes)`. Each page is a `NavDisplay` with `slideForwardTransition()` for pushes and `slideBackTransition()` for pops (300 ms).
+- The neighbouring page follows the finger and the pager settles it. Swiping is enabled only at the root of the current route's stack, so a swipe never leaves a flow half-way.
+- Each route keeps its own back stack. Back at the root of a non-start route returns to the start route.
+- Neighbouring pages are composed while swiping, so only the current route's page may set the top app bar. That's what `TopAppBarState.ownerRoute` is for.
+- Pager, list and saveable keys are primitives or strings (an index or a string id), never route objects, because Android stores them in a `Bundle`.
+- Android: `enableEdgeToEdge()` and `SystemBars` themes. iOS: `.ignoresSafeArea()` in SwiftUI, with Compose handling insets.
+
+### 4.4 Desktop layout (macOS, Windows, Linux)
+
+**The template's desktop shell** is `AdaptiveNavigationScaffold`'s desktop branch, usable as-is by any project:
+
+```text
+┌──────────┬┬────────────────────────────────┐
+│ Sidebar  ││ Top app bar                     │
+│ (wide    ││─────────────────────────────────│
+│  rail,   ││ Page (NavDisplay, fade)          │
+│ toggle)  ││                                 │
+└──────────┴┴────────────────────────────────┘
+```
+
+- `DesktopNavigationSidebar` (collapsible, starts expanded), then a `VerticalDivider` inset 24 dp top and bottom, then a `Scaffold` with the top bar, starting 16 dp after the divider.
+- The sidebar collapses by itself when the window is narrower than 960 dp.
+- Desktop doesn't swipe. `AppNavHost` shows a single `NavDisplay` over the decorated stacks, with `topLevelFadeTransition` (180 ms fade) between top-level routes.
+
+**AutoPilot's richer desktop shell** is `shared` `presentation/shell/DesktopShell.kt`, laid out like Android Studio. A project that wants this layout copies the pattern into its own `shared` and keeps it there, because the toolbar content is product-specific:
+
+```text
+┌─[● ● ●] Page header ············ [routine ▾] [▶] [■] ─────┐  ← toolbar in the title-bar row (drag area)
+├──┬──────────────────────────────────────────────────────────┤
+│▣ │ ╭──────────────────────────────────────────────────────╮ │
+│▣ │ │ Page panel: rounded 10 dp, colour `surface`          │ │  ← NavDisplay with fade
+│  │ │                                                      │ │
+│⚙ │ ╰──────────────────────────────────────────────────────╯ │
+├──┴──────────────────────────────────────────────────────────┤
+│ Status: what's happening now                Chrome · version │  ← status bar
+└─────────────────────────────────────────────────────────────┘
+```
+
+- The frame is `surfaceContainer`, and the page panel is `surface` with 6 dp end padding.
+- **Toolbar:** 28 dp tall, matching the standard Mac title bar, plus 8 dp of space below. It's 38 dp tall when macOS gives the window a tall title bar, and on Windows. It holds the current page's top bar, then the product controls (AutoPilot: routine picker, Start and Stop).
+- **Tool strip:** the top-level pages, with Settings at its foot (`footerItems`). Narrow, each name shows as a tooltip to the right. Clicking the empty middle, or the sidebar symbol, expands it to show names.
+- **Status bar:** live status on the left; connection state and the app version on the right.
+
+**The desktop window** (`shared` `jvmMain` `desktop/`):
+
+| File | Role |
+| --- | --- |
+| `DesktopApp.kt` | `runDesktopApp()`: sets `apple.awt.application.appearance=system`, opens `Window(title, state, undecorated = isWindows, icon)`, and passes the window parameters to `App()`. On close it saves the window state, shuts the services down, then exits |
+| `DesktopTitleBar.kt` | macOS: a transparent title bar with full-size content, so the toolbar shares the row with the system window buttons. Windows: an undecorated, resizable window whose single toolbar row carries the caption controls. Linux: the system title bar |
+| `MacWindowToolbar.kt` | Adds an empty compact `NSToolbar` through AppKit so macOS draws the taller (38 dp) title bar with centred window buttons. It checks every call first, so an older macOS keeps the standard bar |
+| `WindowsWindowControls.kt`, `WindowsNativeCaption.kt` | Minimise, maximise and close drawn in the toolbar; hit-testing so Windows treats the maximise button and the empty toolbar as caption (snap layouts, drag) |
+| `DesktopCaptionClicks.kt` | A double-click on empty toolbar space maximises or restores the window; buttons consume their own clicks |
+| `DesktopWindowPreferences.kt` | Saves the window's size, position and placement in Java Preferences (400 ms debounce), not Room, and restores them at the next start |
+
+### 4.5 UI rules every screen follows
+
+- A screen takes a ViewModel plus callbacks, renders immutable state, and publishes its top bar through `LocalTopAppBarManager`.
+- The start destination shows the app icon in the navigation-icon slot; every other screen shows a back button there, so titles line up.
+- Material 3 components and the theme's tokens only; no hard-coded colours. Palettes keep text contrast at 4.5:1 or more in light and dark.
+- Flat and calm: list rows, dividers and headings before cards; one obvious primary action per screen.
+- Transitions are 300 ms or less; pushes slide forward and pops slide back.
+
+## 5. Gradle setup
+
+### 5.1 Catalog (`gradle/libs.versions.toml`)
 
 ```toml
+[versions]
+versionCode = "1"
+versionName = "1.1.0"              # MAJOR.MINOR.PATCH, changed only by ./dev version …
+androidApplicationId = "com.jagdeep.<app>"
+android-minSdk = "26"
+android-compileSdk = "37"
+android-targetSdk = "37"
+agp = "9.4.1"
+kotlin = "2.4.21"
+composeMultiplatform = "1.12.1"
+composeHotReload = "1.2.0"
+
+[plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidKotlinMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+androidLint = { id = "com.android.lint", version.ref = "agp" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 composeHotReload = { id = "org.jetbrains.compose.hot-reload", version.ref = "composeHotReload" }
@@ -133,35 +357,57 @@ kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref =
 kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 ```
 
-Declare each with `apply false` in the root `build.gradle.kts`.
+The versions are AutoPilot's on 23 November 2026; take the current ones from the new Android Studio template.
 
-### 4.2 `gradle.properties`
-
-- **Remove `android.builtInKotlin=false`.** `androidApp` uses AGP 9's built-in Kotlin (a `kotlin { compilerOptions { … } }` block, no Kotlin Android plugin). That flag existed only for the old module that combined KMP with `com.android.application`; with it set, `androidApp` fails with *"Unresolved reference 'compilerOptions'"*.
-- `android.newDsl=false` may stay while other modules still need it. AutoPilot builds with it set.
-
-### 4.3 `shared/build.gradle.kts` essentials
+### 5.2 `settings.gradle.kts`
 
 ```kotlin
+rootProject.name = "<App>"
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+// pluginManagement and dependencyResolutionManagement: google(), mavenCentral() (+ gradlePluginPortal() for plugins)
+plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0" }
+include(":shared"); include(":androidApp"); include(":desktopApp")
+include(":core:common"); include(":core:logger"); include(":core:ui"); include(":core:persistence") // + every other core module
+include(":feature:shared"); include(":feature:home") // + every other feature
+```
+
+### 5.3 Root `build.gradle.kts`
+
+- Declare every plugin with `apply false`: `androidApplication`, `androidLibrary`, `androidKotlinMultiplatformLibrary`, `androidLint`, `composeHotReload`, `composeMultiplatform`, `composeCompiler`, `kotlinMultiplatform`, `kotlinJvm`, `serialization`, `ksp`, `androidx.room`.
+- Compute values that several modules need **once** and store them in `extra`. AutoPilot's desktop version:
+  - `desktopVersion` = `1.1.0 (105 · a542753)` (release, Git commit count, short SHA), shown in the app
+  - `desktopBuildIdentity` = `1.1.0+build.105.ga542753`, the SemVer identity
+  - `desktopPackageVersion` = `1.1.105`, numeric for MSI/DMG/DEB, so each commit's MSI upgrades in place
+- Register `verifyFeatureModuleBoundaries`.
+
+### 5.4 `gradle.properties`
+
+- **Remove `android.builtInKotlin=false`.** `androidApp` uses AGP 9's built-in Kotlin (a `kotlin { compilerOptions { … } }` block, no Kotlin Android plugin). With the flag set, `androidApp` fails with *"Unresolved reference 'compilerOptions'"*.
+- Keep `org.gradle.configuration-cache=true`, `org.gradle.caching=true`, `android.useAndroidX=true`, `android.nonTransitiveRClass=true`.
+- `android.newDsl=false` may stay while other modules still need it.
+
+### 5.5 `shared/build.gradle.kts`
+
+```kotlin
+plugins { alias(libs.plugins.kotlinMultiplatform); alias(libs.plugins.androidKotlinMultiplatformLibrary)
+          alias(libs.plugins.composeMultiplatform); alias(libs.plugins.composeCompiler); alias(libs.plugins.serialization) }
 kotlin {
     androidLibrary {
         namespace = "com.jagdeep.<app>.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
-        androidResources { enable = true }   // package Compose resources into the Android app
+        androidResources { enable = true }   // package the Compose resources into the Android app
     }
-    listOf(iosArm64(), iosSimulatorArm64()).forEach {
-        it.binaries.framework { baseName = "Shared"; isStatic = true }
-    }
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { it.binaries.framework { baseName = "Shared"; isStatic = true } }
     jvm()
-    sourceSets { /* commonMain/androidMain/jvmMain/… dependencies, unchanged from the old module */ }
+    sourceSets { /* commonMain/androidMain/iosMain/jvmMain/tests: the old module's dependencies, unchanged */ }
 }
 ```
 
 - The generated Compose `Res` class moves to package `<rootProjectName lower-case>.shared.generated.resources`. Update those imports.
-- Values every module needs, such as a per-commit version, are computed once in the root build (`extra["desktopVersion"] = …`) and read with `rootProject.extra["desktopVersion"] as String`.
+- If `core:ui` is a byte-identical template copy whose `AppIcon` imports the template's `Res` package, pin that package in the root build (`packageOfResClass = "zynk.core.ui.generated.resources"`) instead of editing the copy.
 
-### 4.4 `androidApp/build.gradle.kts` essentials
+### 5.6 `androidApp/build.gradle.kts`
 
 ```kotlin
 plugins { alias(libs.plugins.androidApplication); alias(libs.plugins.composeCompiler) }
@@ -169,51 +415,88 @@ kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_11 } }
 dependencies {
     implementation(project(":shared"))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.ui.tooling.preview)
     debugImplementation(libs.ui.tooling)
 }
 android {
-    namespace = "com.jagdeep.<app>"          // keep the old one: R class and manifest class names stay valid
-    defaultConfig { applicationId = …; versionCode = …; versionName = … }   // unchanged
-    signingConfigs { … } ; buildTypes { … }; buildFeatures { compose = true }
+    namespace = "com.jagdeep.<app>"                  // keep the old one, so R and manifest class names stay valid
+    compileSdk = …
+    defaultConfig { applicationId = libs.versions.androidApplicationId.get(); minSdk = …; targetSdk = …
+                    versionCode = libs.versions.versionCode.get().toInt(); versionName = libs.versions.versionName.get() }
+    packaging { resources { excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", /* … */) } }
+    signingConfigs { /* "release" from the git-ignored keystore.properties, only if it exists */ }
+    buildTypes { getByName("release") { signingConfigs.findByName("release")?.let { signingConfig = it } } }
+    compileOptions { sourceCompatibility = JavaVersion.VERSION_11; targetCompatibility = JavaVersion.VERSION_11 }
+    buildFeatures { compose = true }
 }
 ```
 
-### 4.5 `desktopApp/build.gradle.kts` essentials
+### 5.7 `desktopApp/build.gradle.kts`
 
 ```kotlin
-plugins { alias(libs.plugins.kotlinJvm); alias(libs.plugins.composeMultiplatform); alias(libs.plugins.composeCompiler); alias(libs.plugins.composeHotReload) }
+plugins { alias(libs.plugins.kotlinJvm); alias(libs.plugins.composeMultiplatform)
+          alias(libs.plugins.composeCompiler); alias(libs.plugins.composeHotReload) }
 dependencies { implementation(project(":shared")); implementation(compose.desktop.currentOs); implementation(libs.kotlinx.coroutinesSwing) }
-compose.desktop { application { mainClass = "com.jagdeep.<app>.MainKt"; nativeDistributions { … } } }
+compose.desktop {
+    application {
+        mainClass = "com.jagdeep.<app>.MainKt"
+        jvmArgs += "-D<app>.version=${rootProject.extra["desktopVersion"]}"
+        nativeDistributions {
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            packageName = "<App>"; packageVersion = rootProject.extra["desktopPackageVersion"] as String
+            modules(/* the JDK modules the app needs, for example "java.prefs" */)
+            macOS { iconFile.set(project.file("app-icons/<App>.icns")); bundleID = "com.jagdeep.<app>" }
+            windows { iconFile.set(…); shortcut = true; menuGroup = "<App>"; upgradeUuid = "<keep the existing UUID>" }
+            linux { iconFile.set(project.file("app-icons/<app>-icon-linux-512.png")) }
+        }
+    }
+}
+// packaging hooks (for example AutoPilot's Windows Smart App Control fixes) go here, unchanged
 ```
 
-Keep `packageName`, `bundleID`, `upgradeUuid` and the icons unchanged, so installed apps update in place. Packaging hooks (for example AutoPilot's Smart App Control fixes) move here unchanged.
+Keep `packageName`, `bundleID`, `upgradeUuid` and the icons unchanged, so installed apps update in place.
 
-### 4.6 Task names after migration
+### 5.8 A `core:*` or `feature:*` module
+
+```kotlin
+plugins { alias(libs.plugins.kotlinMultiplatform); alias(libs.plugins.androidKotlinMultiplatformLibrary); alias(libs.plugins.androidLint) }
+kotlin {
+    androidLibrary { namespace = "com.jagdeep.<name>"; compileSdk = …; minSdk = …; withHostTestBuilder {} }
+    iosArm64 { binaries.framework { baseName = "<name>Kit" } }
+    iosSimulatorArm64 { binaries.framework { baseName = "<name>Kit" } }
+    jvm()
+    sourceSets { commonMain { dependencies { implementation(project(":core:common")) } } }
+}
+```
+
+### 5.9 Task names after migration
 
 | Old | New |
 | --- | --- |
-| `:composeApp:run`, `:composeApp:package<Release><Format>`, `:composeApp:createReleaseDistributable` | `:desktopApp:…` |
+| `:composeApp:run`, `:composeApp:hotRun`, `:composeApp:package<Release><Format>`, `:composeApp:createReleaseDistributable` | `:desktopApp:…` |
 | `:composeApp:assembleDebug`, `:composeApp:installDebug`, `:composeApp:bundleRelease` | `:androidApp:…` |
 | `:composeApp:jvmTest`, `:composeApp:embedAndSignAppleFrameworkForXcode`, `:composeApp:link…` | `:shared:…` |
 | `composeApp/build/compose/binaries/…` | `desktopApp/build/compose/binaries/…` |
 
-## 5. The private folder
+## 6. The private folder and `dev` command
+
+### 6.1 Layout
 
 ```text
 private/
   docs/          # tracked: 00_INDEX.md routes to common/ and project/
-    common/      # reusable CMP, development-command, Git and SSH guides
-    project/     # this app's commands, machine setup, routines and troubleshooting
-  scripts/       # tracked internal helpers; root dev is the only user-facing command
-  reports/       # tracked: dated investigation and validation reports worth keeping (YYYY-MM-DD-topic.md)
-  <data>/        # tracked: project data the app or build needs, one folder per kind (for example answer-banks/)
-  plans/         # git-ignored: implementation plans, proposals, roadmaps, phase tracking
-  signing/       # git-ignored: release keys and keystore.properties material; never commit
-  secrets/       # git-ignored: .env files and other secrets; never commit
-  misc/          # git-ignored: anything temporary or unimportant (backups, screenshots, captures, research, scratch)
-  zynk-cmp-main/ # git-ignored: read-only reference copy of the template project
-  Test/          # git-ignored: read-only reference copy of the current Android Studio CMP template
+    common/      # 01–19: reusable CMP, Git, SSH, install and debug guides; this file is common/01
+    project/     # 20 onward: this app's commands, machines, features and recorded results
+  scripts/       # tracked: internal helpers called by ./dev, Gradle and CI (windows/ for PowerShell)
+  reports/       # tracked: dated reports worth keeping (YYYY-MM-DD-topic.md)
+  <data>/        # tracked: project data the app or build needs, one folder per kind (AutoPilot: qa/)
+  plans/         # git-ignored: plans, proposals, roadmaps, phase tracking
+  signing/       # git-ignored: release keys, keystore.properties material
+  secrets/       # git-ignored: .env files and other secrets
+  misc/          # git-ignored: anything temporary or unimportant
 ```
+
+Reference copies of other projects, such as the Zynk template or a fresh Android Studio CMP template, are read-only. Keep them outside the repository, or in an ignored folder under `private/`.
 
 `.gitignore` block:
 
@@ -227,112 +510,71 @@ private/
 keystore.properties
 *.jks
 *.keystore
-/private/zynk-cmp-main/
-/private/Test/
 ```
+
+The template's own ignores stay too: `*.iml`, `.kotlin`, `.gradle`, `**/build/`, `local.properties`, `.idea`, `xcuserdata`, `*.xcodeproj/*` with `!*.xcodeproj/project.pbxproj` and `!*.xcodeproj/xcshareddata/`. `.idea` is ignored, so shared run configurations must live in `.run/` (section 7).
 
 Rules:
 
-- **When unsure, use `misc/`.** It is ignored as a whole.
-- Never make the build, the app or a tracked guide depend on a file in `misc/`.
-- Gradle and CI may run scripts from `private/scripts/`. That's why it's tracked: the build machines pull it from Git.
-- Remote build machines build only from Git: commit and push on the Mac, pull on the machine, then build.
+- **When unsure, use `misc/`.** It's ignored as a whole. Never make the build, the app or a tracked guide depend on a file in it.
+- Guides are named `NN_TOPIC_NAME.md`. Common guides use 01–19, project guides 20 onward, and each folder has a `00_INDEX.md`. Link with GitHub heading anchors. When a guide moves, update every index, link, README, AGENTS.md and script message together.
+- Remote build machines build only from Git: commit and push on the Mac, pull on the machine, then build. Never copy source to them.
 
-### 5.1 Documentation standard
+### 6.2 The root `dev` command
 
-Keep reusable guidance in `private/docs/common/` and app-specific instructions in
-`private/docs/project/`. Both are tracked in each project so its checkout is self-contained.
-Each folder has a `00_INDEX.md`; `private/docs/00_INDEX.md` is the main entry point.
-Number common guides from `01` within the reserved `01–19` range; number project guides from
-`20` onward. Each group's `00_INDEX.md` is the index exception. Reusable machine setup,
-installation, debugging and troubleshooting belong in common; product behavior, machine
-workflows and recorded results belong in project. Identify app-specific worked examples
-in common procedures. Update incoming links, relative source links, script error messages, README and
-AGENTS.md together. Use local Markdown links with GitHub heading anchors.
+Every project has an executable `dev` at its root: `./dev <action> <target> [options]`. It resolves paths from its own location, prints grouped help for `./dev` and `./dev --help`, and rejects unknown actions, targets and options with a useful message.
 
-Common guides describe conventions with placeholders. Actual SSH aliases, addresses,
-checkout paths, installed versions and product commands belong in project guides. Label
-dated results as historical evidence; they do not prove the current machines are reachable.
-
-Use uppercase filenames with underscores: `NN_TOPIC_NAME.md`, for example
-`03_UNDERSTAND_SSH_AND_KEYS.md` or `41_SEAGULL_ASSISTANT_APK_EXTRACTION_TUTORIAL.md`.
-Keep the title's numeric prefix consistent with the filename. Order guides by use frequency
-within their reserved ranges; do not create empty files to fill unused numbers.
-
-```text
-private/docs/
-  00_INDEX.md                        # main entry point linking both groups
-  common/
-    00_INDEX.md                      # reusable guide index
-    01_CMP_PROJECT_STANDARD_AND_MIGRATION.md
-    02_GIT_GUIDE.md
-    03_UNDERSTAND_SSH_AND_KEYS.md
-    ...                              # common guides use 01–19
-  project/
-    00_INDEX.md                      # app-specific guide index
-    20_ONE_COMMAND_BUILDS.md
-    ...                              # project guides use 20 onward
-```
-
-Classify by the guide's main purpose, not whether a technique could theoretically be reused.
-A general APK inspection tutorial can be common, but an extraction guide tied to a named
-third-party app, its database, findings and QA imports belongs in project. AutoPilot's
-Seagull Assistant extraction guide is therefore a project guide. Keep dated investigation
-reports in `private/reports/` and temporary captures in `private/misc/`.
-
-When migrating documentation:
-
-1. Inventory the existing guides and classify each as common or project. Preserve useful content.
-2. Create the two folders and their indexes; assign the correct number and uppercase filename.
-3. Move each guide and update its title, relative links to source files, and local section links.
-4. Update both group indexes, the main index, README, AGENTS.md, script help/error messages,
-   and other tracked references. Link across groups with `../common/` or `../project/`.
-5. Verify local file targets and heading anchors, scan for old paths and numbers, then check
-   the diff. Check command descriptions against the actual script; label historical results.
-
-Moving a guide does not require a build or machine connection. Only claim live validation
-when it was actually performed. Keep common guides tracked with each project so a checkout
-remains self-contained.
-
-### 5.2 Root development command standard
-
-Every project exposes an executable file named `dev` at its root. Run it as `./dev` from
-the root, or use its absolute path from another directory. Resolve paths relative to the
-script location. Keep internal platform helpers in `private/scripts/`; they are tracked
-because remote builds also call them.
-
-Use action-first commands: `./dev <action> <target> [options]`. Display grouped help for
-`./dev` and `./dev --help`. Accept supported flags anywhere, document them last, and reject
-unknown actions, targets and obsolete aliases with a useful message.
-
-| Action | Shared meaning |
+| Action | Meaning |
 | --- | --- |
-| `sync` | Check committed source, push outstanding commits, then pull and verify the same commit on a remote target. Local-target behavior must be documented. |
-| `build` | Sync remote source, run focused tests, then create the app or installer. |
-| `run` | Build, install and check launch where supported; explicitly document headless/build-only targets. |
-| `fetch` | Collect build artifacts and verify SHA256; document whether a target builds first or copies existing artifacts. |
-| `debug` | Prepare a debug run on one supported desktop target. |
-| `git <action>` | Group repository operations, including status, check, fetch, pull, diff, history, branches and push-all. |
-| `version patch\|minor\|major` | Deliberately change the release version, commit, tag and push through the documented release workflow. |
+| `sync` | Check committed source, push, then pull and verify the same commit on a remote target |
+| `build` | Sync, run focused tests, create the app or installer |
+| `run` | Build, install and check the launch where supported |
+| `fetch` | Collect build artifacts and verify SHA256 |
+| `debug` | Start a debug run waiting on port 5005, and tunnel it to the Mac for a remote target; attach with `desktopApp [attach :5005]` |
+| `git <action>` | Repository operations: status, check, fetch, pull, diff, history, branches, push-all |
+| `version patch\|minor\|major` | Change the release version, commit, tag `v<version>` and push |
 
-Target names are project configuration. Document the exact membership of `all` and any
-local groups. SSH aliases and command targets are different concepts: list their mapping
-in the project command guide. Use descriptive machine names consistently, for example
-`home-server` and `home-server-vm-win`; keep a hosted VM distinguishable from its host.
+Target names (for example `mac`, `legion`, `all`) are project configuration; document them in the project command guide. `--remote` switches the network route only when asked, and `--no-tests` must be reported in results. AutoPilot's command reference: [20 · One-command builds](../project/20_ONE_COMMAND_BUILDS.md).
 
-Use `--remote` only when explicitly requested; do not silently switch network routes.
-`--no-tests` skips focused build tests and must be reported in validation results.
-Never overwrite uncommitted remote work or copy source directly to remote build machines.
-Data-copy actions operate independently of Git and builds. Keep secrets out of tracked
-configuration, logs and command output. Record VM start/stop ownership so a workflow only
-stops the guests it was asked to stop.
+## 7. Run configurations
 
-For AutoPilot's supported actions, target exceptions, data-copy commands and artifact
-locations, use the [project command reference](../project/20_ONE_COMMAND_BUILDS.md).
+**A CMP project keeps exactly these run configurations, all checked in under `.run/`:**
 
-## 6. Migration procedure
+| Name | File | Type | What it does |
+| --- | --- | --- | --- |
+| `androidApp` | `.run/androidApp.run.xml` | Android App, module `<Project>.androidApp` | Installs and starts the debug app on the chosen emulator or device |
+| `iosApp` | `.run/iosApp.run.xml` | Xcode Application, scheme `iosApp` | Builds the Xcode project (which builds `Shared`) and runs it on the chosen simulator or device |
+| `desktopApp` | `.run/desktopApp.run.xml` | Gradle `:desktopApp:run` | Runs the desktop app; Debug attaches automatically |
+| `desktopApp [hot] 🔥` | `.run/desktopApp-hot.run.xml` | Gradle `:desktopApp:hotRun --mainClass "com.jagdeep.<app>.MainKt"` with Compose Hot Reload | Desktop with live UI reload |
+| `desktopApp [attach :5005]` | `.run/desktopApp-attach-debugger.run.xml` | Remote JVM Debug, `127.0.0.1:5005`, module `<Project>.shared.jvmMain` | Only if the project has `./dev debug`: attaches to a debug run on the Mac, or to a remote one through `dev`'s SSH tunnel |
 
-Do it in this order, one machine at a time. Commit only when each verification passes.
+The first four match what the Android Studio CMP template creates, so every project looks the same. Also track the Xcode scheme `iosApp.xcodeproj/xcshareddata/xcschemes/iosApp.xcscheme`.
+
+**Don't add more.**
+
+- No per-machine copies: one attach configuration serves every machine, because `dev` forwards each remote port to the Mac's 5005.
+- No duplicates in `.idea/runConfigurations/` or `.idea/workspace.xml`. `.idea` is ignored, so anything there is local and goes stale.
+- No configurations for tests, packaging or scripts: run those from the Gradle tool window, the gutter, or `./dev`.
+- Temporary configurations the IDE creates (from a gutter ▶) stay temporary; don't save them.
+
+**Cleaning up an old project:**
+
+1. Close the project in Android Studio, so it can't write `.idea/workspace.xml` back.
+2. Back up `.run/`, `.idea/runConfigurations/` and `.idea/workspace.xml` to `private/misc/`.
+3. `git rm` every old `.run/*.xml`; delete `.idea/runConfigurations/`. In `workspace.xml`, delete every named `<configuration>` inside `<component name="RunManager">` and its `<list>`; keep the `default="true"` templates.
+4. Write the five files above, with the project's name and main class, and check each with `xmllint --noout`.
+5. Update every guide, script message and README line that names an old configuration.
+6. Reopen the project and run **File → Sync Project with Gradle Files**. Each configuration needs the synced model: `androidApp` finds its module only after the sync, and `iosApp` uses the synced `shared` module to build the framework.
+
+**If iOS fails at once, or its Run button is greyed out:**
+
+- The IDE log shows `:composeApp:embedAndSignAppleFrameworkForXcode`: the IDE still has the pre-migration model. Sync. If the sync doesn't start, close the project, move `~/Library/Caches/Google/AndroidStudio<version>/projects/<project>.<hash>/external_build_system` and `project-model-cache` to `private/misc/`, and reopen.
+- `xcode-select -p` prints `/Library/Developer/CommandLineTools`: run `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer` and `sudo xcodebuild -runFirstLaunch`, then check `xcodebuild -version`.
+- No simulator is selected in the device menu.
+
+## 8. Migration procedure
+
+Do it in this order. Commit only when each verification passes.
 
 ### Step 0 — Prepare
 
@@ -341,11 +583,11 @@ git status --short          # must be clean; commit or stash first
 git pull --ff-only
 ```
 
-Copy the new Android Studio CMP template into `private/Test/` (ignored) as the reference.
+Create a fresh Android Studio CMP project (New Project → Kotlin Multiplatform, with Android, iOS and Desktop) somewhere outside the repository, or in an ignored folder. Use it as the reference for file contents and plugin versions.
 
 ### Step 1 — Record a baseline
 
-The goal is "nothing broke", so measure the current project first. Note every failure: they are pre-existing, not caused by the migration.
+The goal is "nothing broke", so measure the current project first. Every failure here is pre-existing, not caused by the migration.
 
 ```sh
 ./gradlew clean
@@ -361,6 +603,7 @@ Keep:
 - the test totals (suites, tests, skipped, failures)
 - a copy of the debug APK
 - the desktop app's file list and launcher `.cfg`
+- the list of run configurations and Xcode schemes
 
 Fix pre-existing compile errors on any target (often iOS) **in separate commits**. Then the migration diff contains only the migration.
 
@@ -381,19 +624,20 @@ git mv shared/src/jvmMain/kotlin/<pkg>/main.kt shared/src/jvmMain/kotlin/<pkg>/d
 
 ### Step 3 — Entry points
 
-1. **Desktop:** rename `fun main()` in `DesktopApp.kt` to a public `fun runDesktopApp()`. Create `desktopApp/src/main/kotlin/<pkg>/main.kt` containing `fun main() = runDesktopApp()`.
-2. **Android:** create `shared/src/androidMain/.../platform/AndroidPlatform.kt` (an object holding `context`, plus `init(context)` that also starts logging). Replace uses of `MainApplication.<context>` in `shared` with `AndroidPlatform.context`. `MainApplication.onCreate` calls `AndroidPlatform.init(applicationContext)`.
-3. Make public only what a shell calls (`App`, `runDesktopApp`, `AndroidPlatform`). Everything else stays `internal`.
+1. **Desktop:** rename `fun main()` in `DesktopApp.kt` to a public `fun runDesktopApp()`. Create `desktopApp/src/main/kotlin/<pkg>/main.kt` with `fun main() = runDesktopApp()`.
+2. **Android:** create `shared/src/androidMain/.../platform/AndroidPlatform.kt`, an object holding `context`, plus `init(context)` that also starts logging. Replace uses of `MainApplication.<context>` in `shared` with `AndroidPlatform.context`. `MainApplication.onCreate` calls `AndroidPlatform.init(applicationContext)`.
+3. **iOS:** keep `MainViewController()` in `shared` `iosMain`.
+4. Make public only what a shell calls. Everything else stays `internal`.
 
 ### Step 4 — Build files
 
-1. **`settings.gradle.kts`:** replace `include(":composeApp")` with `include(":shared")`, `include(":androidApp")` and `include(":desktopApp")`.
-2. **Catalog:** add `kotlinJvm`. **Root build:** add `alias(libs.plugins.kotlinJvm) apply false`, and move shared values (the per-commit version) into `extra`.
-3. **`shared/build.gradle.kts`:** take the old module's `sourceSets` unchanged. Swap `androidApplication` for `androidKotlinMultiplatformLibrary` and `androidTarget {}` for `androidLibrary {}` (section 4.3). Name the iOS framework `Shared`. Remove `compose.desktop`, `android {}` and the signing setup.
-4. **`androidApp/build.gradle.kts`:** move the old `android {}` block (namespace, application ID, versions, signing, packaging) here (section 4.4).
-5. **`desktopApp/build.gradle.kts`:** move `compose.desktop {}` and any packaging hooks here. Fix icon paths (section 4.5).
+1. **`settings.gradle.kts`:** replace `include(":composeApp")` with `:shared`, `:androidApp` and `:desktopApp` (section 5.2).
+2. **Catalog:** add `kotlinJvm`. **Root build:** add `alias(libs.plugins.kotlinJvm) apply false`, and move shared values (the version) into `extra` (section 5.3).
+3. **`shared/build.gradle.kts`:** keep the old module's `sourceSets` unchanged. Swap `androidApplication` for `androidKotlinMultiplatformLibrary`, and `androidTarget {}` for `androidLibrary {}`. Name the iOS framework `Shared`. Remove `compose.desktop`, `android {}` and the signing setup (section 5.5).
+4. **`androidApp/build.gradle.kts`:** move the old `android {}` block here: namespace, application ID, versions, signing, packaging (section 5.6).
+5. **`desktopApp/build.gradle.kts`:** move `compose.desktop {}` and any packaging hooks here, and fix the icon paths (section 5.7).
 6. **`gradle.properties`:** delete `android.builtInKotlin=false`.
-7. **Compose resources:** update `import <old>.composeapp.generated.resources.…` to `<app>.shared.generated.resources.…`.
+7. **Compose resources:** change `import <old>.composeapp.generated.resources.…` to `<app>.shared.generated.resources.…`.
 
 ### Step 5 — iOS
 
@@ -402,80 +646,40 @@ sed -i '' 's/^import ComposeApp$/import Shared/' iosApp/iosApp/ContentView.swift
 sed -i '' 's|:composeApp:embedAndSignAppleFrameworkForXcode|:shared:embedAndSignAppleFrameworkForXcode|' iosApp/iosApp.xcodeproj/project.pbxproj
 ```
 
+Make sure the `iosApp` scheme is shared (Xcode → Product → Scheme → Manage Schemes → Shared), so `xcshareddata/xcschemes/iosApp.xcscheme` is tracked.
+
 ### Step 6 — Group `shared` by role (section 3.1)
 
-- Move each `expect` file and **all** its `actual`s together into `platform/`. Kotlin requires them to share a package.
-- Move `AppServices` to `di/`, app-level implementations to `data/`, and desktop window files to `desktop/`. Tests mirror the packages.
-- After `git mv`, change each moved file's `package` line. Then add imports wherever another package uses its declarations.
+- Move each `expect` file and **all** its `actual`s together into `platform/`, because Kotlin requires them to share a package.
+- Move `AppServices` to `di/`, app-level implementations to `data/`, navigation to `presentation/navigation/`, the shell to `presentation/shell/`, and the desktop window files to `desktop/`. Tests mirror the packages, with end-to-end tests in `integration/`.
+- After each `git mv`, change the file's `package` line, then add imports wherever another package uses its declarations.
 - Watch for names used **inside string templates** (`"${NAME}"`), **fully qualified references** (`com.example.app.Foo(...)`), and **existing explicit imports** of the old package. A text search that skips strings misses the first kind.
 - Compile every target after the move. The compiler lists anything missed.
 
-### Step 7 — Update every reference
+### Step 7 — Bring the UI layout to the standard (section 4)
+
+- `App()` follows the composition order in section 4.2, and the phone branch uses `AdaptiveNavigationScaffold` + `TopLevelPager`.
+- Desktop uses the `AdaptiveNavigationScaffold` desktop branch, or a product `DesktopShell` in `shared` `presentation/shell/` following section 4.4.
+- Screens publish their top bar through `LocalTopAppBarManager`, and every route is registered in the saved-state serializer.
+- Change only structure here; a visual redesign is a separate task.
+
+### Step 8 — Run configurations (section 7)
+
+Replace every old configuration with the standard five (four without `./dev debug`), and clean `.idea`.
+
+### Step 9 — Update every reference
 
 ```sh
 grep -rn "composeApp\|ComposeApp\|composeapp" --exclude-dir=build --exclude-dir=.git --exclude-dir=.gradle .
 ```
 
-Update:
+Update scripts (Gradle task names, output paths), CI workflows, `.run` files, the README module list and run table, guides, comments that name file paths, and AGENTS.md.
 
-- scripts (Gradle task names, output paths)
-- CI workflows
-- `.run` configurations (module `<Project>.composeApp.jvmMain` → `<Project>.shared.jvmMain`)
-- the README module list
-- guides
-- comments that name file paths
-- AGENTS.md
+### Step 10 — Verify (section 9), then commit and push
 
-### Step 8 — Verify (section 7), then commit and push
+Commit the restructure, the package grouping, the run configurations and any unrelated fixes **separately**. Push only when the owner says so. Then build and install on every desktop machine from Git, for example `./dev run legion` and `./dev run mac`.
 
-Commit the restructure, the package grouping and unrelated fixes **separately**. Then push, and build and install on every desktop machine from Git, for example `./dev run legion` and `run mac`.
-
-## 7. Verification checklist
-
-### 7.1 Migrate Android Studio and iOS run configurations
-
-This project no longer has a `composeApp` module. The current modules are `androidApp`,
-`desktopApp`, and `shared`. If Android Studio reports that it cannot find
-`:composeApp:assembleDebug`, the run configuration is stale:
-
-1. Sync the project from `settings.gradle.kts` at the repository root.
-2. Select the shared **Android app** run configuration, which uses the `androidApp` module.
-3. Delete any old configuration that contains `:composeApp:assembleDebug`.
-4. Choose an emulator or connected Android device and run again.
-
-For iOS, open `iosApp/iosApp.xcodeproj` in Xcode and select the shared `iosApp` scheme. The Mac
-must use the full Xcode developer directory, not only Command Line Tools:
-
-```sh
-xcode-select -p
-sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
-sudo xcodebuild -runFirstLaunch
-```
-
-Verify with `xcodebuild -version`. If `xcode-select -p` still prints
-`/Library/Developer/CommandLineTools`, iOS Gradle sync and the iOS Run button remain disabled.
-
-The shared configurations added by this migration are `.run/Android-app.run.xml` and the shared
-`iosApp` scheme at `iosApp/iosApp.xcodeproj/xcshareddata/xcschemes/iosApp.xcscheme`.
-
-Live verification after the migration:
-
-```sh
-./gradlew :androidApp:assembleDebug --no-daemon --console=plain
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
-  -project iosApp/iosApp.xcodeproj \
-  -scheme iosApp \
-  -configuration Debug \
-  -sdk iphonesimulator \
-  -derivedDataPath /tmp/autopilot-ios-derived \
-  build
-```
-
-Both commands must finish with `BUILD SUCCESSFUL`. The Android verification confirms that
-`androidApp` replaces the old `composeApp` module. The iOS verification confirms that the shared
-`iosApp` scheme and Kotlin framework build phase are valid. The `DEVELOPER_DIR` prefix is useful for
-testing; selecting Xcode with `xcode-select --switch` makes the same toolchain available to
-Android Studio and Gradle without the prefix.
+## 9. Verification checklist
 
 | Check | Command or method | Must match the baseline |
 | --- | --- | --- |
@@ -483,75 +687,134 @@ Android Studio and Gradle without the prefix.
 | Module boundaries | `./gradlew verifyFeatureModuleBoundaries` | Passes |
 | Android | `./gradlew :androidApp:assembleDebug`, then `aapt2 dump badging` and the manifest | Same package, label, icon, `MainApplication`, `MainActivity`, versions; Compose resources present |
 | iOS framework | `DEVELOPER_DIR=… ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64` | Links |
-| iOS app | `xcodebuild … build` (Step 1 command) | BUILD SUCCEEDED |
-| Desktop app | `./gradlew :desktopApp:createReleaseDistributable`, compare the file list and `.cfg` | Same files (the app jar becomes `shared` + `desktopApp`); same main class, JVM options, version, bundle ID |
+| iOS app | `xcodebuild … build` (the Step 1 command) | BUILD SUCCEEDED |
+| iOS tests | `DEVELOPER_DIR=… ./gradlew iosSimulatorArm64Test` | Compile and pass |
+| Desktop app | `./gradlew :desktopApp:createReleaseDistributable`, then compare the file list and `.cfg` | Same files (the app jar becomes `shared` + `desktopApp`); same main class, JVM options, version, bundle ID |
 | Desktop runtime | Start the built app for 15 s | Window opens, no exceptions |
-| Windows | `dev run legion` | MSI builds, updates in place, the app's JVM loads, 0 Smart App Control blocks |
+| Windows | `./dev run legion` (or the project's Windows target) | MSI builds, updates in place, the app's JVM loads |
+| Run configurations | `ls .run`; Android Studio after a sync | Exactly the files in section 7; each one runs from its Play button |
 | References | `grep -rn composeApp` | Nothing left |
 
-## 8. Pitfalls found during the AutoPilot migration
+## 10. Pitfalls
 
 | Pitfall | Symptom | Fix |
 | --- | --- | --- |
-| Stale build output from a renamed project folder | Android dexing fails: *"file … AutoClicker/… is located outside the root directory"* | `./gradlew clean` (no code change) |
+| Stale build output from a renamed project folder | Android dexing fails: *"file … is located outside the root directory"* | `./gradlew clean` |
 | JVM-only APIs in common code | iOS: *"Unresolved reference 'putIfAbsent'"* | `if (key !in map) map[key] = value` |
 | `Dispatchers.IO` in common code | iOS: *"Cannot access 'val IO' … internal"* | `import kotlinx.coroutines.IO` |
 | `android.builtInKotlin=false` | `androidApp`: *"Unresolved reference 'compilerOptions'"* | Remove the flag |
 | `expect`/`actual` split across packages | *"expect declaration has no actual"* | Move each set of files together |
 | Names inside string templates and fully qualified references | Unresolved references in tests after a package move | Add the import, or fix the qualified name |
-| Comma or period in a backtick test name | Kotlin/Native test compile: *"Name contains illegal characters"* | Avoid `,` `.` `:` `/` `<` `>` `[` `]` `;` in test names that also compile for iOS |
-| `@Ignore("reason")` in common tests | Kotlin/Native test compile: *"Too many arguments for 'constructor(): Ignore'"* | `// Ignored: reason` above a bare `@Ignore` |
+| Comma or period in a backtick test name | Kotlin/Native: *"Name contains illegal characters"* | Avoid `,` `.` `:` `/` `<` `>` `[` `]` `;` in test names that also compile for iOS |
+| `@Ignore("reason")` in common tests | Kotlin/Native: *"Too many arguments for 'constructor(): Ignore'"* | `// Ignored: reason` above a bare `@Ignore` |
 | `:shared` and `:feature:shared` | Both desktop jars start with `shared-jvm` | Harmless: Compose adds a hash suffix |
 | Android context reached through `MainApplication` | `shared` can't see `androidApp` classes | Hold the context in `AndroidPlatform` in `shared` |
-| `dev` refuses to run | *"the Mac has uncommitted changes"* while `private/Test` is untracked | Ignore reference copies in `.gitignore` |
+| The IDE never re-synced after the restructure | No module in the `androidApp` configuration; iOS runs `:composeApp:embedAndSign…` and fails in under a second | Sync; if it won't start, clear the project's model cache (section 7) |
+| Android configuration pointing at `<Project>.androidApp.main` | No module selected, Play disabled | Use `<Project>.androidApp`, as the template does |
+| Xcode not selected | iOS sync and Play disabled | `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer` |
+| Run configurations piling up | Several entries per platform, some broken | Keep only the section 7 set in `.run/`; nothing in `.idea` |
+| `./dev` refuses to run | *"uncommitted changes"* caused by an untracked reference copy | Keep reference copies outside the repository, or ignored |
 
-## 9. Reusable prompt for Claude
+## 11. Recorded migration — AutoPilot
 
-Paste this into Claude Code at the root of the project to migrate. Copy this guide and the new template into the project's `private/` first.
-
-```text
-Migrate this Compose Multiplatform project to the standard layout in
-private/docs/common/01_CMP_PROJECT_STANDARD_AND_MIGRATION.md (copy it from AutoPilot if missing), using
-the Android Studio CMP template in private/Test as the reference. The code must not break.
-
-Follow the guide's section 6 in order:
-1. Check git is clean. Record a baseline first: clean, all JVM tests, module boundaries, the Android
-   debug APK, the iOS framework link and an xcodebuild simulator build (DEVELOPER_DIR set to Xcode),
-   and the desktop distributable. Save test totals, the APK and the desktop file list. Report every
-   pre-existing failure. Fix pre-existing compile errors in separate commits, and ask before changing
-   behaviour.
-2. git mv composeApp to shared; move MainActivity, MainApplication, the manifest and res to
-   androidApp; app-icons to desktopApp; desktop main.kt to shared desktop/DesktopApp.kt as
-   runDesktopApp(); add AndroidPlatform in shared platform/.
-3. Write shared/androidApp/desktopApp build files as in section 4, move the version and packaging
-   unchanged, keep application ID, bundle ID, MSI upgrade code and data locations, remove
-   android.builtInKotlin=false, update the Compose Res imports and the iOS framework name.
-4. Group shared by role as in section 3.1 (di, data, platform with expect+actuals together,
-   presentation, desktop; tests mirrored, integration/ for end-to-end tests), with git mv and
-   import fixes.
-5. Update every composeApp reference: scripts, CI, .run, README, guides, AGENTS.md (section 7 grep).
-6. Verify everything in section 7 against the baseline and show me the comparison table. Commit the
-   restructure, the package grouping and any fixes as separate commits. Don't push until I say "push";
-   then push and run the project's build/install script on each desktop machine.
-Keep the private/ folder layout from section 5 and update AGENTS.md to match.
-```
-
-## 10. Recorded migration — AutoPilot, 13 November 2026
+This is historical evidence from 13 November 2026, not a current live check.
 
 | Commit | Change |
 | --- | --- |
 | `b309cc0` | Pre-existing iOS fix: `putIfAbsent` in `feature:home` |
 | `bfdebc7` | Pre-existing iOS fix: `kotlinx.coroutines.IO` import |
 | `37c2b34` | `composeApp` → `shared` + `androidApp` + `desktopApp`; references updated |
-| `3d39ddb` | `private/Test` ignored as a reference copy |
-| `2745ebb` | Bundled answer bank refreshed (663 questions); its test updated |
+| `3d39ddb` | Reference copy ignored |
+| `2745ebb` | Bundled answer bank refreshed; its test updated |
 | `a0d04ff` | `shared` grouped into `di`, `data`, `platform`, `presentation`, `desktop`; tests mirrored |
 
 | Check | Baseline | After |
 | --- | --- | --- |
 | JVM tests | 113 suites, 568 tests, 13 skipped, 1 failure (answer-bank count) | 113 suites, 568 tests, 13 skipped, 0 failures |
 | Module boundaries | Pass | Pass |
-| Android debug APK | Same identity | `com.jagdeep.autopilot`, label, icon, `MainApplication`, `MainActivity`, 1.0.0 (1): unchanged |
-| iOS | Didn't compile (2 errors, fixed separately) | Framework links; Xcode BUILD SUCCEEDED; iOS tests: 366 run, 11 skipped, 0 failures (after renaming 24 comma test names and 11 `@Ignore` reasons) |
+| Android debug APK | — | `com.jagdeep.autopilot`, label, icon, `MainApplication`, `MainActivity`, 1.0.0 (1): unchanged |
+| iOS | Didn't compile (2 errors, fixed separately) | Framework links; Xcode BUILD SUCCEEDED; iOS tests 366 run, 11 skipped, 0 failures (after renaming 24 test names and 11 `@Ignore` reasons) |
 | macOS app | 239 files, version 1.0.69 | Same files and launcher; window opens, no errors |
 | Windows (Legion) | 1.0.61 installed | 1.0.71 built from Git, updated in place, JVM loaded, 0 Smart App Control blocks |
+
+On 23 November 2026, the run configurations were reduced from nine (four in `.run/`, one in `.idea/runConfigurations/`, four more in `workspace.xml`) to the five in section 7.
+
+## 12. Migration prompt for the agent
+
+Copy this guide into the project's `private/docs/common/`, then paste the prompt below into the coding agent (Claude Code) at the project root. Replace the values in `<…>` first.
+
+```text
+Migrate this Compose Multiplatform project to the standard in
+private/docs/common/01_CMP_PROJECT_STANDARD_AND_MIGRATION.md. Read the whole guide before
+changing anything. Reference template: a fresh Android Studio CMP project at <path to template>
+(read-only). The code must not break: this is a restructure, not a rewrite.
+
+Project values: app name <App>, base package com.jagdeep.<app>, Android application ID
+<application id>, macOS bundle ID <bundle id>, MSI upgrade UUID <uuid or "none yet">.
+Keep every one of these, and every data location and storage key, unchanged.
+
+Work in this order. Stop and report after each numbered step.
+
+1. Baseline (guide section 8, steps 0–1). Check git is clean. Run clean, every JVM test, the
+   module-boundary check, the Android debug APK, the iOS framework link, an xcodebuild simulator
+   build (DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer) and the desktop
+   distributable. Save the test totals, the APK, the desktop file list and .cfg, and the list of
+   run configurations. Report every pre-existing failure. Fix pre-existing compile errors in
+   separate commits, and ask me before changing any behaviour.
+
+2. Modules (sections 1–2, steps 2–5). git mv composeApp to shared. Move MainActivity,
+   MainApplication, the manifest and res to androidApp; app-icons to desktopApp; the desktop
+   main.kt to shared desktop/DesktopApp.kt as a public runDesktopApp(). Add AndroidPlatform in
+   shared platform/. Write the shared, androidApp and desktopApp build files as in section 5,
+   moving the version, signing and packaging hooks unchanged. Remove android.builtInKotlin=false.
+   Update the Compose Res imports, the iOS framework name (Shared), ContentView.swift and the
+   Xcode build phase. Make sure the iosApp scheme is shared and tracked.
+
+3. Packages (section 3, step 6). Group shared into di/, data/, platform/ (each expect with all its
+   actuals), presentation/navigation/, presentation/shell/ and desktop/, with tests mirrored and
+   end-to-end tests in integration/. Check every feature follows data/domain/ui/screens/
+   ui/components/ui/navigation, and every core module stays product-neutral with no dependency on
+   another technical core module. Use git mv; fix imports, string templates and fully qualified
+   names.
+
+4. UI layout (section 4, step 7). Make App() follow the composition order in 4.2. Phones:
+   AdaptiveNavigationScaffold with the bottom bar, TopLevelPager with one NavDisplay per top-level
+   route, slide forward/back transitions, swiping only at a stack's root, Bundle-safe keys.
+   Desktop: the AdaptiveNavigationScaffold sidebar (or a product DesktopShell in
+   presentation/shell/ following 4.4), a fade between top-level routes, and no swiping. The
+   desktop window lives in shared desktop/ as in 4.4. Screens publish their top bar through
+   LocalTopAppBarManager; the start screen shows the app icon in the navigation slot and every
+   other screen a back button. Every route is registered for saved state. Reuse core:ui; don't
+   copy its components into features. Change structure only, no visual redesign, and list
+   anything that can't match without a behaviour change so I can decide.
+
+5. Run configurations (section 7, step 8). Keep ONLY these, checked in under .run/:
+   androidApp (module <Project>.androidApp), iosApp (scheme iosApp), desktopApp
+   (:desktopApp:run), "desktopApp [hot] 🔥" (:desktopApp:hotRun --mainClass
+   "com.jagdeep.<app>.MainKt"), and, only if the project has ./dev debug,
+   "desktopApp [attach :5005]" (Remote JVM Debug, 127.0.0.1:5005, module <Project>.shared.jvmMain).
+   Delete every other configuration: per-machine copies, duplicates, test, packaging and script
+   configurations, anything in .idea/runConfigurations/, and the named configurations in
+   .idea/workspace.xml's RunManager. Back them up to private/misc/ first, and ask me to close the
+   project in Android Studio before editing .idea. Validate each file with xmllint, and update
+   every guide and script message that names an old configuration.
+
+6. Private folder and dev (section 6). Lay out private/ as in 6.1 (docs/common 01–19,
+   docs/project 20+, each with 00_INDEX.md; scripts, reports, data, and ignored plans, signing,
+   secrets, misc) and add the .gitignore block. If the project has build or install scripts,
+   expose them through a root ./dev with the actions in 6.2. Move files with git mv; update
+   indexes and links.
+
+7. References (step 9). grep for composeApp/ComposeApp/composeapp and fix scripts, CI, .run,
+   README (module list and run table), guides, comments and AGENTS.md. Update AGENTS.md Part A to
+   this standard and keep Part B for product rules.
+
+8. Verify (section 9). Run every check against the baseline and show me a comparison table:
+   tests, boundaries, APK identity, iOS framework, xcodebuild, iOS tests, desktop file list and
+   .cfg, a 15-second desktop launch, the run configuration list, and the composeApp grep. Then
+   tell me to sync in Android Studio and press Play on androidApp, iosApp and desktopApp.
+
+Commit the restructure, the package grouping, the UI-layout changes, the run configurations and
+any fixes as separate commits. Don't push until I say "push". After the push, build and install
+on each desktop machine from Git (never copy source to a build machine).
+```

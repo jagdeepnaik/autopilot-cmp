@@ -120,8 +120,10 @@ Use `.\gradlew.bat` on Windows.
 | Android (debug) | `./gradlew :androidApp:installDebug` |
 | iOS | Open [`iosApp`](iosApp) in Xcode and run |
 
-Android Studio and iOS run-configuration migration is documented in
-[`01_CMP_PROJECT_STANDARD_AND_MIGRATION.md`](private/docs/common/01_CMP_PROJECT_STANDARD_AND_MIGRATION.md#71-migrate-android-studio-and-ios-run-configurations).
+In Android Studio, sync, then use the shared run configurations in [`.run/`](.run): `androidApp`,
+`iosApp`, `desktopApp`, `desktopApp [hot] 🔥` and `desktopApp [attach :5005]` (for `./dev debug`).
+The standard set and how to fix a greyed-out Play button are in
+[the CMP standard, section 7](private/docs/common/01_CMP_PROJECT_STANDARD_AND_MIGRATION.md#7-run-configurations).
 
 ## Tests
 

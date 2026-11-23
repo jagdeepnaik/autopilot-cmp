@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="androidApp" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
+    <module name="AutoPilot.androidApp" />
+    <option name="DEPLOY" value="true" />
+    <option name="DEPLOY_APK_FROM_BUNDLE" value="false" />
+    <option name="MODE" value="default_activity" />
+    <option name="TARGET_SELECTION_MODE" value="DEVICE_AND_SNAPSHOT_COMBO_BOX" />
+    <option name="DEBUGGER_TYPE" value="Auto" />
+    <method v="2">
+      <option name="Android.Gradle.BeforeRunTask" enabled="true" />
+    </method>
+  </configuration>
+</component>

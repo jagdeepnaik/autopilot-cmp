@@ -364,7 +364,7 @@ mac_debug() {
     step "Mac: debug run on port $DEBUG_PORT"
     mac_app_running && fail "AutoPilot is running on the Mac. Quit it first; both copies share ~/.autopilot."
     lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 && fail "port $DEBUG_PORT is in use (a Legion tunnel or another debug run?)."
-    echo "In Android Studio, choose \"AutoPilot Mac (local)\" and click Debug; the app opens once it attaches."
+    echo "In Android Studio, choose \"desktopApp [attach :5005]\" and click Debug; the app opens once it attaches."
     echo "Close the app window to end the debug run."
     ./gradlew --console=plain :desktopApp:run --debug-jvm
 }
@@ -407,7 +407,7 @@ while (-not (Get-NetTCPConnection -LocalPort $DEBUG_PORT -State Listen -ErrorAct
 'The debug run is waiting for the debugger.'
 " || fail "the debug run didn't start (see above)."
     step "Mac: debugger tunnel on 127.0.0.1:$DEBUG_PORT"
-    echo "In Android Studio, choose \"AutoPilot Windows (SSH tunnel)\" and click Debug. The window appears on Legion."
+    echo "In Android Studio, choose \"desktopApp [attach :5005]\" and click Debug. The window appears on Legion."
     echo "Press Control-C here to close the tunnel."
     # Its own connection (-S none): through a shared ControlMaster connection, -N opens a shell and
     # the forward outlives Control-C.

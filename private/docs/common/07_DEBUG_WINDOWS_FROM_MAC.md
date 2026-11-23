@@ -30,7 +30,7 @@ Leave this window open. No output is expected while the tunnel is active; it is 
 
 ### F3. Attach Android Studio
 
-On the Mac, open `/Users/jagdeep/Projects/AndroidStudio/AutoPilot` at the same revision as Legion. Select **AutoPilot Windows (SSH tunnel)** and click **Debug**, then resume startup if paused. The checked-in configuration attaches to `127.0.0.1:5005` with AutoPilot's JVM source mapping.
+On the Mac, open `/Users/jagdeep/Projects/AndroidStudio/AutoPilot` at the same revision as Legion. Select **desktopApp [attach :5005]** and click **Debug**, then resume startup if paused. The checked-in configuration attaches to `127.0.0.1:5005` with AutoPilot's JVM source mapping.
 
 Reproduce the issue on the Legion desktop and inspect breakpoints on the Mac. Pausing the JVM pauses AutoPilot's extension connection too. Debug execution does not run or validate the MSI installer.
 

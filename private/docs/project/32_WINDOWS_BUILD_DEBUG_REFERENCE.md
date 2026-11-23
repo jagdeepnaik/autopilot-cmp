@@ -140,7 +140,7 @@ Use one method, not both on the same local port. `ExitOnForwardFailure` catches 
 1. Open the AutoPilot project at the same Git revision as Windows.
 2. Start the Windows `AutoPilot-Debug` scheduled task.
 3. Establish the SSH forward from section 16.
-4. Select **AutoPilot Windows (SSH tunnel)** in the run configurations.
+4. Select **desktopApp [attach :5005]** in the run configurations.
 5. Click **Debug**.
 6. Set a breakpoint in the shared/JVM code and reproduce the behavior on Windows.
 7. Resume paused threads before detaching when you want the app to continue.
@@ -206,7 +206,7 @@ The historical Windows app PID was `20288`, in session 1; the Mac SSH listener P
 | `private/scripts/windows/Build-Distribution.ps1` | Focused tests and Windows MSI build |
 | `private/scripts/windows/Register-DebugLauncher.ps1` | Register/remove interactive debug task |
 | `private/scripts/windows/Start-Debug.ps1` | Debug run and PowerShell transcript |
-| `.run/AutoPilot-Windows-SSH.run.xml` | Mac IDE attach configuration |
+| `.run/desktopApp-attach-debugger.run.xml` | Mac IDE attach configuration |
 | `.github/workflows/desktop-packages.yml` | Manually requested platform packaging CI |
 | Windows `%USERPROFILE%\.autopilot\logs\debug-*.log` | Debug-launch transcripts |
 | Windows `desktopApp\build\compose\binaries\main-release\msi\` | Laptop-generated MSI |

@@ -17,7 +17,7 @@ Two small Windows scripts and one IDE configuration were added:
 
 - [Register-DebugLauncher.ps1](../../scripts/windows/Register-DebugLauncher.ps1) registers or removes the task.
 - [Start-Debug.ps1](../../scripts/windows/Start-Debug.ps1) runs the app with JVM debugging enabled and creates a transcript.
-- [AutoPilot-Windows-SSH.run.xml](../../../.run/AutoPilot-Windows-SSH.run.xml) tells Android Studio where to attach.
+- [desktopApp-attach-debugger.run.xml](../../../.run/desktopApp-attach-debugger.run.xml) tells Android Studio where to attach.
 
 ### Registration
 

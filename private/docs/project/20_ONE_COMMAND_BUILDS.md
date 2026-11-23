@@ -530,8 +530,8 @@ The focused tests are `core:automation`, the DGS study tests, the desktop data-p
 
 Both debug runs build from source at the synced commit, so breakpoints match the code on the Mac.
 
-- **Mac:** stops if AutoPilot is already running or port 5005 is taken. It then runs `./gradlew :desktopApp:run --debug-jvm`, which waits for the debugger. In Android Studio choose **AutoPilot Mac (local)** → Debug. Closing the app window ends the run.
-- **Legion:** checks that the `AutoPilot-Debug` task exists and that the installed app isn't open, since both would share `.autopilot`. It starts the task on the signed-in desktop and waits up to 15 minutes until the debug run listens on Legion's port 5005. It then opens `ssh -N -L 127.0.0.1:5005:127.0.0.1:5005 home-legion` on the Mac. In Android Studio choose **AutoPilot Windows (SSH tunnel)** → Debug; the window appears on Legion. Control-C in the Terminal closes the tunnel. Port 5005 is never opened to the network.
+- **Mac:** stops if AutoPilot is already running or port 5005 is taken. It then runs `./gradlew :desktopApp:run --debug-jvm`, which waits for the debugger. In Android Studio choose **desktopApp [attach :5005]** → Debug. Closing the app window ends the run.
+- **Legion:** checks that the `AutoPilot-Debug` task exists and that the installed app isn't open, since both would share `.autopilot`. It starts the task on the signed-in desktop and waits up to 15 minutes until the debug run listens on Legion's port 5005. It then opens `ssh -N -L 127.0.0.1:5005:127.0.0.1:5005 home-legion` on the Mac. In Android Studio choose **desktopApp [attach :5005]** → Debug; the window appears on Legion. Control-C in the Terminal closes the tunnel. Port 5005 is never opened to the network.
 - **Mac Windows VM:** uses the same `AutoPilot-Debug` scheduled task and opens an SSH tunnel to the VM's port 5005. Register the task once inside the VM with `private\scripts\windows\Register-DebugLauncher.ps1`, then use `./dev debug mac-vm-win`.
 - **Mac Linux VM:** runs `:desktopApp:run --debug-jvm` over SSH and forwards port 5005 to the Mac. The Linux VM must have an active desktop session available to the SSH user.
 
@@ -565,7 +565,7 @@ The root `./dev` is the single user-facing command (moved from `tools/` on 11 No
 | `private/scripts/windows/Install-Msi.ps1` | Legion | Silent install or update, plus checks |
 | `private/scripts/windows/Remove-UnsignedMsiHelper.ps1`, `Use-SignedJavaLauncher.ps1` | Legion, VM (during packaging) | Smart App Control fixes inside the MSI |
 | `private/scripts/windows/Start-Debug.ps1` | Legion (via the `AutoPilot-Debug` task) | Debug run from source |
-| `.run/AutoPilot-Mac-local.run.xml`, `.run/AutoPilot-Windows-SSH.run.xml` | Android Studio | Attach to `127.0.0.1:5005` |
+| `.run/desktopApp-attach-debugger.run.xml` | Android Studio | Attach to `127.0.0.1:5005` |
 
 ## Recorded run — 11 November 2026
 
