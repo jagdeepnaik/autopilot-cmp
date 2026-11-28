@@ -1,24 +1,24 @@
 # Routine diagnostics and app downloads contract
 
-> **Generated copy, do not edit.** The source is the Compass–AutoPilot hub: `~/Projects/Agents/CompassAutoPilotHub/docs/shared/02_DIAGNOSTICS_AND_DOWNLOADS_API.md`. Edit it there; `tools/sync_shared_docs.py` regenerates this file.
+> **Generated copy, do not edit.** The source is the Cosmos–AutoPilot hub: `~/Projects/Agents/CosmosAutoPilotHub/docs/shared/02_DIAGNOSTICS_AND_DOWNLOADS_API.md`. Edit it there; `tools/sync_shared_docs.py` regenerates this file.
 
-Last checked: 28 November 2026. Owner: Compass (the server owns the contract; AutoPilot adapts to it).
+Last checked: 28 November 2026. Owner: Cosmos (the server owns the contract; AutoPilot adapts to it).
 
-Two more connections between AutoPilot and Compass, both using the app sign-in from
+Two more connections between AutoPilot and Cosmos, both using the app sign-in from
 [01_QA_SYNC_API.md](01_QA_SYNC_API.md#signing-in):
 
 - **Routine diagnostics:** AutoPilot writes a detailed log of every routine run to a local file and, when signed in,
-  uploads finished runs to Compass, where admins read them to fix stuck routines (Chrome needing a refresh, a video
+  uploads finished runs to Cosmos, where admins read them to fix stuck routines (Chrome needing a refresh, a video
   that never plays).
-- **Downloads:** every AutoPilot release is published to Compass, and signed-in accounts download the installers from
-  the Compass website.
+- **Downloads:** every AutoPilot release is published to Cosmos, and signed-in accounts download the installers from
+  the Cosmos website.
 
 On this page:
 
 - [Run logs on the computer](#run-logs-on-the-computer)
 - [What a run log may contain](#what-a-run-log-may-contain)
 - [Uploading run logs](#uploading-run-logs)
-- [Reading run logs (Compass website)](#reading-run-logs-compass-website)
+- [Reading run logs (Cosmos website)](#reading-run-logs-cosmos-website)
 - [Downloads](#downloads)
 - [Publishing a release](#publishing-a-release)
 
@@ -27,7 +27,7 @@ On this page:
 - One file per run: `~/.autopilot/logs/runs/<YYYY-MM-DD>/<runId>.jsonl` (`%USERPROFILE%\.autopilot\…` on Windows),
   one JSON object per line, UTF-8. `runId` is a UUID made when the run starts.
 - Written as the run happens and flushed at least every second, so a run that hangs or crashes still leaves its log.
-- Always on, whether or not the user is signed in to Compass. Local files older than 30 days are deleted at start-up.
+- Always on, whether or not the user is signed in to Cosmos. Local files older than 30 days are deleted at start-up.
 - The first line is the run header, the last the run end; everything between is an event:
 
 ```json
@@ -50,7 +50,7 @@ AutoPilot's privacy rules (its `AGENTS.md`) still apply to logs:
 | Routine kind, name and settings; step names; decisions and their reasons; timings and counts | Page addresses (URLs), page titles or page text |
 | Video and page **state** (playing, paused, times, ready and network state, error codes, element found or not) | Anything typed, passwords, cookies, tokens, course-site account names or emails |
 | A target's label (up to 40 characters), change hashes, question **keys** (`questionKey`) | Question, option or answer **text**, screenshots |
-| Extension and bridge connection state, message types and sizes | Personal details from Compass or the computer (user names, paths with user names) |
+| Extension and bridge connection state, message types and sizes | Personal details from Cosmos or the computer (user names, paths with user names) |
 | Error class and a safe one-line message (no stack traces with paths) | |
 
 AutoPilot strips these before writing, not only before uploading, and `data` values are numbers, booleans, `null` or
@@ -73,9 +73,9 @@ strings of at most 200 characters.
 - `400` for a malformed body, `413` when too large, `401` and `429` as in the Q&A contract.
 - AutoPilot marks a run sent after `stored` or `duplicate`, keeps local files for 30 days either way, and never uploads
   while signed out. Upload failures never affect a routine.
-- Compass keeps uploaded runs for 90 days, then deletes them.
+- Cosmos keeps uploaded runs for 90 days, then deletes them.
 
-## Reading run logs (Compass website)
+## Reading run logs (Cosmos website)
 
 Admin only, checked on the server.
 
@@ -104,7 +104,7 @@ Signed-in accounts only (website cookie or app token).
 
 | Route | Response `200` |
 | --- | --- |
-| `GET /api/app/:platform` | `{ "platform": "windows", "version": "1.1.0", "build": 170, "commit": "fadd6e3", "releasedAt": "…", "downloadUrl": "https://compass.naikio.in/downloads" }` |
+| `GET /api/app/:platform` | `{ "platform": "windows", "version": "1.1.0", "build": 170, "commit": "fadd6e3", "releasedAt": "…", "downloadUrl": "https://cosmos.naikio.in/downloads" }` |
 
 - `:platform` is `windows`, `macos`, `linux` or `android`; `404` when the latest release has no file for it or nothing
   is published yet. It answers only these fields (never file paths or hashes), with `Cache-Control: public, max-age=300`.
@@ -120,7 +120,7 @@ Signed-in accounts only (website cookie or app token).
     "build": 170,
     "commit": "fadd6e3",
     "releasedAt": "2026-11-28T12:00:00.000Z",
-    "notes": ["Android click routines", "Compass Q&A sync"],
+    "notes": ["Android click routines", "Cosmos Q&A sync"],
     "files": [
         { "platform": "windows", "kind": "msi", "fileName": "AutoPilot-1.1.170.msi", "bytes": 136314880, "sha256": "e6b8…", "minimumOs": "Windows 10 64-bit" },
         { "platform": "macos", "kind": "dmg", "fileName": "AutoPilot-1.1.170.dmg", "bytes": 0, "sha256": "…", "minimumOs": "macOS 13, Apple silicon" },
@@ -139,9 +139,9 @@ Signed-in accounts only (website cookie or app token).
 
 ## Publishing a release
 
-- **Where files live on the server:** `/srv/sites/compass/downloads/autopilot/<version>/` with one `manifest.json`
-  at `/srv/sites/compass/downloads/autopilot/manifest.json` (the shape of the `GET` response above). The app
-  container mounts `/srv/sites/compass/downloads` read-only; Compass never writes there.
+- **Where files live on the server:** `/srv/sites/cosmos/downloads/autopilot/<version>/` with one `manifest.json`
+  at `/srv/sites/cosmos/downloads/autopilot/manifest.json` (the shape of the `GET` response above). The app
+  container mounts `/srv/sites/cosmos/downloads` read-only; Cosmos never writes there.
 - **Who builds what:** the Mac builds the DMG and the Android APK; **Legion** builds the Windows MSI (never the home
   server, which only serves); a Linux VM (on Legion or the Mac, not the home server) builds the DEB. Every build comes
   from the pushed release commit.

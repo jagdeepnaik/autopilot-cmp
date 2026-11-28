@@ -17,7 +17,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 internal actual fun createUpdateCheck(scope: CoroutineScope): UpdateCheck {
-    val base = AndroidBuildInfo.COMPASS_URL.trimEnd('/').takeIf { it.startsWith("https://") } ?: return NoUpdateCheck
+    val base = AndroidBuildInfo.COSMOS_URL.trimEnd('/').takeIf { it.startsWith("https://") } ?: return NoUpdateCheck
     return UpdateChecker(scope, buildNumberOf(AndroidBuildInfo.BUILD_IDENTITY), System::currentTimeMillis) { latestAndroidBuild(base) }
 }
 

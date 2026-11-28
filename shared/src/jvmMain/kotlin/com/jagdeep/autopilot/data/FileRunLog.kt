@@ -1,7 +1,7 @@
 package com.jagdeep.autopilot.data
 
-import com.jagdeep.home.domain.compass.RunLogMark
-import com.jagdeep.home.domain.compass.RunLogOutbox
+import com.jagdeep.home.domain.cosmos.RunLogMark
+import com.jagdeep.home.domain.cosmos.RunLogOutbox
 import com.jagdeep.shared.diagnostics.RunLog
 import com.jagdeep.shared.diagnostics.RunLogLevel
 import com.jagdeep.shared.diagnostics.RunLogLines
@@ -165,7 +165,7 @@ internal class FileRunLog(
 }
 
 /**
- * The finished run logs in [root] that Compass hasn't received. A run's upload state is a small
+ * The finished run logs in [root] that Cosmos hasn't received. A run's upload state is a small
  * sidecar next to its log (`<runId>.sent`, `.rejected` or `.unreadable`); the logs themselves stay
  * for 30 days either way.
  */

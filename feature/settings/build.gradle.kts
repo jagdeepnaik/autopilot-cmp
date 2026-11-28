@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.androidLint)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    // Serializable routes for this feature's own pages (Cosmos accounts and machines).
+    alias(libs.plugins.serialization)
 }
 
 kotlin {
@@ -15,6 +17,7 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlin.stdlib)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.ui.tooling.preview)
             implementation(project(":core:automation"))

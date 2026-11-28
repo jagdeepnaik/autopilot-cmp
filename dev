@@ -103,7 +103,7 @@ VERSION RELEASE AND PUBLISH
   ./dev version major          Increment the breaking-change version, tag, push, then publish.
   ./dev version patch --no-publish   Release without publishing.
   ./dev publish                Build the DMG and APK here, the MSI on Legion and the DEB on
-                               legion-linux from the pushed commit, then publish to Compass.
+                               legion-linux from the pushed commit, then publish to Cosmos.
   ./dev publish --dry-run      Print the plan and the manifest; build and change nothing remote.
   ./dev publish --skip windows Leave a platform out (macos, android, windows, linux; repeatable).
 
@@ -1188,7 +1188,7 @@ This command requires a clean, up-to-date main branch. It updates versionName,
 creates one release commit, creates an annotated v<version> tag, and pushes both.
 The Git-generated build number continues increasing and is never reset.
 It then runs ./dev publish, which builds every installer from the release commit
-and publishes it to Compass downloads; --no-publish stops after the push.
+and publishes it to Cosmos downloads; --no-publish stops after the push.
 EOF
     }
 
@@ -1236,7 +1236,7 @@ EOF
     mv "$temp" "$catalog"
     trap - RETURN
 
-    # The Unreleased notes become this release's section (kept for the Compass release notes).
+    # The Unreleased notes become this release's section (kept for the Cosmos release notes).
     if [ -f "$ROOT/CHANGELOG.md" ] && grep -q '^## \[Unreleased\]' "$ROOT/CHANGELOG.md"; then
         awk -v version="$next" -v day="$(date -u +%Y-%m-%d)" '
             /^## \[Unreleased\]/ && !done { print; print ""; print "## [" version "] - " day; done = 1; next }
@@ -1253,24 +1253,24 @@ EOF
     echo "Released $next. The next desktop build keeps its increasing Git build number."
     if [ "$publish" -eq 1 ]; then
         echo
-        echo "Publishing $next to Compass downloads (./dev publish). If it stops, run ./dev publish again to retry."
+        echo "Publishing $next to Cosmos downloads (./dev publish). If it stops, run ./dev publish again to retry."
         "$ROOT/dev" publish
     else
-        echo "Not published (--no-publish). Run ./dev publish when the installers should go to Compass."
+        echo "Not published (--no-publish). Run ./dev publish when the installers should go to Cosmos."
     fi
 }
 
 publish_main() {
-# Build every installer from the pushed release commit and publish it to Compass downloads.
+# Build every installer from the pushed release commit and publish it to Cosmos downloads.
 #
 #   ./dev publish [--dry-run] [--skip <platform>]... [--no-tests] [--remote]
 #
 #   platform  macos (DMG, this Mac), android (APK, this Mac), windows (MSI, Legion),
 #             linux (DEB, Legion's x86-64 Debian VM legion-linux; never the home server)
 #
-# The home server only serves the files: /srv/sites/compass/downloads/autopilot/<version>/ plus
+# The home server only serves the files: /srv/sites/cosmos/downloads/autopilot/<version>/ plus
 # manifest.json, replaced atomically. The three newest version folders are kept. It ends by asking
-# Compass's public update check for each published platform and printing "Published <version> (<build>)".
+# Cosmos's public update check for each published platform and printing "Published <version> (<build>)".
 set -euo pipefail
 
 local dry_run=0 tests=1 remote=0 skip=() arg expect_skip=0
@@ -1290,13 +1290,13 @@ for arg in "$@"; do
 done
 [ "$expect_skip" -eq 0 ] || { echo "--skip needs a platform: macos, android, windows or linux." >&2; exit 2; }
 
-local server="${PUBLISH_SERVER_HOST:-home-server}" downloads_dir='/srv/sites/compass/downloads/autopilot'
+local server="${PUBLISH_SERVER_HOST:-home-server}" downloads_dir='/srv/sites/cosmos/downloads/autopilot'
 [ "$remote" -eq 1 ] && server="${PUBLISH_SERVER_HOST:-home-server-remote}"
 local legion_host=home-legion; [ "$remote" -eq 1 ] && legion_host=home-legion-remote
 local legion_msi_dir='C:/Users/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/msi'
 local linux_host="${LEGION_LINUX_HOST:-home-legion-debian1}" linux_dir="${LEGION_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
-local compass_url
-compass_url="$(sed -n 's/^compassUrl = "\(.*\)"/\1/p' "$ROOT/gradle/libs.versions.toml")"
+local cosmos_url
+cosmos_url="$(sed -n 's/^cosmosUrl = "\(.*\)"/\1/p' "$ROOT/gradle/libs.versions.toml")"
 
 pstep() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 pwarn() { printf '\033[33m%s\033[0m\n' "$*" >&2; }
@@ -1357,7 +1357,7 @@ if [ "$dry_run" -eq 1 ]; then
     if skipped linux; then plan "linux: skipped"; else plan "linux: ./dev build legion-linux$( [ "$tests" -eq 1 ] || echo ' --no-tests') on Legion's Debian VM ($linux_host), then copy and verify autopilot_${package}_amd64.deb"; fi
     plan "upload: rsync to $server:$downloads_dir/$version.uploading/, rename it to $version/, then write manifest.json.tmp and mv it over manifest.json"
     plan "prune: keep the three newest version folders in $server:$downloads_dir"
-    plan "check: GET $compass_url/api/app/<platform> for each published platform, then print \"Published $version ($build)\""
+    plan "check: GET $cosmos_url/api/app/<platform> for each published platform, then print \"Published $version ($build)\""
     # The manifest uses installers already built on this Mac, if any (their sizes and hashes are real).
     local dmg apk
     dmg="$ROOT/desktopApp/build/compose/binaries/main-release/dmg/AutoPilot-$package.dmg"
@@ -1443,7 +1443,7 @@ import json, os, re
 files = []
 for line in open(os.environ["FILES"], encoding="utf-8"):
     platform, kind, name, size, sha, minimum = line.rstrip("\n").split("\t")
-    # Compass refuses a manifest without the full 64-character hex digest and the real size.
+    # Cosmos refuses a manifest without the full 64-character hex digest and the real size.
     assert re.fullmatch(r"[0-9a-f]{64}", sha) and int(size) > 0, name
     files.append({"platform": platform, "kind": kind, "fileName": name, "bytes": int(size), "sha256": sha, "minimumOs": minimum})
 notes = [n.strip()[:200] for n in open(os.environ["NOTES"], encoding="utf-8") if n.strip()][:20]
@@ -1486,20 +1486,20 @@ ssh "$server" "cd '$downloads_dir/$version' && sha256sum -- *" | while read -r s
         || pwarn "$name on $server doesn't match its manifest SHA-256."
 done
 
-pstep "Check what Compass answers"
+pstep "Check what Cosmos answers"
 local platform answer listed mismatch=0
 while IFS=$'\t' read -r platform _ _ _ _ _; do
-    answer="$(curl -fsS --max-time 15 "$compass_url/api/app/$platform" 2>/dev/null || true)"
+    answer="$(curl -fsS --max-time 15 "$cosmos_url/api/app/$platform" 2>/dev/null || true)"
     listed="$(printf '%s' "$answer" | python3 -c 'import json, sys
 try:
     d = json.load(sys.stdin); print("%s (%s)" % (d["version"], d["build"]))
 except Exception:
     print("")')"
-    if [ "$listed" = "$version ($build)" ]; then echo "$platform: Compass lists $listed"
-    else pwarn "Mismatch: Compass lists ${listed:-nothing} for $platform, expected $version ($build)."; mismatch=1; fi
+    if [ "$listed" = "$version ($build)" ]; then echo "$platform: Cosmos lists $listed"
+    else pwarn "Mismatch: Cosmos lists ${listed:-nothing} for $platform, expected $version ($build)."; mismatch=1; fi
 done <"$files_tsv"
 [ "${#failed[@]}" -eq 0 ] || pwarn "Left out (failed to build or copy): ${failed[*]}"
-[ "$mismatch" -eq 0 ] || pwarn "Compass doesn't list this release for every platform; check $compass_url/downloads."
+[ "$mismatch" -eq 0 ] || pwarn "Cosmos doesn't list this release for every platform; check $cosmos_url/downloads."
 printf '\n\033[32mPublished %s (%s)\033[0m\n' "$version" "$build"
 }
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Only for Compass's public update check (is a newer build published?); nothing else goes online. -->
+    <!-- Only for Cosmos's public update check (is a newer build published?); nothing else goes online. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- To list apps for "Only click while this app is in front" and tell which one is in front. -->

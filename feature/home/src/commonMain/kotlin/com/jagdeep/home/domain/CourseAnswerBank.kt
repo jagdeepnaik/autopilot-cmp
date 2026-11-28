@@ -131,7 +131,7 @@ interface CourseAnswerBankStore : com.jagdeep.shared.answers.AnswerBankFiles {
     suspend fun saveReviewed(module: String, answers: List<ReviewedAnswer>): AnswerBankSaveResult = AnswerBankSaveResult.Unavailable
     /**
      * Answers the user confirmed themselves: "Save and continue", or a review after an attempt.
-     * Saved like [saveReviewed]; only these may be shared through Compass sync.
+     * Saved like [saveReviewed]; only these may be shared through Cosmos sync.
      */
     suspend fun saveConfirmed(module: String, answers: List<ReviewedAnswer>): AnswerBankSaveResult = saveReviewed(module, answers)
     /** Combines independent, size-limited bank files without weakening per-file validation. */

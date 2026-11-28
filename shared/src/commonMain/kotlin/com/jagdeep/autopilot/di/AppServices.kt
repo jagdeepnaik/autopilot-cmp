@@ -60,14 +60,14 @@ internal class AppServices private constructor() {
     private val courseProgress = createCourseProgressRepository()
     private val courseCertificates = createCourseCertificateStore()
     val answerBanks = createCourseAnswerBankStore()
-    /** Always-on routine run logs (desktop), uploaded to Compass only while signed in. */
+    /** Always-on routine run logs (desktop), uploaded to Cosmos only while signed in. */
     private val runLogs = com.jagdeep.autopilot.platform.createRunLogServices()
     val runLogFiles: com.jagdeep.shared.diagnostics.RunLogFiles get() = runLogs.files
-    /** Opt-in Compass Q&A sync and run-log upload; idle until the user signs in. Never pauses a routine. */
-    /** Compass's public update check (no sign-in); asked at start-up and when Settings opens. */
+    /** Opt-in Cosmos Q&A sync and run-log upload; idle until the user signs in. Never pauses a routine. */
+    /** Cosmos's public update check (no sign-in); asked at start-up and when Settings opens. */
     val updateCheck: com.jagdeep.shared.update.UpdateCheck = com.jagdeep.autopilot.platform.createUpdateCheck(scope).also { it.check() }
-    val compassSync: com.jagdeep.shared.compass.CompassSync =
-        com.jagdeep.autopilot.platform.createCompassSync(answerBanks, scope, runLogs) { line -> liveLog.log(LiveSource.App) { line } }
+    val cosmosSync: com.jagdeep.shared.cosmos.CosmosSync =
+        com.jagdeep.autopilot.platform.createCosmosSync(answerBanks, scope, runLogs) { line -> liveLog.log(LiveSource.App) { line } }
     private val dgsTimeOrigin=kotlin.time.TimeSource.Monotonic.markNow()
     val page = PageController(
         automation = automation,

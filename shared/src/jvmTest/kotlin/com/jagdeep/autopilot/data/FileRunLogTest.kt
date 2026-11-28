@@ -1,7 +1,7 @@
 package com.jagdeep.autopilot.data
 
-import com.jagdeep.home.domain.compass.RunLogMark
-import com.jagdeep.home.domain.compass.RunLogUploadBody
+import com.jagdeep.home.domain.cosmos.RunLogMark
+import com.jagdeep.home.domain.cosmos.RunLogUploadBody
 import com.jagdeep.shared.diagnostics.RunLogLevel
 import com.jagdeep.shared.diagnostics.RunLogSanitizer
 import com.jagdeep.shared.diagnostics.RunLogSource

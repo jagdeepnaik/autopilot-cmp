@@ -1,11 +1,16 @@
 # Changelog
 
 Every app change adds a line under `## [Unreleased]`. `./dev version patch|minor|major` turns that section into the
-release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes on Compass downloads.
+release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes on Cosmos downloads.
 
 ## [Unreleased]
 
 - Publishing copies the Windows and Linux installers back again (the copy step could not be found, so both were left out of 1.2.2).
+- The sync service is now called Cosmos and lives at `https://cosmos.naikio.in`; everyone signs in again once, and the first sync downloads the approved answers again.
+- Signing in to Cosmos sends an anonymous ID for this computer (a hash; the computer's own identifier never leaves it), and a new computer waits for the admin's approval, with Try again.
+- Settings explains when the admin removed this computer or disabled the account, and asks for a new password after signing in with a temporary one.
+- Open Cosmos signs your default browser in to the Cosmos website with a one-time link.
+- The admin manages Cosmos from Settings: Accounts (create with a machine limit and a temporary password shown once, edit, disable or enable, reset password) and Machines (approve or revoke computers, waiting ones first).
 ## [1.2.2] - 2026-11-28
 
 - Windows builds use IPv4 for Gradle, JDK and dependency downloads, so a machine without working IPv6 no longer times out.
@@ -18,9 +23,9 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [1.2.0] - 2026-11-28
 
-- Every routine run is logged on this computer (steps, timings, video and page state; never page text or answers) and uploaded to Compass while signed in.
+- Every routine run is logged on this computer (steps, timings, video and page state; never page text or answers) and uploaded to Cosmos while signed in.
 - Settings shows how many run logs wait to upload, and opens the logs folder.
 - Settings → About offers a newer published version, with Install.
 - Toolchain on the newest LTS releases: JDK 25 LTS (Microsoft build) for every build machine, Gradle 9.9.3, Ktor 3.6.2.
 - `./dev version` reads the current version again (a quoting error stopped every release).
-- `./dev publish` builds every installer and publishes it to Compass downloads; `./dev version` runs it.
+- `./dev publish` builds every installer and publishes it to Cosmos downloads; `./dev version` runs it.

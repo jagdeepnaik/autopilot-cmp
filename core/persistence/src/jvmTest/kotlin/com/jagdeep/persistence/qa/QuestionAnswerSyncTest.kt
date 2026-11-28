@@ -171,7 +171,7 @@ class QuestionAnswerSyncTest {
         assertNull(store.syncValue("missing"))
     }
 
-    /** A remote entry carrying this file's own keys, as Compass returns them. */
+    /** A remote entry carrying this file's own keys, as the remote service returns them. */
     private fun remote(id: String, question: String, options: List<String>, answers: List<String>, revision: Long, retired: Boolean = false, bank: String = "bank.json") =
         RemoteQuestionAnswer(id, bank, "Module", question, keyOf(question, options), options, answers.map { KeyedAnswer(it, QuestionAnswerText.normalize(it)) }, revision, retired)
 

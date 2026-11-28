@@ -240,7 +240,7 @@ private val MESSAGE_TYPE = Regex("\"type\"\\s*:\\s*\"([A-Za-z0-9_.-]{1,40})\"")
  * A routine file's `question_key` for [question] and [options]: SHA-256 (lowercase hex) of the
  * normalised question, U+001F, then the sorted normalised options joined by U+001E — the same key
  * as `QuestionAnswerText.questionKey`, so a logged key finds the question in the Q&A file and on
- * Compass without the log holding its text.
+ * Cosmos without the log holding its text.
  */
 internal fun runLogQuestionKey(question: String, options: List<String>): String {
     fun normalize(value: String) = value.replace(' ', ' ').replace(Regex("\\s+"), " ").trim().lowercase()

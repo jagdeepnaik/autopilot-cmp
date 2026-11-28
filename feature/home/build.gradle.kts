@@ -27,7 +27,7 @@ kotlin {
             implementation(project(":feature:shared"))
         }
         jvmMain.dependencies {
-            // Compass Q&A sync client (the engine is supplied by the desktop app).
+            // Cosmos Q&A sync client (the engine is supplied by the desktop app).
             implementation(libs.ktor.client.core)
         }
         commonTest.dependencies {

@@ -16,6 +16,8 @@ import androidx.savedstate.compose.serialization.serializers.MutableStateSeriali
 import androidx.savedstate.serialization.SavedStateConfiguration
 import com.jagdeep.home.ui.navigation.RouteRoutineEditor
 import com.jagdeep.home.ui.navigation.RouteRunningRoutine
+import com.jagdeep.settings.ui.navigation.RouteCosmosAccounts
+import com.jagdeep.settings.ui.navigation.RouteCosmosMachines
 import com.jagdeep.ui.navigation.NavigationState
 import com.jagdeep.ui.navigation.topLevelSavedStateSerializer
 import kotlinx.serialization.PolymorphicSerializer
@@ -28,6 +30,8 @@ private val savedStateConfiguration = SavedStateConfiguration {
             topLevelSavedStateSerializer()
             subclass(RouteRoutineEditor::class, RouteRoutineEditor.serializer())
             subclass(RouteRunningRoutine::class, RouteRunningRoutine.serializer())
+            subclass(RouteCosmosAccounts::class, RouteCosmosAccounts.serializer())
+            subclass(RouteCosmosMachines::class, RouteCosmosMachines.serializer())
         }
     }
 }

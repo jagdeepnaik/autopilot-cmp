@@ -21,16 +21,16 @@ val generateAnswerBankIndex by tasks.registering {
     }
 }
 
-// compass/compass.properties: the Compass Q&A sync address, from the version catalog's compassUrl
-// (or -PcompassUrl=…), so the address is set in exactly one place.
-val compassUrl = providers.gradleProperty("compassUrl").orElse(libs.versions.compassUrl.get())
-val generateCompassConfig by tasks.registering {
-    val url = compassUrl
-    val output = layout.buildDirectory.dir("generated/compass-config")
-    inputs.property("compassUrl", url)
+// cosmos/cosmos.properties: the Cosmos Q&A sync address, from the version catalog's cosmosUrl
+// (or -PcosmosUrl=…), so the address is set in exactly one place.
+val cosmosUrl = providers.gradleProperty("cosmosUrl").orElse(libs.versions.cosmosUrl.get())
+val generateCosmosConfig by tasks.registering {
+    val url = cosmosUrl
+    val output = layout.buildDirectory.dir("generated/cosmos-config")
+    inputs.property("cosmosUrl", url)
     outputs.dir(output)
     doLast {
-        output.get().file("compass/compass.properties").asFile.apply { parentFile.mkdirs(); writeText("url=${url.get()}\n") }
+        output.get().file("cosmos/cosmos.properties").asFile.apply { parentFile.mkdirs(); writeText("url=${url.get()}\n") }
     }
 }
 
@@ -38,18 +38,18 @@ val desktopVersion = rootProject.extra["desktopVersion"] as String
 val desktopBuildIdentity = rootProject.extra["desktopBuildIdentity"] as String
 
 // AndroidBuildInfo.kt: the Android app's build identity (for the update check's build number) and the
-// Compass address. Desktop reads both from launcher properties and resources instead.
+// Cosmos address. Desktop reads both from launcher properties and resources instead.
 val generateAndroidBuildInfo by tasks.registering {
     val identity = desktopBuildIdentity
-    val url = compassUrl
+    val url = cosmosUrl
     val output = layout.buildDirectory.dir("generated/android-build-info")
     inputs.property("identity", identity)
-    inputs.property("compassUrl", url)
+    inputs.property("cosmosUrl", url)
     outputs.dir(output)
     doLast {
         output.get().file("com/jagdeep/autopilot/platform/AndroidBuildInfo.kt").asFile.apply {
             parentFile.mkdirs()
-            writeText("package com.jagdeep.autopilot.platform\n\ninternal object AndroidBuildInfo {\n    const val BUILD_IDENTITY = \"$identity\"\n    const val COMPASS_URL = \"${url.get()}\"\n}\n")
+            writeText("package com.jagdeep.autopilot.platform\n\ninternal object AndroidBuildInfo {\n    const val BUILD_IDENTITY = \"$identity\"\n    const val COSMOS_URL = \"${url.get()}\"\n}\n")
         }
     }
 }
@@ -122,7 +122,7 @@ kotlin {
             implementation(libs.kotlinx.coroutinesSwing)
             // Windows title bar colours (DWM).
             implementation(libs.jna.platform)
-            // Compass Q&A sync: the HTTPS engine for feature:home's client.
+            // Cosmos Q&A sync: the HTTPS engine for feature:home's client.
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.cio)
         }
@@ -136,7 +136,7 @@ kotlin {
             implementation(compose.desktop.uiTestJUnit4)
         }
         // answer-banks/index.txt: lists every bank in resources/answer-banks, so adding a bank file is enough.
-        jvmMain { resources.srcDir(generateAnswerBankIndex); resources.srcDir(generateCompassConfig) }
+        jvmMain { resources.srcDir(generateAnswerBankIndex); resources.srcDir(generateCosmosConfig) }
         androidMain { kotlin.srcDir(generateAndroidBuildInfo) }
     }
 }

@@ -11,8 +11,8 @@ android-minSdk = "26"
 android-targetSdk = "37"
 android-compileSdk = "37"
 androidApplicationId = "com.jagdeep.autopilot"
-# Compass Q&A sync server (the app's only outside connection; opt-in). Override with -PcompassUrl=…
-compassUrl = "https://compass.naikio.in"
+# Cosmos Q&A sync server (the app's only outside connection; opt-in). Override with -PcosmosUrl=…
+cosmosUrl = "https://cosmos.naikio.in"
 
 # --> App Build Variants
 logConfigProfile = "release"  # "debug" "release"

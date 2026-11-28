@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** What Compass's public `GET /api/app/:platform` says is the newest build for this platform. */
+/** What Cosmos's public `GET /api/app/:platform` says is the newest build for this platform. */
 data class LatestBuild(val version: String, val build: Int?, val downloadUrl: String?)
 
 /** A newer build than the one running, to offer in Settings → About. */
@@ -34,7 +34,7 @@ fun buildNumberOf(identity: String): Int? = Regex("\\+build\\.(\\d{1,6})(?:\\.|$
 interface UpdateCheck {
     val update: StateFlow<AppUpdate?>
 
-    /** Asks Compass again (at start-up and when About opens); repeated calls within a few minutes are ignored. */
+    /** Asks Cosmos again (at start-up and when About opens); repeated calls within a few minutes are ignored. */
     fun check()
 }
 

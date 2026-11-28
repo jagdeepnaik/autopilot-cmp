@@ -1,12 +1,12 @@
 # Q&A sync API contract
 
-> **Generated copy, do not edit.** The source is the Compass–AutoPilot hub: `~/Projects/Agents/CompassAutoPilotHub/docs/shared/01_QA_SYNC_API.md`. Edit it there; `tools/sync_shared_docs.py` regenerates this file.
+> **Generated copy, do not edit.** The source is the Cosmos–AutoPilot hub: `~/Projects/Agents/CosmosAutoPilotHub/docs/shared/01_QA_SYNC_API.md`. Edit it there; `tools/sync_shared_docs.py` regenerates this file.
 
-Last checked: 28 November 2026. Owner: Compass (the server owns the contract; AutoPilot adapts to it).
+Last checked: 28 November 2026. Owner: Cosmos (the server owns the contract; AutoPilot adapts to it).
 
-AutoPilot desktop apps share their routine question-and-answer banks through Compass (`https://compass.naikio.in`).
-Every app downloads the **approved** answers; answers an app learns go to Compass as **submissions**, which an admin
-reviews on the Compass website before any app receives them. Only the Q&A banks sync: course progress, routines, run
+AutoPilot desktop apps share their routine question-and-answer banks through Cosmos (`https://cosmos.naikio.in`).
+Every app downloads the **approved** answers; answers an app learns go to Cosmos as **submissions**, which an admin
+reviews on the Cosmos website before any app receives them. Only the Q&A banks sync: course progress, routines, run
 history, accounts on course sites and anything typed stay on the computer.
 
 On this page:
@@ -16,7 +16,7 @@ On this page:
 - [Banks and entries](#banks-and-entries)
 - [Downloading approved entries](#downloading-approved-entries)
 - [Submitting learned answers](#submitting-learned-answers)
-- [Reviewing submissions (Compass website)](#reviewing-submissions-compass-website)
+- [Reviewing submissions (Cosmos website)](#reviewing-submissions-cosmos-website)
 - [Seeding the server](#seeding-the-server)
 - [Errors](#errors)
 - [Rules both sides follow](#rules-both-sides-follow)
@@ -24,15 +24,15 @@ On this page:
 ## Overview
 
 ```text
-AutoPilot (desktop) ──HTTPS──> compass.naikio.in /api ──> Compass backend (Express) ──> PostgreSQL
+AutoPilot (desktop) ──HTTPS──> cosmos.naikio.in /api ──> Cosmos backend (Express) ──> PostgreSQL
    local <routine>.db              ▲
-   (bundled + approved + learned)  └── Compass website: admins review submissions
+   (bundled + approved + learned)  └── Cosmos website: admins review submissions
 ```
 
-- All routes are under `/api` on `https://compass.naikio.in`. Requests and responses are JSON (`UTF-8`).
-- Sync is **opt-in**: AutoPilot does nothing on the network until the user signs in to Compass in Settings.
+- All routes are under `/api` on `https://cosmos.naikio.in`. Requests and responses are JSON (`UTF-8`).
+- Sync is **opt-in**: AutoPilot does nothing on the network until the user signs in to Cosmos in Settings.
 - AutoPilot sends `X-AutoPilot-App-Version: <SemVer identity>` (for example `1.1.0+build.165.ga542753`) on every
-  request. Compass records it with submissions; it never rejects a request because of it (yet).
+  request. Cosmos records it with submissions; it never rejects a request because of it (yet).
 
 ## Signing in
 
@@ -87,7 +87,7 @@ An **entry** is one question with its options and its accepted answers. Its iden
   with the same wording but different options are different entries.
 - **`answerKey`** is AutoPilot's key for one accepted answer of that question (`qa_answers.answer_key`): the
   normalised answer text, for example `shipyard manager`. It is not a hash.
-- **Keys are opaque to Compass.** Compass stores and compares them byte for byte and never computes them. Changing how
+- **Keys are opaque to Cosmos.** Cosmos stores and compares them byte for byte and never computes them. Changing how
   AutoPilot computes them is a breaking change to this contract.
 - **Revision:** every change to an entry (approval, new answer, retirement) gives it a new `revision`, a number that
   only grows across the whole server. Apps remember the highest revision they have seen per bank.
@@ -116,7 +116,7 @@ An **entry** is one question with its options and its accepted answers. Its iden
 
 - `source`: `bundled` (from AutoPilot's audited sources) or `learned` (approved from a submission).
 - `status`: `approved`, or `retired` when an admin withdraws the entry. Apps delete retired entries they got from
-  Compass; they never delete their own bundled or learned answers because of it.
+  Cosmos; they never delete their own bundled or learned answers because of it.
 
 ## Downloading approved entries
 
@@ -129,7 +129,7 @@ An **entry** is one question with its options and its accepted answers. Its iden
 - `after` defaults to `0`; `limit` defaults to 500, at most 1000. Entries come in ascending `revision` order;
   call again with `after = nextAfter` while `hasMore` is `true`.
 - An unknown bank returns `404`.
-- AutoPilot stores downloaded entries in that routine's local database with `source = 'compass'` and their
+- AutoPilot stores downloaded entries in that routine's local database with `source = 'cosmos'` and their
   `revision`, and uses them exactly like bundled answers: exact matches only, never fuzzy.
 
 ## Submitting learned answers
@@ -178,7 +178,7 @@ Response `200`, one result per submission in the same order:
 - Only answers the user confirmed in AutoPilot (saved with "Save and continue" or reviewed after an attempt) are
   submitted. AutoPilot never submits a guess.
 
-## Reviewing submissions (Compass website)
+## Reviewing submissions (Cosmos website)
 
 Admin only (`role = admin`), checked on the server for every request.
 
@@ -223,7 +223,7 @@ never shows the submitter's email or tokens.
 
 ## Seeding the server
 
-`npm run qa:import -- --bank <key> --file <path to the AutoPilot .db>` (Compass backend, admin machine only) imports a
+`npm run qa:import -- --bank <key> --file <path to the AutoPilot .db>` (Cosmos backend, admin machine only) imports a
 bundled AutoPilot database as approved `bundled` entries. It is idempotent: an entry that already exists keeps its
 revision unless its options or answers changed. It reads `qa_questions` (`id`, `bank_name`, `module`, `question_text`,
 `question_key`), `qa_options` (`question_id`, `position`, `option_text`) and the `qa_answers` rows (`question_id`,
@@ -245,10 +245,10 @@ Errors are `{ "error": "<sentence a person can read>" }`, never a stack trace or
 
 ## Rules both sides follow
 
-- **Opt-in and offline-first.** AutoPilot works fully without Compass; sync failures never pause a course routine.
-- **Never guess.** Compass serves only admin-approved answers; AutoPilot still pauses on any question it cannot
+- **Opt-in and offline-first.** AutoPilot works fully without Cosmos; sync failures never pause a course routine.
+- **Never guess.** Cosmos serves only admin-approved answers; AutoPilot still pauses on any question it cannot
   match exactly.
 - **Least data.** Submissions carry the question, options, chosen answer, module, times and app version. No page
   addresses, course-site accounts, screenshots or other page text.
-- **Contract changes** are made here first, then in Compass (routes, validation, tests) and AutoPilot (client,
+- **Contract changes** are made here first, then in Cosmos (routes, validation, tests) and AutoPilot (client,
   tests) in the same piece of work.

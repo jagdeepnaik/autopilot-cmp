@@ -1,6 +1,6 @@
 package com.jagdeep.autopilot.platform
 
-import com.jagdeep.home.domain.compass.NoRunLogOutbox
+import com.jagdeep.home.domain.cosmos.NoRunLogOutbox
 import com.jagdeep.shared.diagnostics.NoRunLog
 import com.jagdeep.shared.diagnostics.NoRunLogFiles
 import kotlinx.coroutines.flow.emptyFlow

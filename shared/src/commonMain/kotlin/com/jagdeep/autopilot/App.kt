@@ -131,7 +131,7 @@ fun App(
                         liveLog = services.liveLog,
                         routineFiles = routineFiles,
                         answerBanks = services.answerBanks,
-                        compassSync = services.compassSync,
+                        cosmosSync = services.cosmosSync,
                         runLogFiles = services.runLogFiles,
                         updateCheck = services.updateCheck,
                         displayWakeProblem = services.displayWakeProblem,

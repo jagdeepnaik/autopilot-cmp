@@ -11,7 +11,7 @@ import kotlinx.coroutines.test.runTest
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppUpdateTest {
-    private val url = "https://compass.naikio.in/downloads"
+    private val url = "https://cosmos.naikio.in/downloads"
 
     @Test fun given_a_newer_build_when_compared_then_it_is_offered() {
         assertEquals(AppUpdate("1.1.1", 171, url), newerUpdate(170, LatestBuild("1.1.1", 171, url)))

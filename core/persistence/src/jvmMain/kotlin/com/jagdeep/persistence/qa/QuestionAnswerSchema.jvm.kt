@@ -11,6 +11,9 @@ import java.io.File
  * (`confirmed_at`) per learned answer, and a
  * `sync_state` table. SQLite can't change a CHECK constraint in place, so `qa_answers` is rebuilt
  * inside one transaction after a backup copy of the file is written next to it.
+ *
+ * The `compass` source value and `compass_*` column names are shipped storage identifiers in users'
+ * files; they keep their values for compatibility and change only through an approved migration.
  */
 internal object QuestionAnswerSchema {
     const val VERSION = 2

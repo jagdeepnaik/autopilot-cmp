@@ -272,8 +272,10 @@ def split_routine_databases(master_path: Path) -> list[Path]:
             path.unlink()
     databases = {name: sqlite3.connect(path) for name, path in outputs.items()}
     # Routine file schema version 2 (PRAGMA user_version), the same schema the app's in-place upgrade
-    # (core:persistence QuestionAnswerSchema) gives older files: Compass sync bookkeeping columns, the
-    # 'compass' answer source and the sync_state table. Bundled rows leave the new columns empty.
+    # (core:persistence QuestionAnswerSchema) gives older files: remote-sync bookkeeping columns, the
+    # 'compass' answer source and the sync_state table. Bundled rows leave the new columns empty. The
+    # compass_* names and the 'compass' value are shipped storage identifiers (the Cosmos service's former
+    # name), kept unchanged so existing user files keep working; changing them needs an approved migration.
     schema = """
         CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         CREATE TABLE qa_questions (

@@ -72,6 +72,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
     appVersion: String,
+    /** The admin's Cosmos pages; shown only while signed in as the admin. */
+    onOpenAccounts: () -> Unit = {},
+    onOpenMachines: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val topBarManager = LocalTopAppBarManager.current
@@ -134,11 +137,15 @@ fun SettingsScreen(
             }
 
             if (desktop) {
-                Group("Compass sync")
-                com.jagdeep.settings.ui.components.CompassSyncSection(
-                    state.compass, state.compassSigningIn, state.compassSignInProblem,
-                    onSignIn = viewModel::signInToCompass, onSyncNow = viewModel::syncCompassNow, onSignOut = viewModel::signOutOfCompass,
+                Group("Cosmos sync")
+                com.jagdeep.settings.ui.components.CosmosSyncSection(
+                    state.cosmos, state.cosmosSigningIn, state.cosmosSignInProblem,
+                    onSignIn = viewModel::signInToCosmos, onSyncNow = viewModel::syncCosmosNow, onSignOut = viewModel::signOutOfCosmos,
                     runLogsAvailable = state.runLogsAvailable, onOpenRunLogs = viewModel::openRunLogsFolder,
+                    machinePending = state.cosmosMachinePending,
+                    changingPassword = state.cosmosChangingPassword, passwordProblem = state.cosmosPasswordProblem, onChangePassword = viewModel::changeCosmosPassword,
+                    openingCosmos = state.cosmosOpeningBrowser, onOpenCosmos = viewModel::openCosmos,
+                    onOpenAccounts = onOpenAccounts, onOpenMachines = onOpenMachines,
                 )
             }
 
@@ -189,13 +196,13 @@ fun SettingsScreen(
             state.update?.let { update ->
                 val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
                 ListItem(colors = transparent(), headlineContent = { Text("Update available: ${update.version} (${update.build})") },
-                    supportingContent = { Text("Opens the Compass download page in your browser.") },
+                    supportingContent = { Text("Opens the Cosmos download page in your browser.") },
                     trailingContent = {
                         androidx.compose.material3.Button(onClick = { runCatching { uriHandler.openUri(update.downloadUrl) } }) { Text("Install") }
                     })
             }
             ListItem(colors = transparent(), headlineContent = { Text("Privacy") }, supportingContent = {
-                Text("Settings, routines and saved progress stay on this computer. Browser actions happen on the website you open. Only shortcut keys are monitored; typed text is not recorded. Each routine run is logged on this computer (steps and timings, never page text or answers). If you sign in to Compass sync, only Q&A answers and those run logs are shared with Compass. AutoPilot also asks Compass whether a newer version is published.")
+                Text("Settings, routines and saved progress stay on this computer. Browser actions happen on the website you open. Only shortcut keys are monitored; typed text is not recorded. Each routine run is logged on this computer (steps and timings, never page text or answers). If you sign in to Cosmos sync, only Q&A answers, those run logs and an anonymous ID for this computer (for the admin's approval) are shared with Cosmos. AutoPilot also asks Cosmos whether a newer version is published.")
             })
         }
     }

@@ -2,7 +2,7 @@ package com.jagdeep.autopilot.platform
 
 import com.jagdeep.autopilot.data.FileRunLog
 import com.jagdeep.autopilot.data.FileRunLogOutbox
-import com.jagdeep.home.domain.compass.NoRunLogOutbox
+import com.jagdeep.home.domain.cosmos.NoRunLogOutbox
 import com.jagdeep.logger.Log
 import com.jagdeep.shared.diagnostics.NoRunLog
 import com.jagdeep.shared.diagnostics.NoRunLogFiles

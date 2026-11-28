@@ -25,7 +25,7 @@ class SqliteCourseAnswerBanks(
     private var migrated = false
     private val stores = mutableMapOf<String, SqliteQuestionAnswerStore>()
     private val mutableReviewedSaves = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
-    /** Emits after the user confirms answers ("Save and continue" or a post-attempt review): the ones Compass sync uploads. */
+    /** Emits after the user confirms answers ("Save and continue" or a post-attempt review): the ones Cosmos sync uploads. */
     val reviewedSaves: kotlinx.coroutines.flow.SharedFlow<Unit> = mutableReviewedSaves
 
     /** The routine file named [databaseName] (for example `smy.db`), after any pending migration. */
