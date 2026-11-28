@@ -5,6 +5,7 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Publishing copies the Windows and Linux installers back again (the copy step could not be found, so both were left out of 1.2.2).
 ## [1.2.2] - 2026-11-28
 
 - Windows builds use IPv4 for Gradle, JDK and dependency downloads, so a machine without working IPv6 no longer times out.

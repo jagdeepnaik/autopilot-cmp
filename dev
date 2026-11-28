@@ -231,6 +231,17 @@ LOW_MEMORY=(--no-daemon --console=plain --max-workers=2 '-Dorg.gradle.jvmargs=-X
 LOCAL_LINUX_MEMORY=(--no-daemon --console=plain --max-workers=1 '-Dorg.gradle.jvmargs=-Xmx768m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' '-Dkotlin.daemon.jvm.options=-Xmx256m')
 FOCUSED_TESTS=(:core:automation:jvmTest :feature:home:jvmTest --tests '*DgsStudy*' :shared:jvmTest --tests '*DesktopDataPathsTest*' --tests '*AppVersionTest*')
 
+# Copies a build back to the Mac, trying three times: the jump through Legion to its VM can drop a long copy.
+scp_retry() {
+    local attempt
+    for attempt in 1 2 3; do
+        scp -q "$1" "$2" && return 0
+        echo "Copy attempt $attempt of 3 failed; retrying in 10 s." >&2
+        sleep 10
+    done
+    return 1
+}
+
 # The help text is the comment block at the top of this file, up to the first line of code.
 usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$SCRIPT"; }
 
@@ -567,16 +578,6 @@ server_fetch() {
 # --- Fetch every existing Legion MSI and server DEB ---------------------------------------------
 # This is deliberately separate from a build: it never syncs Git, builds, installs or deletes.
 safe_artifact_name() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.(msi|deb)$ ]]; }
-# Copies a build back to the Mac, trying three times: the jump through Legion to its VM can drop a long copy.
-scp_retry() {
-    local attempt
-    for attempt in 1 2 3; do
-        scp -q "$1" "$2" && return 0
-        echo "Copy attempt $attempt of 3 failed; retrying in 10 s." >&2
-        sleep 10
-    done
-    return 1
-}
 normalize_architecture() {
     case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '\r')" in
         amd64|x86_64|x64) echo amd64 ;;
