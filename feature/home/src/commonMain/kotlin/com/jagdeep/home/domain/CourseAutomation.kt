@@ -279,6 +279,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var completionSince = 0L
     private var coursePath: String? = null
     private var currentView: CourseView? = null
+    // The run is inside an assessment or quiz, from the moment one is opened until a navigation page after its result
+    // (or the dashboard or a video lesson). No page reload happens while it is set ([recoveryBlocker]).
+    private var inAssessmentFlow = false
+    private var assessmentResultSeen = false
     private var focusedModule: String? = null
     private var focusedAction: CourseModuleAction? = null
 
@@ -398,6 +402,10 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         failure != null -> "failure"
         attention != null -> "attention"
         currentView == CourseView.Assessment -> "assessment"
+        inAssessmentFlow -> "assessment"
+        assessmentPass || waitingForAssessmentPass -> "assessmentPass"
+        // Only normal module navigation is ever reloaded: the dashboard, a module page or a video lesson.
+        currentView !in setOf(CourseView.Dashboard, CourseView.Course, CourseView.Lesson) -> "notNavigation"
         action?.let { it.kind != "click" && it.kind != "play" && it.kind != "courseDashboard" } == true -> "assessmentAction"
         now < nextActionAt -> "timedWait"
         else -> null
@@ -480,6 +488,13 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             completionCandidate = null
         }
         currentView = view
+        if (view == CourseView.Assessment || snapshot.assessment != null) inAssessmentFlow = true
+        if (inAssessmentFlow && snapshot.assessment?.result != null) assessmentResultSeen = true
+        if (inAssessmentFlow && (view == CourseView.Dashboard || view == CourseView.Lesson ||
+                (view == CourseView.Course && assessmentResultSeen))) {
+            inAssessmentFlow = false
+            assessmentResultSeen = false
+        }
         if (action != null) {
             if (now - pendingAt > 15_000) {
                 if (action?.kind == "certificateDownload") requestManualCertificate(now)
@@ -510,6 +525,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         fun issue(element: CourseElement, kind: String = "click", message: String, repeat: Boolean = false, restart: Boolean = false) {
             val key = "$pageId:${snapshot.document}:${element.id}:$kind"
             if (!repeat && !attempted.add(key)) { detail = "Waiting for the page to change. Stop and start again if it stays here."; return }
+            if (kind.startsWith("assessment") || kind.startsWith("quiz")) { inAssessmentFlow = true; assessmentResultSeen = false }
             action = CourseAction(++sequence, snapshot.document, element.id, kind, element.label.takeIf {
                 kind.startsWith("assessment") || kind == "quizOpen" || kind in setOf("certificateDownload", "certificateClose")
             }, restart = restart)

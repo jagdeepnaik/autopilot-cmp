@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Sagar Mein Yog: a stuck run reloads its course tab only during normal module navigation (the dashboard, a module page or a video lesson) and only after 10 minutes without progress (was 90 seconds). No page is ever reloaded anywhere in an assessment or quiz, from opening it until you are back on a module page after its result. The five-minute stall alert still comes first.
+
 ## [1.8.0] - 2026-11-28
 
 - Windows 10: a dark window frame now also works on Windows 10 releases before 20H1, and the documentation says what Windows 10 needs (nothing extra) and that it isn't tested yet.

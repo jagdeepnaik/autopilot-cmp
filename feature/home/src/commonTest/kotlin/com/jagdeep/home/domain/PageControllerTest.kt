@@ -634,9 +634,11 @@ class PageControllerTest {
         advanceTimeBy(16_000); send(page)
         assertNull(lastCommand().courseAutomation!!.action)
         assertEquals(0, lastCommand().courseAutomation!!.reloadPageRequest)
-        advanceTimeBy(75_000); runCurrent()
+        advanceTimeBy(9 * 60_000L); runCurrent()
+        assertEquals(0, lastCommand().courseAutomation!!.reloadPageRequest, "No reload before 10 minutes without progress")
+        advanceTimeBy(45_000); runCurrent()
         val request = lastCommand().courseAutomation!!.reloadPageRequest
-        assertTrue(request > 0, "No progress for 90 seconds asks the extension to reload the tab")
+        assertTrue(request > 0, "No progress for 10 minutes on a module page asks the extension to reload the tab")
 
         bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("smyPageReloaded", session, request = request, success = true)))
         runCurrent()

@@ -108,7 +108,7 @@ internal class CourseStallRecovery(
 
     companion object {
         /** No page change for this long, outside a legitimate wait, counts as a stall. */
-        const val STALL_MILLIS = 90_000L
+        const val STALL_MILLIS = 10 * 60_000L
 
         /** How long a reload may take to bring the page back and moving. */
         const val RELOAD_TIMEOUT_MILLIS = 60_000L

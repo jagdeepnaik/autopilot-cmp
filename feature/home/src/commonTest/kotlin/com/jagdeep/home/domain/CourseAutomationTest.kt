@@ -3,6 +3,7 @@ package com.jagdeep.home.domain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
@@ -279,6 +280,28 @@ class CourseAutomationTest {
         runner.read(CourseSnapshot("session", "test", "$course/test/attempt", elements = listOf(CourseElement("crumb", tag = "a", href = course, label = "Wellness")),
             assessment = CourseAssessment("Wellness", listOf(question))), 20_000)
         assertTrue(runner.recoveryBlocker(20_000) in setOf("assessment", "approval", "attention", "manualAnswer"))
+    }
+
+    @Test fun `recovery reloads only during module navigation, never anywhere in an assessment`() {
+        val crumb = CourseElement("crumb", tag = "a", href = course, label = "Wellness")
+        val question = CourseQuestion("q", "Which option is correct?", listOf(CourseOption("a", "First"), CourseOption("b", "Second")))
+        val watch = CourseElement("watch", label = "Watch video", href = lesson, context = "Part:1 Not Started")
+
+        val stuckInside = CourseAutomationSession("session", answerAssessments = true)
+        stuckInside.read(CourseSnapshot("session", "test", "$course/test/attempt", elements = listOf(crumb),
+            assessment = CourseAssessment("Wellness", listOf(question))), 0)
+        assertNotNull(stuckInside.recoveryBlocker(1_000), "An assessment page is never reloaded")
+        // Back on the module page with no result seen: the assessment is still under way, so no reload.
+        stuckInside.read(snapshot(course, watch, document = "module"), 2_000)
+        assertNotNull(stuckInside.recoveryBlocker(3_000), "A module page in the middle of an assessment is never reloaded")
+
+        val afterResult = CourseAutomationSession("session", answerAssessments = true)
+        afterResult.read(CourseSnapshot("session", "result", "$course/test/attempt", elements = listOf(crumb),
+            assessment = CourseAssessment("Wellness", result = "passed")), 0)
+        assertNotNull(afterResult.recoveryBlocker(1_000), "A result page is never reloaded")
+        afterResult.read(snapshot(lesson, CourseElement("video", tag = "video", paused = false), document = "lesson"), 2_000)
+        assertEquals(null, afterResult.recoveryBlocker(60_000).takeIf { it == "assessment" || it == "notNavigation" },
+            "Normal module navigation after the assessment can be reloaded again")
     }
 
     @Test fun `given a paused video with a resume control then retry that control safely`() {

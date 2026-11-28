@@ -414,7 +414,7 @@ The app uses the Sagar Mein Yog SQLite database in `~/.autopilot/databases/qa/` 
 
 A run can stop moving for reasons outside the app: an action's reply got lost, the page kept a cut-off script, the player froze. People used to fix this by refreshing the course tab. The app now does that itself, once (`CourseStallRecovery`, called from `PageController`):
 
-1. **Noticing.** Progress is any change in what the page reports: the page, its video position or state, its chapters, links and questions (`CourseSnapshot.progressMarker`). No change for **90 seconds** is a stall, except while the run waits for you (an approval, a question, a failed result, the profile choice), for a timer (the wait after a click), or is checking saved progress. Those waits restart the clock.
+1. **Noticing.** Progress is any change in what the page reports: the page, its video position or state, its chapters, links and questions (`CourseSnapshot.progressMarker`). No change for **10 minutes** is a stall (owner decision, 29 November 2026), and a reload happens only during normal module navigation: the dashboard, a module page or a video lesson. It never happens anywhere in an assessment or quiz, from opening it until a navigation page after its result, nor during the assessment pass of a videos-first run. It also never happens while the run waits for you (an approval, a question, a failed result, the profile choice), for a timer (the wait after a click), or is checking saved progress. Those waits restart the clock.
 2. **Never in an assessment.** A live test, quiz or result page is never reloaded, and neither is a page with a pending assessment, quiz or certificate action (`CourseAutomationSession.recoveryBlocker`), so nothing is answered or submitted twice. There the five-minute stall alert stays the only response.
 3. **Reloading.** The app publishes `courseAutomation.reloadPageRequest` (a timestamp). The worker reloads the bound course tab, or the active sagarmeinyog.com tab, only if it is the active tab in its window: a tab you moved away from is left alone. It replies `smyPageReloaded` with success or a reason (`noTab`, `inactiveTab`, `reloadFailed`). A worker that restarts ignores a request older than 15 seconds, so a reload is never replayed.
 4. **Carrying on.** The reloaded page is a new document, so the old document's pending action and blocks are dropped (`pageReloaded`), and the next snapshot is read as a fresh page: the run continues from the step it shows. The extension only acts on an action addressed to the document showing, so no click from before the reload repeats.
@@ -821,7 +821,7 @@ expected to work until a real Windows 10 PC confirms it.
 | "Allow access" won't go away | The old permission belongs to an earlier build | Remove AutoPilot from the Accessibility list, add it again, reopen the app |
 | Clicks do nothing | Same as above | Same as above |
 | "Reading the page" stays | The tab wasn't refreshed after a reload, or the page can't run extensions (such as `chrome://` pages or the Chrome Web Store) | Refresh, or use another page (Sagar Mein Yog tabs reattach by themselves) |
-| A Sagar Mein Yog run reloads its tab | Nothing changed for 90 seconds outside a wait | Nothing; it continues from the page shown. If it stalls again, the five-minute alert follows: check the run log's `recovery.*` events |
+| A Sagar Mein Yog run reloads its tab | Nothing changed for 10 minutes during module navigation (never in an assessment) | Nothing; it continues from the page shown. If it stalls again, the five-minute alert follows: check the run log's `recovery.*` events |
 | "Chrome blocked playback with sound" | Chrome's autoplay rule for this site | Click once on the course page in Chrome |
 | "Bring Chrome to the front" | Another app, including AutoPilot, is in front | Click Chrome and leave it there |
 | "Press play on the video in Chrome" | Chrome blocked autoplay, or the video was paused | Press play once |
@@ -860,7 +860,7 @@ expected to work until a real Windows 10 PC confirms it.
 | Page-script message deadline | 30 seconds | `course-automation.js` |
 | Sagar Mein Yog action reply | 15 seconds | `CourseAutomationSession` |
 | Frozen-video restart | after 20 seconds still, at most once a minute | `CourseAutomationSession` |
-| Stall before a reload; reload deadline; reloads per run | 90 seconds; 60 seconds; 5 | `CourseStallRecovery` |
+| Stall before a reload; reload deadline; reloads per run | 10 minutes (module navigation only); 60 seconds; 5 | `CourseStallRecovery` |
 | Stall alert | 5 minutes, repeating | `RoutineInactivityMonitor` |
 | App message queue | 20,000 messages | `PageController` |
 | Bottom tolerance | 2 pixels | `content.js` |
