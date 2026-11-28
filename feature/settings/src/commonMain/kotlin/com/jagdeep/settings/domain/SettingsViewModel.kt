@@ -38,11 +38,6 @@ data class SettingsUiState(
     val cosmosSignInProblem: String? = null,
     /** The last sign-in found this computer waiting for the admin's approval; offers Try again. */
     val cosmosMachinePending: Boolean = false,
-    /**
-     * The admin's password was accepted and Cosmos wants the authenticator code: Settings shows the code field
-     * and sends the same sign-in again with it. Stays on after a wrong code; off after any other answer.
-     */
-    val cosmosTotpRequired: Boolean = false,
     /** True while a new Cosmos password is on its way. */
     val cosmosChangingPassword: Boolean = false,
     /** Why the last password change didn't work; null when there's nothing to explain. */
@@ -107,34 +102,20 @@ class SettingsViewModel(
             finally { mutableState.update { it.copy(transferringRoutines = false) } }
         }
     }
-    /**
-     * The password and [totpCode] (the admin's authenticator or recovery code) are passed straight to the
-     * sign-in request; neither is ever kept in state or logged.
-     */
-    fun signInToCosmos(email: String, password: String, totpCode: String? = null) {
+    /** The password is passed straight to the sign-in request; it is never kept in state. */
+    fun signInToCosmos(email: String, password: String) {
         if (state.value.cosmosSigningIn) return
         if (email.isBlank() || password.isEmpty()) {
             mutableState.update { it.copy(cosmosSignInProblem = "Enter your Cosmos email and password.") }
             return
         }
-        val code = totpCode?.takeIf { state.value.cosmosTotpRequired }
-        if (state.value.cosmosTotpRequired && com.jagdeep.shared.cosmos.CosmosSync.normalizedTotpCode(code) == null) {
-            mutableState.update { it.copy(cosmosSignInProblem = "Enter the code from your authenticator app, or a recovery code.") }
-            return
-        }
         mutableState.update { it.copy(cosmosSigningIn = true, cosmosSignInProblem = null) }
         viewModelScope.launch {
-            val result = try { cosmosSync.signIn(email, password, code) }
+            val result = try { cosmosSync.signIn(email, password) }
             catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (_: Exception) { com.jagdeep.shared.cosmos.CosmosSignInResult.ServerTrouble }
-            val totpStep = result == com.jagdeep.shared.cosmos.CosmosSignInResult.TotpRequired || result == com.jagdeep.shared.cosmos.CosmosSignInResult.TotpInvalid ||
-                // A refused request (too many codes, offline) keeps the code step so the admin can try again with a new code.
-                (state.value.cosmosTotpRequired && result in TOTP_STEP_KEEPERS)
-            // TOTP_REQUIRED isn't a problem: its sentence is the code field's own prompt (cosmosTotpPrompt).
-            val problem = if (result == com.jagdeep.shared.cosmos.CosmosSignInResult.TotpRequired) null else cosmosSignInProblem(result)
-            mutableState.update { it.copy(cosmosSigningIn = false, cosmosSignInProblem = problem,
-                cosmosMachinePending = result == com.jagdeep.shared.cosmos.CosmosSignInResult.MachinePending, cosmosTotpRequired = totpStep,
-                cosmosPasswordProblem = null) }
+            mutableState.update { it.copy(cosmosSigningIn = false, cosmosSignInProblem = cosmosSignInProblem(result),
+                cosmosMachinePending = result == com.jagdeep.shared.cosmos.CosmosSignInResult.MachinePending, cosmosPasswordProblem = null) }
             if (result == com.jagdeep.shared.cosmos.CosmosSignInResult.SignedIn) mutableMessages.send(
                 if (cosmosSync.state.value.passwordChangeRequired) "Signed in to Cosmos. Choose a new password to start syncing."
                 else "Signed in to Cosmos. Syncing answers now.",
@@ -177,12 +158,6 @@ class SettingsViewModel(
             finally { mutableState.update { it.copy(cosmosOpeningBrowser = false) } }
             problem?.let { mutableMessages.send(it) }
         }
-    }
-
-    /** Leaves the authenticator-code step, so the sign-in starts again from the email and password. */
-    fun cancelCosmosTotp() {
-        if (state.value.cosmosSigningIn) return
-        mutableState.update { it.copy(cosmosTotpRequired = false, cosmosSignInProblem = null) }
     }
 
     fun syncCosmosNow() = cosmosSync.syncNow()
@@ -276,13 +251,6 @@ class SettingsViewModel(
     }
 }
 
-/** The prompt beside the authenticator-code field: the contract's TOTP_REQUIRED sentence. */
-internal val cosmosTotpPrompt: String get() = cosmosSignInProblem(com.jagdeep.shared.cosmos.CosmosSignInResult.TotpRequired).orEmpty()
-
-/** Answers that leave the authenticator-code step in place when it was already showing. */
-private val TOTP_STEP_KEEPERS = setOf(com.jagdeep.shared.cosmos.CosmosSignInResult.RateLimited, com.jagdeep.shared.cosmos.CosmosSignInResult.Offline,
-    com.jagdeep.shared.cosmos.CosmosSignInResult.ServerTrouble)
-
 internal fun cosmosSignInProblem(result: com.jagdeep.shared.cosmos.CosmosSignInResult): String? = when (result) {
     com.jagdeep.shared.cosmos.CosmosSignInResult.SignedIn -> null
     com.jagdeep.shared.cosmos.CosmosSignInResult.WrongEmailOrPassword -> "That email and password don't match a Cosmos account. Check them and try again."
@@ -295,10 +263,6 @@ internal fun cosmosSignInProblem(result: com.jagdeep.shared.cosmos.CosmosSignInR
     com.jagdeep.shared.cosmos.CosmosSignInResult.MachineRevoked -> "The admin removed this computer from your account. Ask the admin to approve it again."
     com.jagdeep.shared.cosmos.CosmosSignInResult.AccountDisabled -> "This Cosmos account is disabled. Ask the admin to enable it."
     com.jagdeep.shared.cosmos.CosmosSignInResult.ComputerNotIdentified -> "AutoPilot couldn't identify this computer, so Cosmos can't approve it. Restart AutoPilot and try again."
-    // The contract's own sentences (02/03 shared docs): only the error code is read from Cosmos, never its text.
-    com.jagdeep.shared.cosmos.CosmosSignInResult.TotpRequired -> "Enter the code from your authenticator app."
-    com.jagdeep.shared.cosmos.CosmosSignInResult.TotpInvalid -> "That code didn't work. Try the newest one."
-    com.jagdeep.shared.cosmos.CosmosSignInResult.TotpSetupRequired -> "Set up two-step sign-in on the server first (npm run admin:totp)."
 }
 
 internal fun cosmosPasswordProblem(result: com.jagdeep.shared.cosmos.CosmosPasswordChangeResult): String? = when (result) {

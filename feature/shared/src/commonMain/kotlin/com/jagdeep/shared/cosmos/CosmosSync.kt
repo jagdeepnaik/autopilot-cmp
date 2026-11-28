@@ -12,11 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 interface CosmosSync {
     val state: StateFlow<CosmosSyncState>
 
-    /**
-     * The password (and [totpCode], the admin's authenticator or recovery code) is used for this one request
-     * and never kept. Send [totpCode] only after a [CosmosSignInResult.TotpRequired] or [CosmosSignInResult.TotpInvalid].
-     */
-    suspend fun signIn(email: String, password: String, totpCode: String? = null): CosmosSignInResult
+    /** The password is used for this one request and never kept. */
+    suspend fun signIn(email: String, password: String): CosmosSignInResult
 
     /** Ends the session on Cosmos when reachable, and always forgets it on this computer. */
     suspend fun signOut()
@@ -45,16 +42,6 @@ interface CosmosSync {
     companion object {
         /** The contract's shortest allowed password. */
         const val MIN_PASSWORD_LENGTH = 12
-
-        /** Longest authenticator or recovery code the app accepts (a TOTP code is 6 digits). */
-        const val MAX_TOTP_CODE_LENGTH = 20
-
-        /**
-         * The code as sent: spaces dropped, letters, digits and dashes only, at most [MAX_TOTP_CODE_LENGTH]
-         * characters; null when nothing usable is left.
-         */
-        fun normalizedTotpCode(code: String?): String? = code?.filter { !it.isWhitespace() }
-            ?.takeIf { it.isNotEmpty() && it.length <= MAX_TOTP_CODE_LENGTH && it.all { c -> c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9' || c == '-' } }
     }
 }
 
@@ -100,12 +87,6 @@ enum class CosmosSignInResult {
     AccountDisabled,
     /** This computer's identifier couldn't be read, so Cosmos can't approve it. */
     ComputerNotIdentified,
-    /** The admin's password was right; Cosmos wants the code from the authenticator app (send the same sign-in again with it). */
-    TotpRequired,
-    /** The authenticator or recovery code was wrong or already used. */
-    TotpInvalid,
-    /** The admin hasn't set up two-step sign-in on the server yet (`npm run admin:totp`). */
-    TotpSetupRequired,
 }
 
 enum class CosmosPasswordChangeResult { Changed, TooShort, WrongCurrentPassword, Offline, RateLimited, ServerTrouble, SignInNeeded, Unavailable }
@@ -122,7 +103,7 @@ sealed interface CosmosBrowserLinkResult {
 object NoCosmosSync : CosmosSync {
     private val unavailable = MutableStateFlow(CosmosSyncState()).asStateFlow()
     override val state: StateFlow<CosmosSyncState> = unavailable
-    override suspend fun signIn(email: String, password: String, totpCode: String?) = CosmosSignInResult.Unavailable
+    override suspend fun signIn(email: String, password: String) = CosmosSignInResult.Unavailable
     override suspend fun signOut() = Unit
     override fun syncNow() = Unit
     override fun answersChanged() = Unit

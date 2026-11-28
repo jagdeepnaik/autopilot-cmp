@@ -91,7 +91,7 @@ class CosmosAccountsSettingsTest {
         val changes = mutableListOf<Pair<String, String>>()
         var link: CosmosBrowserLinkResult = CosmosBrowserLinkResult.Link("https://cosmos.test/link#secret-link-token")
         var links = 0
-        override suspend fun signIn(email: String, password: String, totpCode: String?) = signInResult
+        override suspend fun signIn(email: String, password: String) = signInResult
         override suspend fun signOut() = Unit
         override fun syncNow() = Unit
         override fun answersChanged() = Unit

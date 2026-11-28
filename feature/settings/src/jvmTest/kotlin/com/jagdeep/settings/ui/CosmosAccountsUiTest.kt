@@ -64,7 +64,7 @@ class CosmosAccountsUiTest {
     private class FakeSync(initial: CosmosSyncState) : CosmosSync {
         override val state = MutableStateFlow(initial)
         val changes = mutableListOf<Pair<String, String>>()
-        override suspend fun signIn(email: String, password: String, totpCode: String?) = CosmosSignInResult.MachinePending
+        override suspend fun signIn(email: String, password: String) = CosmosSignInResult.MachinePending
         override suspend fun signOut() = Unit
         override fun syncNow() = Unit
         override fun answersChanged() = Unit

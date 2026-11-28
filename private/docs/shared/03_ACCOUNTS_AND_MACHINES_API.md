@@ -16,7 +16,6 @@ On this page:
 - [Signing in from the app](#signing-in-from-the-app)
 - [Linking the browser on a machine](#linking-the-browser-on-a-machine)
 - [Signing in on the website](#signing-in-on-the-website)
-- [Two-step sign-in for the admin](#two-step-sign-in-for-the-admin)
 - [Admin routes (website and app)](#admin-routes-website-and-app)
 - [Errors](#errors)
 
@@ -92,26 +91,6 @@ On this page:
 - Every cookie-authenticated request checks the machine cookie too, so revoking the machine signs that browser out.
 - Signing out on the website keeps the machine cookie (the browser stays linked); revoking the machine removes it.
 - Forgotten password: the OTP reset still works, but only from a linked browser.
-
-## Two-step sign-in for the admin
-
-The admin signs in with the password **and** a code from an authenticator app (TOTP: RFC 6238, SHA-1, 6 digits,
-30-second steps, one step of clock drift either way). Other accounts are not asked for a code.
-
-- **Setting it up** happens only on the server: `npm run admin:totp` shows the secret once (an `otpauth://` link and a
-  QR code drawn in the terminal), asks for a current code to confirm it, then prints 10 one-time **recovery codes**
-  once. `npm run admin:totp -- --reset` replaces the secret and the recovery codes. The secret is stored encrypted
-  (`PII_SECRET`), recovery codes only as hashes. Nothing is printed by the API.
-- Until it is set up, the admin's sign-in answers `403 { "code": "TOTP_SETUP_REQUIRED", "error": "Set up two-step
-  sign-in on the server first (npm run admin:totp)." }` after a correct password, on the website and in the app.
-- **Sign-in:** `POST /api/auth/login` and `POST /api/auth/app/login` take an optional `"totpCode"` (6 digits, or a
-  recovery code). For the admin, after a correct password (and, on the website, a valid machine link):
-    - no code: `401 { "code": "TOTP_REQUIRED", "error": "Enter the code from your authenticator app." }`; the app and
-      the website then show a code field and send the same request again with `totpCode`;
-    - a wrong or already-used code: `401 { "code": "TOTP_INVALID", "error": "That code didn't work. Try the newest
-      one." }`. A code is accepted once only; a recovery code is used up when accepted.
-- Codes are rate-limited with sign-in (at most 10 wrong codes per account per 15 minutes, then `429`). Refreshing an
-  app session does not ask for a code; a new sign-in does.
 
 ## Admin routes (website and app)
 

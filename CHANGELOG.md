@@ -5,6 +5,7 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Removed: the authenticator-code step when the admin signs in to Cosmos (Cosmos no longer asks for one).
 - Publishing copies installers over a fresh SSH connection each time; a stale shared connection to Legion made every copy fail (the 1.4.0 MSI was added by hand).
 
 ## [1.4.0] - 2026-11-28

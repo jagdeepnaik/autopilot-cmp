@@ -35,7 +35,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.jagdeep.settings.domain.cosmosTotpPrompt
 import com.jagdeep.settings.ui.util.cosmosPendingText
 import com.jagdeep.settings.ui.util.cosmosStatusText
 import com.jagdeep.settings.ui.util.runLogsText
@@ -47,24 +46,20 @@ import kotlinx.coroutines.delay
 /**
  * Settings rows for the opt-in Cosmos Q&A sync. Passwords live only in these fields while typed: they
  * are handed to the request and then cleared, never saved. While this computer waits for the admin's
- * approval, or while the admin enters the authenticator code, the sign-in password stays in its field (on
- * screen only, masked) so the same sign-in can be sent again. The code is cleared after every request.
+ * approval the sign-in password stays in its field (on screen only) so Try again can resend it.
  */
 @Composable
 internal fun CosmosSyncSection(
     state: CosmosSyncState,
     signingIn: Boolean,
     signInProblem: String?,
-    /** [totpCode] is null until Cosmos asked for the authenticator code. */
-    onSignIn: (email: String, password: String, totpCode: String?) -> Unit,
+    onSignIn: (email: String, password: String) -> Unit,
     onSyncNow: () -> Unit,
     onSignOut: () -> Unit,
     now: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
     runLogsAvailable: Boolean = false,
     onOpenRunLogs: () -> Unit = {},
     machinePending: Boolean = false,
-    totpRequired: Boolean = false,
-    onCancelTotp: () -> Unit = {},
     changingPassword: Boolean = false,
     passwordProblem: String? = null,
     onChangePassword: (current: String, new: String) -> Unit = { _, _ -> },
@@ -84,18 +79,9 @@ internal fun CosmosSyncSection(
     if (account == null) {
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
-        var code by remember { mutableStateOf("") }
-        val codeReady = !totpRequired || CosmosSync.normalizedTotpCode(code) != null
-        val canSubmit = !signingIn && email.isNotBlank() && password.isNotEmpty() && codeReady
-        val submit = {
-            if (canSubmit) {
-                onSignIn(email, password, code.takeIf { totpRequired })
-                // A code works once: emptied as soon as it is handed to the request.
-                code = ""
-            }
-        }
-        // Cleared once a request finishes, unless the same sign-in will be sent again (Try again, or with a code).
-        LaunchedEffect(signingIn, machinePending, totpRequired) { if (!signingIn && !machinePending && !totpRequired) password = "" }
+        val submit = { onSignIn(email, password) }
+        // Cleared once a request finishes, unless Try again will need it.
+        LaunchedEffect(signingIn, machinePending) { if (!signingIn && !machinePending) password = "" }
         ListItem(colors = transparent, headlineContent = { Text("Cosmos sync") }, supportingContent = {
             Text(when {
                 state.sessionEnd == CosmosSessionEnd.MachineRevoked -> "The admin removed this computer from your Cosmos account, so you were signed out. Ask the admin to approve it again."
@@ -105,29 +91,20 @@ internal fun CosmosSyncSection(
             })
         })
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // While the code is asked for, the email and password are the ones already accepted: locked until Cancel.
-            OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth(), label = { Text("Email") }, singleLine = true, enabled = !signingIn && !totpRequired,
+            OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth(), label = { Text("Email") }, singleLine = true, enabled = !signingIn,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next))
-            OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), label = { Text("Password") }, singleLine = true, enabled = !signingIn && !totpRequired,
+            OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), label = { Text("Password") }, singleLine = true, enabled = !signingIn,
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = if (totpRequired) ImeAction.Next else ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { submit() }))
-            if (totpRequired) {
-                OutlinedTextField(code, { typed -> code = typed.filter { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' }.take(CosmosSync.MAX_TOTP_CODE_LENGTH) },
-                    Modifier.fillMaxWidth(), label = { Text("Authenticator code") }, singleLine = true, enabled = !signingIn,
-                    supportingText = { Text("$cosmosTotpPrompt You can also use a recovery code.") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { submit() }))
-            }
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (!signingIn) submit() }))
             signInProblem?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             }
-            Row(Modifier.padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = submit, enabled = canSubmit) {
-                    Text(when { signingIn -> "Signing in…"; totpRequired -> "Verify"; machinePending -> "Try again"; else -> "Sign in" })
+            Row(Modifier.padding(bottom = 8.dp)) {
+                Button(onClick = submit, enabled = !signingIn && email.isNotBlank() && password.isNotEmpty()) {
+                    Text(when { signingIn -> "Signing in…"; machinePending -> "Try again"; else -> "Sign in" })
                 }
-                if (totpRequired) TextButton(onClick = onCancelTotp, enabled = !signingIn) { Text("Cancel") }
             }
         }
         RunLogsRow(state, runLogsAvailable, onOpenRunLogs)

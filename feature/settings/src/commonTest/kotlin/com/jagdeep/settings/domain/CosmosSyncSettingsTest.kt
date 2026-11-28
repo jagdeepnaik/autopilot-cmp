@@ -44,16 +44,11 @@ class CosmosSyncSettingsTest {
         val signIns = mutableListOf<Pair<String, String>>()
         var syncs = 0
         var signOuts = 0
-        /** Answers for the next sign-ins, in order; [result] once they run out. */
-        val results = ArrayDeque<CosmosSignInResult>()
-        val codes = mutableListOf<String?>()
-        override suspend fun signIn(email: String, password: String, totpCode: String?): CosmosSignInResult {
+        override suspend fun signIn(email: String, password: String): CosmosSignInResult {
             signIns += email to password
-            codes += totpCode
             gate?.await()
-            val answer = results.removeFirstOrNull() ?: result
-            if (answer == CosmosSignInResult.SignedIn) state.value = state.value.copy(account = CosmosAccount("Tester"))
-            return answer
+            if (result == CosmosSignInResult.SignedIn) state.value = state.value.copy(account = CosmosAccount("Tester"))
+            return result
         }
         override suspend fun signOut() { signOuts++; state.value = state.value.copy(account = null) }
         override fun syncNow() { syncs++ }
@@ -93,76 +88,6 @@ class CosmosSyncSettingsTest {
         advanceUntilIdle()
         assertEquals("That email and password don't match a Cosmos account. Check them and try again.", viewModel.state.value.cosmosSignInProblem)
         assertNull(viewModel.state.value.cosmos.account)
-    }
-
-    @Test fun given_the_admin_when_cosmos_asks_for_a_code_then_the_same_sign_in_is_sent_again_with_it() = test {
-        val sync = FakeSync().apply { results += listOf(CosmosSignInResult.TotpRequired, CosmosSignInResult.SignedIn) }
-        val viewModel = SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate, cosmosSync = sync)
-        // A code typed before Cosmos asked for one isn't sent.
-        viewModel.signInToCosmos("admin@example.com", "test-password", "999999")
-        advanceUntilIdle()
-        var state = viewModel.state.value
-        assertTrue(state.cosmosTotpRequired)
-        // The contract's sentence is the code field's prompt, not an error.
-        assertNull(state.cosmosSignInProblem)
-        assertEquals("Enter the code from your authenticator app.", cosmosTotpPrompt)
-        assertNull(state.cosmos.account)
-
-        viewModel.signInToCosmos("admin@example.com", "test-password", "123456")
-        advanceUntilIdle()
-        state = viewModel.state.value
-        assertEquals(listOf(null, "123456"), sync.codes)
-        assertEquals(listOf("admin@example.com" to "test-password", "admin@example.com" to "test-password"), sync.signIns)
-        assertFalse(state.cosmosTotpRequired)
-        assertNull(state.cosmosSignInProblem)
-        assertEquals("Tester", state.cosmos.account?.name)
-        // Neither the password nor the code is kept in state.
-        assertFalse("test-password" in state.toString() || "123456" in state.toString())
-        assertEquals("Signed in to Cosmos. Syncing answers now.", viewModel.messages.first())
-    }
-
-    @Test fun given_a_wrong_code_when_signing_in_then_the_sentence_shows_and_the_code_field_stays() = test {
-        val sync = FakeSync().apply { results += listOf(CosmosSignInResult.TotpRequired, CosmosSignInResult.TotpInvalid, CosmosSignInResult.RateLimited) }
-        val viewModel = SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate, cosmosSync = sync)
-        viewModel.signInToCosmos("admin@example.com", "test-password")
-        advanceUntilIdle()
-        viewModel.signInToCosmos("admin@example.com", "test-password", "000000")
-        advanceUntilIdle()
-        assertTrue(viewModel.state.value.cosmosTotpRequired)
-        assertEquals("That code didn't work. Try the newest one.", viewModel.state.value.cosmosSignInProblem)
-        // Too many wrong codes: the existing rate-limit words, and the field stays for later.
-        viewModel.signInToCosmos("admin@example.com", "test-password", "111111")
-        advanceUntilIdle()
-        assertTrue(viewModel.state.value.cosmosTotpRequired)
-        assertEquals("Too many sign-in attempts. Wait a few minutes, then try again.", viewModel.state.value.cosmosSignInProblem)
-        // An empty code isn't sent.
-        viewModel.signInToCosmos("admin@example.com", "test-password", " ")
-        advanceUntilIdle()
-        assertEquals(3, sync.signIns.size)
-        assertEquals("Enter the code from your authenticator app, or a recovery code.", viewModel.state.value.cosmosSignInProblem)
-        // Cancel starts again from the email and password.
-        viewModel.cancelCosmosTotp()
-        assertFalse(viewModel.state.value.cosmosTotpRequired)
-        assertNull(viewModel.state.value.cosmosSignInProblem)
-    }
-
-    @Test fun given_two_step_sign_in_not_set_up_when_the_admin_signs_in_then_the_server_step_is_explained() = test {
-        val sync = FakeSync().apply { result = CosmosSignInResult.TotpSetupRequired }
-        val viewModel = SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate, cosmosSync = sync)
-        viewModel.signInToCosmos("admin@example.com", "test-password")
-        advanceUntilIdle()
-        assertFalse(viewModel.state.value.cosmosTotpRequired)
-        assertEquals("Set up two-step sign-in on the server first (npm run admin:totp).", viewModel.state.value.cosmosSignInProblem)
-        assertNull(viewModel.state.value.cosmos.account)
-    }
-
-    @Test fun given_codes_as_typed_then_only_plain_codes_up_to_twenty_characters_are_sent() {
-        assertEquals("123456", CosmosSync.normalizedTotpCode(" 123 456 "))
-        assertEquals("ABCD-EFGH-1234", CosmosSync.normalizedTotpCode("ABCD-EFGH-1234"))
-        assertNull(CosmosSync.normalizedTotpCode(null))
-        assertNull(CosmosSync.normalizedTotpCode("   "))
-        assertNull(CosmosSync.normalizedTotpCode("12#456"))
-        assertNull(CosmosSync.normalizedTotpCode("x".repeat(21)))
     }
 
     @Test fun given_empty_fields_when_signing_in_then_nothing_is_sent() = test {

@@ -52,38 +52,6 @@ class KtorCosmosApiTest {
         assertEquals("macos", body["platform"].toString().trim('"'))
     }
 
-    @Test fun given_a_totp_code_when_logging_in_then_the_body_carries_it_and_without_one_it_is_left_out() = runBlocking {
-        val client = api { json(session) }
-        client.login("admin@example.com", "test-password", "AutoPilot on macOS", "c".repeat(64), "macos", totpCode = "123456")
-        client.login("admin@example.com", "test-password", "AutoPilot on macOS", "c".repeat(64), "macos", totpCode = null)
-        val (withCode, withoutCode) = requests.map { Json.parseToJsonElement(it.bodyText()).jsonObject }
-        assertEquals(setOf("email", "password", "deviceName", "machineId", "platform", "totpCode"), withCode.keys)
-        assertEquals("123456", withCode["totpCode"].toString().trim('"'))
-        assertFalse("totpCode" in withoutCode.keys)
-    }
-
-    @Test fun given_a_401_with_a_two_step_code_then_only_the_code_is_kept() = runBlocking {
-        val cases = mapOf(
-            """{"code":"TOTP_REQUIRED","error":"Enter the code from your authenticator app."}""" to "TOTP_REQUIRED",
-            """{"code":"TOTP_INVALID","error":"That code didn't work. Try the newest one."}""" to "TOTP_INVALID",
-            """{"error":"Invalid email or password"}""" to null,
-            "not json" to null,
-        )
-        cases.forEach { (body, code) ->
-            val error = assertFailsWith<CosmosApiException.Unauthorized> {
-                api { json(body, HttpStatusCode.Unauthorized) }.login("admin@example.com", "test-password", "AutoPilot on macOS", "c".repeat(64), "macos", "123456")
-            }
-            assertEquals(code, error.code, body)
-            // Neither the server's sentence nor anything sent reaches the exception text.
-            listOf("authenticator", "didn't work", "Invalid email", "123456", "test-password").forEach { assertFalse(it in error.message.orEmpty(), it) }
-        }
-        val setup = assertFailsWith<CosmosApiException.Forbidden> {
-            api { json("""{"code":"TOTP_SETUP_REQUIRED","error":"Set up two-step sign-in on the server first (npm run admin:totp)."}""", HttpStatusCode.Forbidden) }
-                .login("admin@example.com", "test-password", "AutoPilot on macOS", "c".repeat(64), "macos")
-        }
-        assertEquals("TOTP_SETUP_REQUIRED", setup.code)
-    }
-
     @Test fun given_an_approved_machine_when_logging_in_then_the_machine_and_password_flag_are_read() = runBlocking {
         val reply = session.dropLast(1) + ""","machine":{"id":"m_1","status":"approved"},"mustChangePassword":true}"""
         val result = api { json(reply) }.login("person@example.com", "test-password", "AutoPilot on macOS", "c".repeat(64), "macos")
