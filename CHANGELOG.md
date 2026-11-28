@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-28
+
 - Publishing copies the Windows and Linux installers back again (the copy step could not be found, so both were left out of 1.2.2).
 - The sync service is now called Cosmos and lives at `https://cosmos.naikio.in`; everyone signs in again once, and the first sync downloads the approved answers again.
 - Signing in to Cosmos sends an anonymous ID for this computer (a hash; the computer's own identifier never leaves it), and a new computer waits for the admin's approval, with Try again.
