@@ -61,6 +61,9 @@ On this page:
 - `mustChangePassword`: the session can only call `POST /api/auth/app/change-password`
   `{ "currentPassword", "newPassword" }` (at least 12 characters) and `logout` until the password is changed; anything
   else answers `403 { "code": "PASSWORD_CHANGE_REQUIRED" }`.
+- `change-password` answers `204` with no body: the session in use carries on (the app refreshes its access token)
+  and every other session of the account ends. A wrong current password, or a new one equal to the current one,
+  answers `400 { "error" }` with a sentence the app shows as it is.
 - Refresh tokens and app access tokens carry the machine; they stop working as soon as the machine is revoked or the
   account disabled.
 
@@ -103,6 +106,11 @@ Responses never include password hashes, tokens or machine cookies.
 | `GET /api/admin/machines?status=pending&page=&pageSize=` | `{ "machines": [Machine & { "account": { "id", "name", "email" } }], "page", "pageSize", "total" }` |
 | `POST /api/admin/machines/:id/approve` | `{ "machine": Machine }`; `409` beyond the account's limit |
 | `POST /api/admin/machines/:id/revoke` | `{ "machine": Machine }` |
+
+- `pageSize` for both lists defaults to 20 and is at most 50.
+- Creating an account with an email that already exists answers `409`; so do disabling the admin account and lowering
+  a machine limit below the account's approved machines.
+- A revoked machine can be approved again (subject to the limit).
 
 `Account`: `{ "id", "name", "email", "role", "status", "machineLimit", "approvedMachines", "pendingMachines",
 "mustChangePassword", "createdAt", "lastSignInAt" }`. `Machine`: the record above.

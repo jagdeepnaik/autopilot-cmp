@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Publishing copies the Windows MSI and Linux DEB back to the Mac (the copy helper was only defined for desktop commands, so 1.3.0 shipped macOS and Android only).
+
 ## [1.3.0] - 2026-11-28
 
 - Publishing copies the Windows and Linux installers back again (the copy step could not be found, so both were left out of 1.2.2).
