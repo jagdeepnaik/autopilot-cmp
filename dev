@@ -1499,12 +1499,13 @@ local names=() name
 while IFS=$'\t' read -r _ _ name _ _ _; do names+=("$stage/$name"); done <"$files_tsv"
 ssh "$server" "mkdir -p '$downloads_dir/${version:?}.uploading'" || pfail "couldn't create the upload folder on $server."
 rsync -a --checksum "${names[@]}" "$server:$downloads_dir/$version.uploading/" || pfail "the upload to $server failed; the published manifest is unchanged."
-# The new folder replaces any older copy of this version, then the manifest is swapped in one rename.
-ssh "$server" "set -e; cd '$downloads_dir'
+# The new folder replaces any older copy of this version, then the manifest is swapped in one rename. Both steps hold
+# .publish.lock, which Cosmos's downloads-prune job (deleting releases the admin removed) also takes.
+ssh "$server" "set -e; cd '$downloads_dir'; exec 9>.publish.lock; flock -w 60 9
 rm -rf './${version:?}.previous'; if [ -d './$version' ]; then mv './$version' './$version.previous'; fi
 mv './$version.uploading' './$version'; rm -rf './${version:?}.previous'
 cat > manifest.json.tmp" <"$manifest" || pfail "couldn't write the manifest on $server."
-ssh "$server" "set -e; cd '$downloads_dir'; mv manifest.json.tmp manifest.json
+ssh "$server" "set -e; cd '$downloads_dir'; exec 9>.publish.lock; flock -w 60 9; mv manifest.json.tmp manifest.json
 ls -1d */ 2>/dev/null | tr -d / | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\$' | sort -V | head -n -3 | while read -r old; do rm -rf -- \"./\$old\"; echo \"Removed old release \$old\"; done" \
     || pfail "couldn't replace the manifest on $server."
 local sha
