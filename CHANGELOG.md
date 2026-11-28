@@ -9,4 +9,5 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 - Settings shows how many run logs wait to upload, and opens the logs folder.
 - Settings → About offers a newer published version, with Install.
 - Toolchain on the newest LTS releases: JDK 25 LTS (Microsoft build) for every build machine, Gradle 9.9.3, Ktor 3.6.2.
+- `./dev version` reads the current version again (a quoting error stopped every release).
 - `./dev publish` builds every installer and publishes it to Compass downloads; `./dev version` runs it.

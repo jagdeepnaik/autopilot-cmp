@@ -1175,7 +1175,7 @@ EOF
     git pull --ff-only origin main
 
     catalog="$ROOT/gradle/libs.versions.toml"
-    current="$(awk -F'\"' '/^versionName = / { print $2 }' \"$catalog\")"
+    current="$(awk -F'"' '/^versionName = / { print $2 }' "$catalog")"
     [ -n "$current" ] || { echo "Stopped: versionName must be MAJOR.MINOR.PATCH." >&2; exit 1; }
     IFS=. read -r major minor patch <<<"$current"
 
