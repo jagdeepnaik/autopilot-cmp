@@ -263,6 +263,10 @@ Problem kinds, computed by Cosmos with the text rules above:
   replace every local answer for that `(bankName, module, questionKey)`, whatever their source (bundled, learned or
   earlier Cosmos rows). Entries without it keep today's rule: bundled and learned answers win.
 - Approving a submission also makes the entry authoritative.
+- **Disagreeing with a correction.** If a user confirms an answer that differs from an authoritative entry, the app
+  uses it on that computer and still submits it; Cosmos answers `conflict` and the admin sees both answers in Q&A
+  review, to keep the correction (reject) or change it (approve). Automatic saves never do this: only answers the
+  user confirmed.
 
 ## Seeding the server
 

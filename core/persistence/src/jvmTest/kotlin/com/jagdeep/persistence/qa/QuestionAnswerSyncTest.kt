@@ -253,15 +253,73 @@ class QuestionAnswerSyncTest {
         assertEquals("compass", entry.source)
     }
 
-    @Test fun given_a_corrected_question_when_the_user_confirms_a_different_answer_then_it_is_kept_locally_and_not_uploaded() = runBlocking {
+    @Test fun given_a_corrected_question_when_the_user_confirms_a_different_answer_then_it_is_used_locally_and_uploaded_once() = runBlocking {
         val store = store(File(root, "smy.db"), oldSchemaFile("bundle.db"))
         store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10)
         assertEquals(QuestionAnswerWriteResult.Saved,
             store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Bundled?", listOf("A", "B"), "B", previousAnswer = "A")), reviewed = true, confirmed = true))
         assertEquals(listOf("B"), store.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
-        // It disagrees with the admin's correction: marked superseded, never submitted again.
+        // It disagrees with the admin's correction and is submitted, so the admin sees the conflict.
+        val pending = store.pendingUploads(100)!!.single()
+        assertEquals("Bundled?", pending.question)
+        assertEquals("b", pending.answerKey)
+        assertTrue(store.markUploads(mapOf(pending.clientId to "conflict"), at = 1_000))
         assertEquals(0, store.pendingUploadCount())
         assertTrue(store.pendingUploads(100)!!.isEmpty())
+        assertEquals(listOf("B"), store.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
+    }
+
+    @Test fun given_a_corrected_question_when_an_automatic_save_disagrees_then_nothing_is_stored_or_queued() = runBlocking {
+        val store = store(File(root, "smy.db"), oldSchemaFile("bundle.db"))
+        store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10)
+        // A legacy import or quiz feedback (reviewed, not confirmed) and a reference capture (not reviewed).
+        assertEquals(QuestionAnswerWriteResult.Saved,
+            store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Bundled?", listOf("A", "B"), "B", previousAnswer = "A")), reviewed = true))
+        assertEquals(QuestionAnswerWriteResult.Saved,
+            store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Bundled?", listOf("A", "B"), "B")), reviewed = false))
+        val entry = store.entries("bank.json")!!.single { it.question == "Bundled?" }
+        assertEquals(listOf("A"), entry.answers)
+        assertEquals("compass", entry.source)
+        assertEquals(0, store.pendingUploadCount())
+    }
+
+    @Test fun given_a_confirmed_disagreeing_answer_when_the_same_revision_arrives_again_then_the_answer_stays_until_a_newer_revision() = runBlocking {
+        val store = store(File(root, "smy.db"), oldSchemaFile("bundle.db"))
+        store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10)
+        store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Bundled?", listOf("A", "B"), "B", previousAnswer = "A")), reviewed = true, confirmed = true)
+        // A full sync downloads the same correction again: the user's confirmed answer stays in use and queued.
+        assertEquals(RemoteApplyResult(skipped = 1), store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10))
+        assertEquals(listOf("B"), store.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
+        assertEquals(1, store.pendingUploadCount())
+        // The admin acts (a new revision): it replaces the user's answer.
+        assertEquals(RemoteApplyResult(updated = 1), store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 11, authoritative = true)), "revision", 11))
+        val entry = store.entries("bank.json")!!.single { it.question == "Bundled?" }
+        assertEquals(listOf("A"), entry.answers)
+        assertEquals("compass", entry.source)
+        assertEquals(0, store.pendingUploadCount())
+    }
+
+    @Test fun given_a_file_with_superseded_answers_from_an_earlier_version_when_opened_then_they_are_queued_once() = runBlocking {
+        val installed = File(root, "smy.db")
+        val bundle = oldSchemaFile("bundle.db")
+        store(installed, bundle).applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10)
+        // What an earlier version wrote for a confirmed answer that disagreed with the correction.
+        BundledSQLiteDriver().open(installed.absolutePath).use { db ->
+            db.sql("DELETE FROM qa_answers WHERE question_id=(SELECT id FROM qa_questions WHERE question_text='Bundled?')")
+            db.sql("INSERT INTO qa_answers(question_id,answer_text,answer_key,source,learned_at,reviewed_at,submitted_at,submit_status,confirmed_at) " +
+                "SELECT id,'B','b','learned',100,100,100,'superseded',100 FROM qa_questions WHERE question_text='Bundled?'")
+        }
+        val restarted = store(installed, bundle)
+        val pending = restarted.pendingUploads(100)!!.single()
+        assertEquals("b", pending.answerKey)
+        assertTrue(restarted.markUploads(mapOf(pending.clientId to "conflict"), at = 1_000))
+        // Later starts never queue it again.
+        val again = store(installed, bundle)
+        assertEquals(0, again.pendingUploadCount())
+        BundledSQLiteDriver().open(installed.absolutePath).use { db ->
+            assertEquals("conflict", db.text("SELECT submit_status FROM qa_answers WHERE answer_key='b' AND source='learned'"))
+            assertEquals(0L, db.long("SELECT count(*) FROM qa_answers WHERE submit_status='superseded'"))
+        }
     }
 
     @Test fun given_a_retired_authoritative_entry_when_applied_then_the_question_is_left_without_its_old_bundled_answer() = runBlocking {

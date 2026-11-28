@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- An answer you confirm that disagrees with a Cosmos admin correction is now submitted to Cosmos (as a conflict for the admin to review) while it stays in use on this computer until the admin changes the entry; such answers kept back by earlier versions are submitted once. Automatic saves still never override or upload against a correction.
+
 ## [1.6.1] - 2026-11-28
 
 - Questions containing the micro sign `µ` (15 bundled OLP and Seagull questions) are found again: the bundled Q&A files are rebuilt with the app's own lowercasing instead of case folding, and routine Q&A files move to schema version 4, which repairs the stored keys in place (after a backup copy), merging any duplicate the app had created and keeping learned answers.

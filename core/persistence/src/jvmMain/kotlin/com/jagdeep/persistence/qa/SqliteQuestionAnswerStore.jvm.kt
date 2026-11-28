@@ -129,10 +129,10 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
         val previous = value.previousAnswer?.let(::normalize)
         // An admin's correction stands: saving the same answer changes nothing, and an automatic save
         // (a legacy import, quiz feedback, a reference) never replaces it. Only the user's own
-        // confirmation can, and that answer is kept on this computer instead of being uploaded again.
+        // confirmation can: that answer is used on this computer and queued for upload like any other
+        // confirmed answer, so the admin sees the disagreement (Cosmos answers `conflict`).
         val corrected = isAuthoritative(db, bank, value.module, key) && existing.isNotEmpty()
         if (corrected && (existing == setOf(answerKey) || !confirmed)) return
-        val superseded = corrected
         if (reviewed && ((previous != null && existing != setOf(previous)) || (previous == null && existing.isNotEmpty() && existing != setOf(answerKey)))) throw WriteConflict()
         if (!reviewed && existing.isNotEmpty() && existing != setOf(answerKey)) throw WriteConflict()
         // The same answer saved again keeps its upload identity, so it is never submitted twice.
@@ -144,8 +144,7 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
         db.prepare("INSERT INTO qa_answers(question_id,answer_text,answer_key,source,learned_at,reviewed_at,client_id,submitted_at,submit_status,confirmed_at) VALUES (?,?,?,'learned',?,?,?,?,?,?)").use { row ->
             val now = System.currentTimeMillis(); row.bindLong(1, id); row.bindText(2, value.answer); row.bindText(3, answerKey); row.bindLong(4, now); if (reviewed) row.bindLong(5, now) else row.bindNull(5)
             row.bindTextOrNull(6, kept?.get(0) as String?)
-            if (superseded) { row.bindLong(7, now); row.bindText(8, SUPERSEDED) }
-            else { row.bindLongOrNull(7, kept?.get(1) as Long?); row.bindTextOrNull(8, kept?.get(2) as String?) }
+            row.bindLongOrNull(7, kept?.get(1) as Long?); row.bindTextOrNull(8, kept?.get(2) as String?)
             // Confirmation is kept when the same answer is saved again by an automatic path.
             row.bindLongOrNull(9, if (confirmed && reviewed) now else kept?.get(3) as Long?); row.step()
         }
@@ -171,6 +170,7 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
                 open().use { installed ->
                     QuestionAnswerSchema.upgrade(installed, databaseFile, backup = true)
                     installed.prepare("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)").use { it.step() }
+                    requeueSuperseded(installed)
                     val current = installed.prepare("SELECT value FROM metadata WHERE key='bundled_sha256'").use { row -> if (row.step()) row.getText(0) else null }
                     if (current != fingerprint) {
                         driver.open(bundled.absolutePath).use { source -> mergeBundledSource(installed, source) }
@@ -181,6 +181,25 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
             }
             true
         }.getOrElse { false }
+    }
+
+    /**
+     * Earlier versions kept a confirmed answer that disagreed with an admin's correction on this computer
+     * only (`submit_status = 'superseded'`). Such answers are now submitted, so those rows go back into the
+     * upload queue, once per file: a metadata flag records that it was done.
+     */
+    private fun requeueSuperseded(db: SQLiteConnection) {
+        val done = db.prepare("SELECT 1 FROM metadata WHERE key='$REQUEUED_KEY'").use { it.step() }
+        if (done) return
+        db.prepare("BEGIN IMMEDIATE").use { it.step() }
+        try {
+            db.prepare("UPDATE qa_answers SET submit_status=NULL,submitted_at=NULL WHERE source='learned' AND submit_status=?").use { row -> row.bindText(1, SUPERSEDED); row.step() }
+            db.prepare("INSERT OR REPLACE INTO metadata(key,value) VALUES ('$REQUEUED_KEY','1')").use { it.step() }
+            db.prepare("COMMIT").use { it.step() }
+        } catch (error: Throwable) {
+            runCatching { db.prepare("ROLLBACK").use { it.step() } }
+            throw error
+        }
     }
 
     /**
@@ -247,6 +266,9 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
      * - A question that already has bundled or learned answers keeps them: local answers win.
      * - An authoritative entry (an admin's correction) replaces every local answer of its question, and
      *   the question stays authoritative: later entries for it, authoritative or not, are applied the same way.
+     *   One exception: once the user has confirmed a different answer after that correction, the same
+     *   revision arriving again (or an older one) leaves the user's answer in use; only a newer revision
+     *   (the admin acted again) replaces it.
      * - A retired entry removes only the answers (and questions) that came from the remote service; a
      *   corrected question then stays empty rather than getting its old answer back.
      */
@@ -331,6 +353,12 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
             row.bindText(1, entry.entryId); row.bindLong(2, entry.revision); row.bindLong(3, existing); row.step()
         }
         if (authoritative) {
+            // The user confirmed a different answer after this correction: it stays in use until the admin
+            // changes the entry again (a newer revision).
+            val corrected = authoritativeRevision(db, entry.bankName, entry.module, entry.questionKey)
+            if (corrected != null && entry.revision <= corrected && hasConfirmedLearned(db, existing)) {
+                return result.copy(skipped = result.skipped + 1, removed = result.removed + removed)
+            }
             // Bundled, learned and earlier remote answers all give way; a learned answer removed here is never uploaded.
             db.prepare("DELETE FROM qa_answers WHERE question_id=?").use { row -> row.bindLong(1, existing); row.step() }
             insertRemoteAnswers(db, existing, entry)
@@ -370,6 +398,14 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
         db.prepare("SELECT 1 FROM qa_authoritative WHERE bank_name=? AND module=? AND question_key=?").use { row ->
             row.bindText(1, bankName); row.bindText(2, module); row.bindText(3, questionKey); row.step()
         }
+
+    private fun authoritativeRevision(db: SQLiteConnection, bankName: String, module: String, questionKey: String): Long? =
+        db.prepare("SELECT revision FROM qa_authoritative WHERE bank_name=? AND module=? AND question_key=?").use { row ->
+            row.bindText(1, bankName); row.bindText(2, module); row.bindText(3, questionKey); if (row.step()) row.longOrNull(0) else null
+        }
+
+    private fun hasConfirmedLearned(db: SQLiteConnection, questionId: Long): Boolean =
+        db.prepare("SELECT 1 FROM qa_answers WHERE question_id=? AND source='learned' AND confirmed_at IS NOT NULL LIMIT 1").use { row -> row.bindLong(1, questionId); row.step() }
 
     private fun recordAuthoritative(db: SQLiteConnection, entry: RemoteQuestionAnswer) {
         db.prepare("INSERT OR REPLACE INTO qa_authoritative(bank_name,module,question_key,entry_id,revision) VALUES (?,?,?,?,?)").use { row ->
@@ -412,9 +448,13 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
     private class WriteConflict : RuntimeException()
 
     private companion object {
-        /** Learned answers the user confirmed ("Save and continue" or a post-attempt review), not yet uploaded. */
-        /** `submit_status` of a learned answer that disagrees with an admin's correction: never uploaded. */
+        /**
+         * `submit_status` earlier versions gave a confirmed answer that disagreed with an admin's correction, so it
+         * was never uploaded. No longer written; [requeueSuperseded] puts such rows back in the upload queue.
+         */
         const val SUPERSEDED = "superseded"
+        const val REQUEUED_KEY = "superseded_requeued"
+        /** Learned answers the user confirmed ("Save and continue" or a post-attempt review), not yet uploaded. */
         const val PENDING = "a.source='learned' AND a.reviewed_at IS NOT NULL AND a.confirmed_at IS NOT NULL AND a.submit_status IS NULL"
     }
 }
