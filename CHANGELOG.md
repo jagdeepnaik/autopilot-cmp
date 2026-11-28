@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Windows builds use IPv4 for Gradle, JDK and dependency downloads, so a machine without working IPv6 no longer times out.
+- Publishing retries copying a finished installer back to the Mac up to three times.
 ## [1.2.1] - 2026-11-28
 
 - Copying a DEB back to the Mac reads its package name, version and architecture correctly on Debian 13.

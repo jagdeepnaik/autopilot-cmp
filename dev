@@ -567,6 +567,16 @@ server_fetch() {
 # --- Fetch every existing Legion MSI and server DEB ---------------------------------------------
 # This is deliberately separate from a build: it never syncs Git, builds, installs or deletes.
 safe_artifact_name() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.(msi|deb)$ ]]; }
+# Copies a build back to the Mac, trying three times: the jump through Legion to its VM can drop a long copy.
+scp_retry() {
+    local attempt
+    for attempt in 1 2 3; do
+        scp -q "$1" "$2" && return 0
+        echo "Copy attempt $attempt of 3 failed; retrying in 10 s." >&2
+        sleep 10
+    done
+    return 1
+}
 normalize_architecture() {
     case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '\r')" in
         amd64|x86_64|x64) echo amd64 ;;
@@ -1390,7 +1400,7 @@ else
         pstep "Windows: build the MSI on Legion, then copy and verify it"
         local msi="AutoPilot-$package.msi" remote_hash=''
         if "$ROOT/dev" build legion "${passthrough[@]+"${passthrough[@]}"}" \
-            && scp -q "$legion_host:$legion_msi_dir/$msi" "$stage/$msi" \
+            && scp_retry "$legion_host:$legion_msi_dir/$msi" "$stage/$msi" \
             && remote_hash=$(ssh "$legion_host" "powershell -NoProfile -Command \"(Get-FileHash -Algorithm SHA256 -LiteralPath '$legion_msi_dir/$msi').Hash\"" | tr -d '\r' | tr 'A-F' 'a-f') \
             && [ "$remote_hash" = "$(shasum -a 256 "$stage/$msi" | awk '{print $1}')" ]; then
             add_file windows msi "$stage/$msi" "Windows 10 64-bit"
@@ -1401,7 +1411,7 @@ else
         local deb="autopilot_${package}_amd64.deb" remote_deb='' remote_hash=''
         if "$ROOT/dev" build legion-linux "${passthrough[@]+"${passthrough[@]}"}" \
             && remote_deb=$(ssh "$linux_host" "ls '$linux_dir'/desktopApp/build/compose/binaries/main-release/deb/*$package*.deb | head -1") \
-            && [ -n "$remote_deb" ] && scp -q "$linux_host:$remote_deb" "$stage/$deb" \
+            && [ -n "$remote_deb" ] && scp_retry "$linux_host:$remote_deb" "$stage/$deb" \
             && remote_hash=$(ssh "$linux_host" "sha256sum '$remote_deb'" | awk '{print $1}') \
             && [ "$remote_hash" = "$(shasum -a 256 "$stage/$deb" | awk '{print $1}')" ]; then
             add_file linux deb "$stage/$deb" "Debian 12 / Ubuntu 22.04, x86-64"

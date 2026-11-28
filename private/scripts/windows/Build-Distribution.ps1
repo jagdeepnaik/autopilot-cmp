@@ -19,8 +19,11 @@ try {
         }
     }
     if (-not (Get-Command java -ErrorAction SilentlyContinue)) { throw 'Install a full JDK 21 and reopen PowerShell first.' }
+    # Java tries IPv6 first, and Legion has an IPv6 address without a working IPv6 route, so Gradle's own download,
+    # the JDK download and dependencies time out. IPv4 works (28 November 2026).
+    if (-not $env:GRADLE_OPTS) { $env:GRADLE_OPTS = '-Djava.net.preferIPv4Stack=true' }
     # Low-memory settings: the build laptop also runs Chrome and the app.
-    $gradleTasks = @('--no-daemon', '--console=plain', '--max-workers=2', '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8', '-Pkotlin.compiler.execution.strategy=in-process')
+    $gradleTasks = @('--no-daemon', '--console=plain', '--max-workers=2', '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8 -Djava.net.preferIPv4Stack=true', '-Pkotlin.compiler.execution.strategy=in-process')
     if (-not $SkipTests) {
         $gradleTasks += @(':core:automation:jvmTest', ':feature:home:jvmTest', '--tests', '*DgsStudy*', ':shared:jvmTest', '--tests', '*DesktopDataPathsTest*')
     }
