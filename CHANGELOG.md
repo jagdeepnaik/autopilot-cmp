@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-28
+
 - Copying a DEB back to the Mac reads its package name, version and architecture correctly on Debian 13.
 - Release DEBs are built on Legion's x86-64 Debian VM (`./dev build legion-linux`), so Linux PCs get an x86-64 package and the home server only serves.
 - Gradle waits up to two minutes to download itself, so a slow first download no longer stops the Windows build.
