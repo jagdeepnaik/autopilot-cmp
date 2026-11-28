@@ -1469,7 +1469,11 @@ for line in open(os.environ["FILES"], encoding="utf-8"):
     # Cosmos refuses a manifest without the full 64-character hex digest and the real size.
     assert re.fullmatch(r"[0-9a-f]{64}", sha) and int(size) > 0, name
     files.append({"platform": platform, "kind": kind, "fileName": name, "bytes": int(size), "sha256": sha, "minimumOs": minimum})
-notes = [n.strip()[:200] for n in open(os.environ["NOTES"], encoding="utf-8") if n.strip()][:20]
+def clip(note, limit=500):
+    # Cosmos accepts notes up to 500 characters; a longer one ends at a word, never mid-word.
+    note = " ".join(note.split())
+    return note if len(note) <= limit else note[:limit - 1].rsplit(" ", 1)[0].rstrip(",;:") + "…"
+notes = [clip(n) for n in open(os.environ["NOTES"], encoding="utf-8") if n.strip()][:20]
 release = {"version": os.environ["VERSION"], "build": int(os.environ["BUILD"]), "commit": os.environ["COMMIT"],
            "releasedAt": os.environ["RELEASED_AT"], "notes": notes, "files": files}
 try:
