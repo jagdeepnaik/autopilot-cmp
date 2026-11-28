@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-11-28
+
 - New app icon on every platform (macOS, Windows, Linux, Android and the in-app mark), drawn from one source, `desktopApp/app-icons/AutoPilot.svg`. Android 8 and later get an adaptive icon that follows the launcher's shape, and Android 13 and later can show it as a themed icon.
 
 ## [1.7.1] - 2026-11-28
