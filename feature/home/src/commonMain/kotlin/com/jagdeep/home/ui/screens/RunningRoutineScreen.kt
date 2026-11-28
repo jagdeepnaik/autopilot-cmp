@@ -150,7 +150,7 @@ fun RunningRoutineScreen(viewModel: HomeViewModel, onBack: () -> Unit) {
                     Icon(Icons.Default.Stop,null,Modifier.size(18.dp)); Text("Stop",Modifier.padding(start=8.dp))
                 }
                 Column(Modifier.weight(1f)) {
-                    Text("${state.toggleHotKey.name} also stops the routine",style=MaterialTheme.typography.bodyMedium)
+                    Text(if (state.floatingControls) "The floating Stop button also stops the routine" else "${state.toggleHotKey.name} also stops the routine",style=MaterialTheme.typography.bodyMedium)
                     Text("Back keeps it running.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

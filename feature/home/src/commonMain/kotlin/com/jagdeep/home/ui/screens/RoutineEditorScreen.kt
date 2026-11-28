@@ -276,7 +276,7 @@ private fun ClickSections(state: RoutineEditorUiState, viewModel: RoutineEditorV
     val update = viewModel::updateDraft
     Group("What to click with")
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        ButtonChoice(draft.button) { button -> update { it.copy(button = button) } }
+        ButtonChoice(draft.button, state.floatingControls) { button -> update { it.copy(button = button) } }
     }
     DoubleClickRow(draft, update)
 
@@ -357,6 +357,7 @@ private fun StepsEditor(
             firstStepWait = firstStepWait,
             firstStepHint = firstStepHint,
             allowText = allowText,
+            floatingControls = state.floatingControls,
             onToggle = { openStep = if (openStep == index) null else index },
             onChange = { viewModel.updatePoint(index, it) },
             onMove = { by ->
@@ -374,7 +375,7 @@ private fun StepsEditor(
         errors.points?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         val capture = state.capture
         if (capture != null) {
-            CaptureStatus(capture, state.captureHotKey, single = capture.replacing != null, onDone = viewModel::finishCapture)
+            CaptureStatus(capture, state.captureHotKey, single = capture.replacing != null, floatingControls = state.floatingControls, onDone = viewModel::finishCapture)
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilledTonalButton(onClick = { viewModel.startCapture() }) {
@@ -403,6 +404,7 @@ private fun StepRow(
     firstStepHint: String,
     /** Scroll and click: a step may click a button by its text instead of a spot. */
     allowText: Boolean,
+    floatingControls: Boolean,
     onToggle: () -> Unit,
     onChange: (PointDraft) -> Unit,
     onMove: (Int) -> Unit,
@@ -418,7 +420,7 @@ private fun StepRow(
     val action = if (allowText && step.byText) {
         if (step.text.isBlank()) "Button text not set" else "Clicks \"${step.text.trim()}\""
     } else {
-        "${step.button.name} click at $where"
+        if (floatingControls) "${step.button.label(true)} at $where" else "${step.button.name} click at $where"
     }
     ListItem(
         modifier = Modifier.clickable(onClickLabel = if (isOpen) "Close $title" else "Edit $title", onClick = onToggle),
@@ -485,7 +487,7 @@ private fun StepRow(
                     NumberField("X", step.x, null, onChange = { onChange(step.copy(x = it)) }, modifier = Modifier.weight(1f))
                     NumberField("Y", step.y, null, onChange = { onChange(step.copy(y = it)) }, modifier = Modifier.weight(1f))
                 }
-                ButtonChoice(step.button) { onChange(step.copy(button = it)) }
+                ButtonChoice(step.button, floatingControls) { onChange(step.copy(button = it)) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (!(allowText && step.byText)) {
@@ -543,14 +545,16 @@ private fun RepeatEditor(draft: RoutineDraft, error: String?, update: ((RoutineD
 }
 
 @Composable
-private fun ButtonChoice(selected: PointerButton, onSelect: (PointerButton) -> Unit) {
+private fun ButtonChoice(selected: PointerButton, floatingControls: Boolean, onSelect: (PointerButton) -> Unit) {
+    // A touch screen has a tap and a long press: the left and right buttons.
+    val buttons = if (floatingControls) listOf(PointerButton.Left, PointerButton.Right) else PointerButton.entries
     SingleChoiceSegmentedButtonRow(Modifier.widthIn(max = 420.dp).fillMaxWidth()) {
-        PointerButton.entries.forEachIndexed { index, button ->
+        buttons.forEachIndexed { index, button ->
             SegmentedButton(
                 selected = selected == button,
                 onClick = { onSelect(button) },
-                shape = SegmentedButtonDefaults.itemShape(index, PointerButton.entries.size),
-                label = { Text(button.name) },
+                shape = SegmentedButtonDefaults.itemShape(index, buttons.size),
+                label = { Text(button.label(floatingControls)) },
             )
         }
     }
@@ -642,7 +646,26 @@ private fun SpeedSlider(value: Int, onChange: (Int) -> Unit) {
 }
 
 @Composable
-private fun CaptureStatus(capture: PointCapture, hotKey: HotKey, single: Boolean, onDone: () -> Unit) {
+private fun CaptureStatus(capture: PointCapture, hotKey: HotKey, single: Boolean, floatingControls: Boolean, onDone: () -> Unit) {
+    if (floatingControls) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                if (single) {
+                    "Drag the floating target over the spot with its handle, then tap Pick."
+                } else {
+                    "Go to the other app, drag the floating target over each spot in turn with its handle, and tap Pick for each. They're added as steps."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                capture.pointer?.let { "Target is at ${it.x}, ${it.y}." } ?: "Turn on AutoPilot under Settings → Accessibility to show the target.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = onDone) { Text(if (capture.added == 0) "Stop picking" else "Done (${capture.added} added)") }
+        }
+        return
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             if (single) {
@@ -806,3 +829,10 @@ private fun Group(title: String) {
 
 @Composable
 private fun transparent() = ListItemDefaults.colors(containerColor = Color.Transparent)
+
+/** The button's name, or the touch press it stands for where floating controls are used. */
+private fun PointerButton.label(floatingControls: Boolean): String = when {
+    !floatingControls -> name
+    this == PointerButton.Right -> "Long press"
+    else -> "Tap"
+}

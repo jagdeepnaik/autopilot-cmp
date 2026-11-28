@@ -1,5 +1,6 @@
 package com.jagdeep.home.domain
 
+import com.jagdeep.automation.ControlPress
 import com.jagdeep.automation.DesktopAutomation
 import com.jagdeep.automation.InputAccess
 import com.jagdeep.automation.ScreenPoint
@@ -96,7 +97,20 @@ class ClickController(
                 }
             }
         }
+        // Where there are no hot keys (Android), floating buttons do the same two jobs.
+        scope.launch {
+            automation.hotKeys.controls.collect { press ->
+                live.log(LiveSource.Keys) { "${press.name} control pressed" }
+                when (press) {
+                    ControlPress.Toggle -> toggle()
+                    ControlPress.Capture -> if (state.value == RunState.Idle) automation.pointer.position()?.let(mutableCaptures::tryEmit)
+                }
+            }
+        }
     }
+
+    /** True where floating on-screen controls replace the hot keys and the mouse pointer. */
+    val usesFloatingControls: Boolean get() = automation.usesFloatingControls
 
     fun access(): InputAccess = automation.access.access()
 

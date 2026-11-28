@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">AutoPilot</string>
+    <string name="accessibility_service_label">AutoPilot taps</string>
+    <string name="accessibility_service_summary">Taps where you set it, in any app, while a routine runs.</string>
+    <string name="accessibility_service_description">AutoPilot uses this to tap the spots you set in other apps while a routine runs, and to see which app is in front so a routine can pause in the wrong app. It doesn\'t read what\'s on the screen or anything you type, and nothing leaves this device. Stop a routine any time with the floating Stop button.</string>
 </resources>

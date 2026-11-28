@@ -47,9 +47,21 @@ interface InputAccessGate {
     fun requestAccess(): Boolean
 }
 
+/** On-screen controls that stand in for the hot keys where there is no keyboard, such as on a phone. */
+enum class ControlPress {
+    /** Starts the selected routine, or stops whatever is running: the toggle hot key. */
+    Toggle,
+
+    /** Records the pointer's position: the capture hot key. */
+    Capture,
+}
+
 interface HotKeyMonitor {
     /** Emits once each time a key goes down, whichever app is in front. */
     val presses: Flow<HotKey>
+
+    /** Presses of on-screen controls that stand in for the keys; none where there are hot keys. */
+    val controls: Flow<ControlPress> get() = emptyFlow()
 }
 
 interface ForegroundApps {
@@ -75,6 +87,15 @@ interface DesktopAutomation {
 
     /** Stops the display sleeping while [awake], where the platform allows it. Safe to repeat. */
     fun setDisplayAwake(awake: Boolean) = Unit
+
+    /**
+     * True where the user starts, stops and picks spots with floating on-screen controls (Android)
+     * instead of hot keys and the mouse pointer (desktop).
+     */
+    val usesFloatingControls: Boolean get() = false
+
+    /** Tells floating controls whether a routine is active, so they offer Stop instead of Start. */
+    fun showRoutineActive(active: Boolean) = Unit
 
     fun close()
 }

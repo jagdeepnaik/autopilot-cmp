@@ -280,4 +280,25 @@ class HomeViewModelsTest {
         viewModel.removePoint(0)
         assertEquals(listOf(PointDraft("5", "6")), viewModel.state.value.draft.points)
     }
+
+    @Test
+    fun `given floating controls when the routines page and editor open then both use touch wording`() = test {
+        automation.floatingControls = true
+        val repository = FakeRoutineRepository(RoutineLibrary(listOf(first), "a"))
+        val home = HomeViewModel(controller(repository), repository)
+        val editor = RoutineEditorViewModel("a", controller(repository), repository, newId = { "new-id" })
+        runCurrent()
+        assertTrue(home.state.value.floatingControls)
+        assertTrue(editor.state.value.floatingControls)
+    }
+
+    @Test
+    fun `given hot keys when the routines page and editor open then neither uses touch wording`() = test {
+        val repository = FakeRoutineRepository(RoutineLibrary(listOf(first), "a"))
+        val home = HomeViewModel(controller(repository), repository)
+        val editor = RoutineEditorViewModel("a", controller(repository), repository, newId = { "new-id" })
+        runCurrent()
+        assertFalse(home.state.value.floatingControls)
+        assertFalse(editor.state.value.floatingControls)
+    }
 }

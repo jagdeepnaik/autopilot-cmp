@@ -125,6 +125,9 @@ internal fun RunPanel(
         }
         chromeProblem != null -> chromeProblem
         access == InputAccess.Unsupported -> "Clicking in other apps works on Mac and Windows."
+        access == InputAccess.NeedsPermission && state.floatingControls ->
+            "Android only lets an app tap in other apps after you turn it on under Settings → Accessibility → AutoPilot. " +
+                "If the switch is greyed out, open App info for AutoPilot, choose ⋮ → Allow restricted settings, then try again."
         access == InputAccess.NeedsPermission -> "macOS only lets an app click in other apps after you turn it on under Privacy & Security → Accessibility."
         state.selected == null -> "Create a routine to get started."
         else -> state.lastRun?.let(::lastRunLabel) ?: state.selected.name
@@ -212,6 +215,8 @@ internal fun RunPanel(
             if (access == InputAccess.Granted && showStopControl) {
                 Text(
                     when {
+                        state.floatingControls && isActive -> "The floating Stop button stops it from any app"
+                        state.floatingControls -> "Or use the floating Start button from any app"
                         isActive -> "Press ${state.toggleHotKey.name} in any app to stop"
                         else -> "Press ${state.toggleHotKey.name} in any app to start or stop"
                     },

@@ -1,5 +1,6 @@
 package com.jagdeep.home.domain
 
+import com.jagdeep.automation.ControlPress
 import com.jagdeep.automation.DesktopAutomation
 import com.jagdeep.automation.ForegroundApps
 import com.jagdeep.automation.HotKey
@@ -32,6 +33,9 @@ internal class FakeAutomation(
     var appList = listOf("Google Chrome", "Finder")
     var accessRequests = 0
     val keyPresses = MutableSharedFlow<HotKey>(extraBufferCapacity = 8)
+    val controlPresses = MutableSharedFlow<ControlPress>(extraBufferCapacity = 8)
+    var floatingControls = false
+    override val usesFloatingControls: Boolean get() = floatingControls
 
     override val pointer = object : PointerDevice {
         override fun position() = this@FakeAutomation.position
@@ -56,6 +60,7 @@ internal class FakeAutomation(
     }
     override val hotKeys = object : HotKeyMonitor {
         override val presses: Flow<HotKey> = keyPresses
+        override val controls: Flow<ControlPress> = controlPresses
     }
     override val apps = object : ForegroundApps {
         override fun frontmost() = front

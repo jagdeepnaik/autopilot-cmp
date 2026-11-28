@@ -52,6 +52,8 @@ import com.jagdeep.home.domain.HomeViewModel
 import com.jagdeep.home.domain.Routine
 import com.jagdeep.home.domain.RoutineKind
 import com.jagdeep.home.ui.components.RunPanel
+import com.jagdeep.home.ui.util.availableKinds
+import com.jagdeep.home.ui.util.descriptionFor
 import com.jagdeep.home.ui.util.icon
 import com.jagdeep.home.ui.util.routineSummary
 import com.jagdeep.ui.components.AppBarTop
@@ -75,6 +77,7 @@ fun HomeScreen(
     var choosingKind by remember { mutableStateOf(false) }
     if (choosingKind) {
         KindChooser(
+            floatingControls = state.floatingControls,
             onChoose = { kind ->
                 choosingKind = false
                 onNewRoutine(kind)
@@ -202,19 +205,19 @@ private fun EmptyRoutines(onNewRoutine: () -> Unit) {
 }
 
 @Composable
-private fun KindChooser(onChoose: (RoutineKind) -> Unit, onDismiss: () -> Unit) {
+private fun KindChooser(floatingControls: Boolean, onChoose: (RoutineKind) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("New routine") },
         text = {
             Column {
-                RoutineKind.entries.forEach { kind ->
+                availableKinds(floatingControls).forEach { kind ->
                     ListItem(
                         modifier = Modifier.selectable(selected = false, role = Role.Button) { onChoose(kind) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         leadingContent = { Icon(kind.icon(), contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         headlineContent = { Text(kind.label) },
-                        supportingContent = { Text(kind.description) },
+                        supportingContent = { Text(kind.descriptionFor(floatingControls)) },
                     )
                 }
             }

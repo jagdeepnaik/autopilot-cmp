@@ -6,6 +6,7 @@ import com.jagdeep.home.domain.ClickTarget
 import com.jagdeep.home.domain.CourseAutomationRoutine
 import com.jagdeep.home.domain.PauseReason
 import com.jagdeep.home.domain.Routine
+import com.jagdeep.home.domain.RoutineKind
 import com.jagdeep.home.domain.ScrollClickPhase
 import com.jagdeep.home.domain.ScrollClickProgress
 import com.jagdeep.home.domain.ScrollClickRoutine
@@ -90,4 +91,19 @@ private fun PointerButton.label() = when (this) {
     PointerButton.Left -> "Left"
     PointerButton.Right -> "Right"
     PointerButton.Middle -> "Middle"
+}
+
+/**
+ * The kinds of routine this device can run. With floating controls (Android) only the tapping
+ * routines are offered: the Chrome routines need the desktop browser extension.
+ */
+internal fun availableKinds(floatingControls: Boolean): List<RoutineKind> =
+    if (floatingControls) listOf(RoutineKind.Click, RoutineKind.Sequence) else RoutineKind.entries
+
+/** The kind's description, worded for taps on a touch screen where floating controls are used. */
+internal fun RoutineKind.descriptionFor(floatingControls: Boolean): String = when {
+    !floatingControls -> description
+    this == RoutineKind.Click -> "Taps wherever the floating target is, in any app, at a set interval."
+    this == RoutineKind.Sequence -> "Taps a list of spots in order. Each has its own wait and press, and the list can run once or repeat."
+    else -> description
 }

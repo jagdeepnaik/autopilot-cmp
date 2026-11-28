@@ -1,6 +1,7 @@
 package com.jagdeep.autopilot.platform
 
 import android.content.Context
+import com.jagdeep.automation.AndroidAutomation
 import com.jagdeep.logger.Log
 import com.jagdeep.logger.initLoggerAndroid
 
@@ -15,6 +16,7 @@ object AndroidPlatform {
     fun init(applicationContext: Context) {
         context = applicationContext
         initLoggerAndroid(applicationContext)
+        AndroidAutomation.init(applicationContext, AppAccessibilityService::class.java)
         Log.print("-------------> Android App Start <-------------", "Android App")
     }
 }

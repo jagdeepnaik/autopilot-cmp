@@ -27,6 +27,8 @@ data class HomeUiState(
     val routinePendingDeletion: Routine? = null,
     /** Whether routines can be exported to and imported from files here. */
     val canUseFiles: Boolean = true,
+    /** True on Android: floating Start/Stop and Pick buttons replace the hot keys and the pointer. */
+    val floatingControls: Boolean = false,
 ) {
     /** True while any routine runs, of any kind. */
     val isActive: Boolean get() = run != RunState.Idle || page.activity != null
@@ -41,7 +43,7 @@ class HomeViewModel(
     private val files: RoutineFiles = NoRoutineFiles,
     private val newId: () -> String = { "" },
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(HomeUiState(access = controller.access(), canUseFiles = files.isAvailable))
+    private val mutableState = MutableStateFlow(HomeUiState(access = controller.access(), canUseFiles = files.isAvailable, floatingControls = controller.usesFloatingControls))
     val state = mutableState.asStateFlow()
     private val mutableMessages = Channel<String>(Channel.BUFFERED)
 

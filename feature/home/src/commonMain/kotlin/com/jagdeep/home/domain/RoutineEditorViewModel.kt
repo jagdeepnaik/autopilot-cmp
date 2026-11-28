@@ -29,6 +29,8 @@ data class RoutineEditorUiState(
     val capture: PointCapture? = null,
     val captureHotKey: HotKey = HotKey.F7,
     val runningApps: List<String> = emptyList(),
+    /** True on Android: spots are picked with the floating target and its Pick button. */
+    val floatingControls: Boolean = false,
     val isSaved: Boolean = false,
     val progressAccounts: List<com.jagdeep.persistence.room.learning.LearningAccount> = emptyList(),
     val savedProgress: CourseProgressSummary? = null,
@@ -49,7 +51,7 @@ class RoutineEditorViewModel(
     private val newKind: RoutineKind = RoutineKind.Click,
     private val answerBanks: com.jagdeep.shared.answers.AnswerBankFiles = com.jagdeep.shared.answers.NoAnswerBankFiles,
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(RoutineEditorUiState(isNew = routineId == null))
+    private val mutableState = MutableStateFlow(RoutineEditorUiState(isNew = routineId == null, floatingControls = controller.usesFloatingControls))
     val state = mutableState.asStateFlow()
     private var captureJob: Job? = null
 

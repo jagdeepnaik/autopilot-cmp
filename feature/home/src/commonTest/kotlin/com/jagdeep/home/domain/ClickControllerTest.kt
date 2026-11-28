@@ -1,5 +1,6 @@
 package com.jagdeep.home.domain
 
+import com.jagdeep.automation.ControlPress
 import com.jagdeep.automation.HotKey
 import com.jagdeep.automation.InputAccess
 import com.jagdeep.automation.ScreenPoint
@@ -290,5 +291,43 @@ class ClickControllerTest {
         runCurrent()
         assertEquals(1, captured.size)
         controller.stop()
+    }
+
+    @Test
+    fun `given floating controls when Start then Stop is tapped then the selected routine starts then stops`() = runTest {
+        val controller = controller()
+        automation.controlPresses.emit(ControlPress.Toggle)
+        runCurrent()
+        assertIs<RunState.CountingDown>(controller.state.value)
+
+        automation.controlPresses.emit(ControlPress.Toggle)
+        runCurrent()
+        assertEquals(RunState.Idle, controller.state.value)
+    }
+
+    @Test
+    fun `given floating controls when Pick is tapped while idle then the target is recorded and during a run it isn't`() = runTest {
+        val controller = controller()
+        val captured = mutableListOf<ScreenPoint>()
+        backgroundScope.launch { controller.captures.collect { captured += it } }
+        runCurrent()
+        automation.position = ScreenPoint(120, 640)
+        automation.controlPresses.emit(ControlPress.Capture)
+        runCurrent()
+        assertEquals(listOf(ScreenPoint(120, 640)), captured)
+
+        controller.start(routine)
+        runCurrent()
+        automation.controlPresses.emit(ControlPress.Capture)
+        runCurrent()
+        assertEquals(1, captured.size)
+        controller.stop()
+    }
+
+    @Test
+    fun `given the platform uses floating controls when asked then the controller reports it`() = runTest {
+        assertFalse(controller().usesFloatingControls)
+        automation.floatingControls = true
+        assertTrue(controller().usesFloatingControls)
     }
 }
