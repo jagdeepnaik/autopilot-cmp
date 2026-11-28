@@ -99,6 +99,7 @@ Signed-in accounts only (website cookie or app token).
 | --- | --- |
 | `GET /api/downloads/autopilot` | `{ "latest": Release, "previous": [Release] }` (up to 2 previous releases) or `404` before the first release |
 | `GET /api/downloads/autopilot/files/:version/:fileName` | The file, `Content-Disposition: attachment` |
+| `DELETE /api/admin/downloads/autopilot/:version` | Admin only. `200 { "deletion": { "version": "1.1.0", "requestedAt": "…", "doneAt": null } }`; `404` when the manifest does not list the version; `409` when it is the only release left. Asking again answers the same record |
 
 **Update check** (public, no sign-in, so a signed-out app can still learn about updates):
 
@@ -111,6 +112,12 @@ Signed-in accounts only (website cookie or app token).
 - The app compares the server's `build` with its own build number (the commit count): if the server's is higher it
   shows "Update available: <version> (<build>)" with an **Install** button that opens `downloadUrl`. If the call fails,
   answers `404` or has no build number, it shows nothing.
+- **Deleting a release** (admin, to free the server's disk; owner decision, 29 November 2026): Cosmos records it and
+  from that moment leaves the version out of every answer above, the update check included. When the latest is
+  deleted, the newest remaining release becomes `latest`, and a deleted release's files answer `404`. The response
+  shapes do not change. Within a minute the server's prune job removes the version from `manifest.json` and deletes its
+  folder. The last remaining release cannot be deleted. A deleted version number stays hidden for good, so a release is
+  never republished under it.
 
 `Release`:
 
@@ -141,7 +148,8 @@ Signed-in accounts only (website cookie or app token).
 
 - **Where files live on the server:** `/srv/sites/cosmos/downloads/autopilot/<version>/` with one `manifest.json`
   at `/srv/sites/cosmos/downloads/autopilot/manifest.json` (the shape of the `GET` response above). The app
-  container mounts `/srv/sites/cosmos/downloads` read-only; Cosmos never writes there.
+  container mounts `/srv/sites/cosmos/downloads` read-only; the Cosmos app never writes there (only the host prune job
+  below does, for releases the admin deleted).
 - **Who builds what:** the Mac builds the DMG and the Android APK; **Legion** builds the Windows MSI (never the home
   server, which only serves); a Linux VM (on Legion or the Mac, not the home server) builds the DEB. Every build comes
   from the pushed release commit.
@@ -149,3 +157,8 @@ Signed-in accounts only (website cookie or app token).
   fetches every installer, checks each SHA-256, copies the new version folder to the server over SSH, then replaces
   `manifest.json` atomically (write a temporary file, then rename). It keeps the three newest version folders and
   deletes older ones. A platform that fails to build is reported and left out; the rest are still published.
+- **Lock:** while it replaces `manifest.json` and deletes old version folders, `./dev publish` holds
+  `flock -w 60 /srv/sites/cosmos/downloads/autopilot/.publish.lock` on the server. Cosmos's prune job
+  (`scripts/server/downloads-prune.sh`, a systemd timer on the host, not the app container) takes the same lock to
+  remove deleted releases, and on every run it removes every deleted version again, so a publish that read the
+  manifest before a deletion and writes it back is corrected within a minute; Cosmos hides the version meanwhile.
