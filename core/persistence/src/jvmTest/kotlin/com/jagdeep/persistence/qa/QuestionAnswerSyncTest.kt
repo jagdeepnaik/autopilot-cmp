@@ -56,7 +56,7 @@ class QuestionAnswerSyncTest {
             // The rebuilt table accepts the new source.
             db.sql("INSERT INTO qa_answers(question_id,answer_text,answer_key,source) VALUES(1,'A','a','compass')")
         }
-        val backup = File(root, "smy.db.before-v2.bak")
+        val backup = File(root, "smy.db.before-v${QuestionAnswerSchema.VERSION}.bak")
         assertTrue(backup.isFile)
         BundledSQLiteDriver().open(backup.absolutePath).use { db -> assertEquals(3L, db.long("SELECT count(*) FROM qa_answers")) }
     }
@@ -171,9 +171,135 @@ class QuestionAnswerSyncTest {
         assertNull(store.syncValue("missing"))
     }
 
+    @Test fun given_a_version_2_user_file_when_opened_then_it_is_upgraded_to_the_current_version_with_a_backup_and_no_data_lost() = runBlocking {
+        val bundle = oldSchemaFile("bundle.db")
+        val installed = File(root, "smy.db")
+        bundle.copyTo(installed)
+        // A file exactly as version 2 left it, with a remote answer and a sync cursor of its own.
+        BundledSQLiteDriver().open(installed.absolutePath).use { db ->
+            QuestionAnswerSchema.upgrade(db, installed, backup = false)
+            db.sql("DROP TABLE qa_authoritative"); db.sql("PRAGMA user_version = 2")
+            db.sql("INSERT INTO qa_questions(id,bank_name,module,question_text,question_key,compass_entry_id,compass_revision,compass_created) VALUES(3,'bank.json','Module','Remote?','${keyOf("Remote?", listOf("Red", "Blue"))}','e1',7,1)")
+            db.sql("INSERT INTO qa_options VALUES(3,1,'Red'), (3,2,'Blue')")
+            db.sql("INSERT INTO qa_answers(question_id,answer_text,answer_key,source,compass_revision) VALUES(3,'Blue','blue','compass',7)")
+            db.sql("INSERT INTO sync_state VALUES('revision','7')")
+        }
+        val entries = store(installed, bundle).entries("bank.json")!!
+        assertEquals(listOf("Blue"), entries.single { it.question == "Remote?" }.answers)
+        assertEquals("7", store(installed, bundle).syncValue("revision"))
+        BundledSQLiteDriver().open(installed.absolutePath).use { db ->
+            assertEquals(3, QuestionAnswerSchema.version(db))
+            assertEquals(3L, db.long("SELECT count(*) FROM qa_answers"))
+            assertEquals(0L, db.long("SELECT count(*) FROM qa_authoritative"))
+        }
+        val backup = File(root, "smy.db.before-v3.bak")
+        assertTrue(backup.isFile)
+        BundledSQLiteDriver().open(backup.absolutePath).use { db ->
+            assertEquals(2, QuestionAnswerSchema.version(db))
+            assertEquals(3L, db.long("SELECT count(*) FROM qa_answers"))
+        }
+    }
+
+    @Test fun given_bundled_learned_and_remote_answers_when_an_authoritative_entry_is_applied_then_its_answers_replace_them_all() = runBlocking {
+        val store = store(File(root, "smy.db"), oldSchemaFile("bundle.db"))
+        // A confirmed learned answer waiting to be uploaded, and an earlier remote answer.
+        store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Mine?", listOf("Up", "Down"), "Up")), reviewed = true, confirmed = true)
+        store.applyRemote(listOf(remote("e4", "Remote?", listOf("Red", "Blue"), listOf("Blue"), 5)), "revision", 5)
+        assertEquals(1, store.pendingUploadCount())
+        val result = store.applyRemote(listOf(
+            remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true),
+            remote("e2", "Learned?", listOf("Yes", "No"), listOf("Yes"), 11, authoritative = true),
+            remote("e3", "Mine?", listOf("Up", "Down"), listOf("Down"), 12, authoritative = true),
+            remote("e4", "Remote?", listOf("Red", "Blue"), listOf("Red"), 13, authoritative = true),
+        ), "revision", 13)!!
+        assertEquals(RemoteApplyResult(updated = 4), result)
+        val entries = store.entries("bank.json")!!.associateBy { it.question }
+        assertEquals(listOf("A"), entries.getValue("Bundled?").answers)
+        assertEquals(listOf("Yes"), entries.getValue("Learned?").answers)
+        assertEquals(listOf("Down"), entries.getValue("Mine?").answers)
+        assertEquals(listOf("Red"), entries.getValue("Remote?").answers)
+        assertTrue(entries.values.all { it.source == "compass" })
+        // The learned answer the correction replaced is never uploaded.
+        assertEquals(0, store.pendingUploadCount())
+        assertTrue(store.pendingUploads(100)!!.isEmpty())
+    }
+
+    @Test fun given_a_corrected_question_when_the_bundle_changes_or_the_app_starts_again_then_the_correction_is_kept() = runBlocking {
+        var bundle = oldSchemaFile("bundle.db")
+        val installed = File(root, "smy.db")
+        val store = SqliteQuestionAnswerStore(installed) { bundle.inputStream() }
+        store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10)
+        bundle = changedBundle(bundle)
+        assertEquals(listOf("A"), store.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
+        // A new start: a fresh store on the same file, and the legacy import's automatic save of the old answer.
+        val restarted = SqliteQuestionAnswerStore(installed) { bundle.inputStream() }
+        assertEquals(QuestionAnswerWriteResult.Saved,
+            restarted.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Bundled?", listOf("A", "B"), "B", previousAnswer = "A")), reviewed = true))
+        assertEquals(listOf("A"), restarted.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
+        assertEquals(0, restarted.pendingUploadCount())
+    }
+
+    @Test fun given_a_corrected_question_when_a_later_entry_without_the_flag_arrives_then_it_stays_authoritative() = runBlocking {
+        var bundle = oldSchemaFile("bundle.db")
+        val store = SqliteQuestionAnswerStore(File(root, "smy.db")) { bundle.inputStream() }
+        store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10)
+        // A user's own learned answer after the correction still gives way to the next remote revision.
+        store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Bundled?", listOf("A", "B"), "B", previousAnswer = "A")), reviewed = true, confirmed = true)
+        assertEquals(RemoteApplyResult(updated = 1), store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 20)), "revision", 20))
+        assertEquals(listOf("A"), store.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
+        bundle = changedBundle(bundle)
+        val entry = store.entries("bank.json")!!.single { it.question == "Bundled?" }
+        assertEquals(listOf("A"), entry.answers)
+        assertEquals("compass", entry.source)
+    }
+
+    @Test fun given_a_corrected_question_when_the_user_confirms_a_different_answer_then_it_is_kept_locally_and_not_uploaded() = runBlocking {
+        val store = store(File(root, "smy.db"), oldSchemaFile("bundle.db"))
+        store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10)
+        assertEquals(QuestionAnswerWriteResult.Saved,
+            store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Bundled?", listOf("A", "B"), "B", previousAnswer = "A")), reviewed = true, confirmed = true))
+        assertEquals(listOf("B"), store.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
+        // It disagrees with the admin's correction: marked superseded, never submitted again.
+        assertEquals(0, store.pendingUploadCount())
+        assertTrue(store.pendingUploads(100)!!.isEmpty())
+    }
+
+    @Test fun given_a_retired_authoritative_entry_when_applied_then_the_question_is_left_without_its_old_bundled_answer() = runBlocking {
+        var bundle = oldSchemaFile("bundle.db")
+        val store = SqliteQuestionAnswerStore(File(root, "smy.db")) { bundle.inputStream() }
+        store.applyRemote(listOf(
+            remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true),
+            remote("e2", "New?", listOf("P", "Q"), listOf("Q"), 11, authoritative = true),
+        ), "revision", 11)
+        val result = store.applyRemote(listOf(
+            remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 20, retired = true, authoritative = true),
+            remote("e2", "New?", listOf("P", "Q"), listOf("Q"), 21, retired = true, authoritative = true),
+        ), "revision", 21)!!
+        assertEquals(2, result.removed)
+        assertEquals(emptyList(), store.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
+        assertTrue(store.entries("bank.json")!!.none { it.question == "New?" })
+        // A later bundle that carries both questions brings back neither answer.
+        bundle = changedBundle(bundle) { db ->
+            db.sql("INSERT INTO qa_questions VALUES(9,'bank.json','Module','New?','${keyOf("New?", listOf("P", "Q"))}')")
+            db.sql("INSERT INTO qa_options VALUES(9,1,'P'), (9,2,'Q')")
+            db.sql("INSERT INTO qa_answers VALUES(9,'P','p','source',NULL,NULL)")
+        }
+        val entries = store.entries("bank.json")!!
+        assertEquals(emptyList(), entries.single { it.question == "Bundled?" }.answers)
+        assertTrue(entries.none { it.question == "New?" })
+        assertEquals(listOf("No"), entries.single { it.question == "Learned?" }.answers)
+    }
+
+    /** A copy of [bundle] with different contents, so the next open merges it again. */
+    private fun changedBundle(bundle: File, change: (SQLiteConnection) -> Unit = {}): File =
+        File(root, "bundle-${System.nanoTime()}.db").also { updated ->
+            bundle.copyTo(updated)
+            BundledSQLiteDriver().open(updated.absolutePath).use { db -> db.sql("INSERT OR REPLACE INTO metadata VALUES('build','${updated.name}')"); change(db) }
+        }
+
     /** A remote entry carrying this file's own keys, as the remote service returns them. */
-    private fun remote(id: String, question: String, options: List<String>, answers: List<String>, revision: Long, retired: Boolean = false, bank: String = "bank.json") =
-        RemoteQuestionAnswer(id, bank, "Module", question, keyOf(question, options), options, answers.map { KeyedAnswer(it, QuestionAnswerText.normalize(it)) }, revision, retired)
+    private fun remote(id: String, question: String, options: List<String>, answers: List<String>, revision: Long, retired: Boolean = false, bank: String = "bank.json", authoritative: Boolean = false) =
+        RemoteQuestionAnswer(id, bank, "Module", question, keyOf(question, options), options, answers.map { KeyedAnswer(it, QuestionAnswerText.normalize(it)) }, revision, retired, authoritative)
 
     private fun keyOf(question: String, options: List<String>): String {
         val payload = QuestionAnswerText.normalize(question) + "\u001f" + options.map(QuestionAnswerText::normalizedOption).sorted().joinToString("\u001e")

@@ -42,11 +42,25 @@ class SqliteCosmosQaStoreTest {
 
     private val options = listOf("Two", "Three")
 
-    private fun entry(id: String, revision: Long, answer: String = "Three", status: String = "approved", bankName: String = DEFAULT_ANSWER_BANK_FILE) = CosmosEntry(
+    private fun entry(id: String, revision: Long, answer: String = "Three", status: String = "approved", bankName: String = DEFAULT_ANSWER_BANK_FILE, authoritative: Boolean = false) = CosmosEntry(
         id, "smy", bankName, "Module 3", "What is the minimum?", QuestionAnswerText.questionKey("What is the minimum?", options),
         listOf(CosmosOption(2, "Three"), CosmosOption(1, "Two")),
-        listOf(CosmosAnswer(answer, QuestionAnswerText.answerKey(answer))), "bundled", status, revision,
+        listOf(CosmosAnswer(answer, QuestionAnswerText.answerKey(answer))), "bundled", status, revision, authoritative = authoritative,
     )
+
+    @Test fun given_a_confirmed_learned_answer_when_an_authoritative_entry_disagrees_then_the_correction_is_used_and_nothing_is_uploaded() = runBlocking {
+        val banks = banks()
+        val store = SqliteCosmosQaStore(banks)
+        val bank = banks.forName(DEFAULT_ANSWER_BANK_FILE)
+        bank.saveConfirmed("Module 3", listOf(ReviewedAnswer(CourseAnswer("What is the minimum?", options, "Two"), null)))
+        assertEquals(1, store.pendingCount())
+        // Without the flag, the learned answer wins.
+        assertTrue(store.apply("smy", listOf(entry("e1", 7)), 7))
+        assertEquals("Two", bank.load()!!.module("Module 3")!!.single().answer)
+        assertTrue(store.apply("smy", listOf(entry("e1", 8, authoritative = true)), 8))
+        assertEquals("Three", bank.load()!!.module("Module 3")!!.single().answer)
+        assertEquals(0, store.pendingCount())
+    }
 
     @Test fun given_downloaded_entries_when_a_routine_loads_its_bank_then_the_approved_answer_is_an_exact_match() = runBlocking {
         val banks = banks()

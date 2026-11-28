@@ -271,9 +271,10 @@ def split_routine_databases(master_path: Path) -> list[Path]:
         if path.exists():
             path.unlink()
     databases = {name: sqlite3.connect(path) for name, path in outputs.items()}
-    # Routine file schema version 2 (PRAGMA user_version), the same schema the app's in-place upgrade
+    # Routine file schema version 3 (PRAGMA user_version), the same schema the app's in-place upgrade
     # (core:persistence QuestionAnswerSchema) gives older files: remote-sync bookkeeping columns, the
-    # 'compass' answer source and the sync_state table. Bundled rows leave the new columns empty. The
+    # 'compass' answer source, the sync_state table (version 2) and the qa_authoritative table of
+    # admin-corrected questions (version 3). Bundled rows leave the new columns and table empty. The
     # compass_* names and the 'compass' value are shipped storage identifiers (the Cosmos service's former
     # name), kept unchanged so existing user files keep working; changing them needs an approved migration.
     schema = """
@@ -300,7 +301,12 @@ def split_routine_databases(master_path: Path) -> list[Path]:
         );
         CREATE UNIQUE INDEX qa_answers_client_id ON qa_answers(client_id);
         CREATE TABLE sync_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-        PRAGMA user_version = 2;
+        CREATE TABLE qa_authoritative (
+          bank_name TEXT NOT NULL, module TEXT NOT NULL, question_key TEXT NOT NULL,
+          entry_id TEXT NOT NULL, revision INTEGER NOT NULL,
+          PRIMARY KEY(bank_name, module, question_key)
+        );
+        PRAGMA user_version = 3;
     """
     for database in databases.values():
         database.execute("PRAGMA foreign_keys = ON")

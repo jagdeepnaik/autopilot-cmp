@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Cosmos admin corrections win: an entry Cosmos marks `authoritative` replaces the bundled, learned and earlier Cosmos answers for its question, and app updates, legacy imports and later downloads never bring the old answer back. Routine Q&A files move to schema version 3 (in place, after a backup copy).
+
 ## [1.5.1] - 2026-11-28
 
 - Publishing builds the Linux DEB on the home server when Legion's Debian VM can't build or hand it over, so every release is hosted for all four platforms.

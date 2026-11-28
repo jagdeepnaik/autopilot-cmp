@@ -9,14 +9,20 @@ import java.io.File
  * Version 2 adds remote-sync bookkeeping: the `compass` answer source, the remote entry and revision
  * of a downloaded question, a stable `client_id`, submission state and user confirmation time
  * (`confirmed_at`) per learned answer, and a
- * `sync_state` table. SQLite can't change a CHECK constraint in place, so `qa_answers` is rebuilt
- * inside one transaction after a backup copy of the file is written next to it.
+ * `sync_state` table. SQLite can't change a CHECK constraint in place, so `qa_answers` is rebuilt.
+ *
+ * Version 3 adds `qa_authoritative`: the questions an admin corrected in the remote service. Their
+ * remote answers replace every local answer, and the record outlives the question row, so a later
+ * bundle merge or an automatic save never brings the old answer back.
+ *
+ * Every step from the file's version up to [VERSION] runs inside one transaction, after a backup copy
+ * of the file is written next to it.
  *
  * The `compass` source value and `compass_*` column names are shipped storage identifiers in users'
  * files; they keep their values for compatibility and change only through an approved migration.
  */
 internal object QuestionAnswerSchema {
-    const val VERSION = 2
+    const val VERSION = 3
 
     fun version(db: SQLiteConnection): Int = db.prepare("PRAGMA user_version").use { row -> if (row.step()) row.getLong(0).toInt() else 0 }
 
@@ -25,37 +31,43 @@ internal object QuestionAnswerSchema {
      * just copied from the bundle and holds no user data yet.
      */
     fun upgrade(db: SQLiteConnection, databaseFile: File, backup: Boolean) {
-        if (version(db) >= VERSION) return
+        val from = version(db)
+        if (from >= VERSION) return
         if (backup) backupCopy(db, databaseFile)
         db.exec("BEGIN IMMEDIATE")
         try {
-            val answersBefore = count(db, "qa_answers")
-            val questionColumns = columns(db, "qa_questions")
-            if ("compass_entry_id" !in questionColumns) db.exec("ALTER TABLE qa_questions ADD COLUMN compass_entry_id TEXT")
-            if ("compass_revision" !in questionColumns) db.exec("ALTER TABLE qa_questions ADD COLUMN compass_revision INTEGER")
-            if ("compass_created" !in questionColumns) db.exec("ALTER TABLE qa_questions ADD COLUMN compass_created INTEGER NOT NULL DEFAULT 0")
-            db.exec("CREATE INDEX IF NOT EXISTS qa_questions_compass_entry ON qa_questions(compass_entry_id)")
-            val answerColumns = columns(db, "qa_answers")
-            fun existing(name: String) = if (name in answerColumns) name else "NULL"
-            db.exec(ANSWERS_TABLE.replace("qa_answers", "qa_answers_v2"))
-            db.exec(
-                "INSERT INTO qa_answers_v2(question_id,answer_text,answer_key,source,learned_at,reviewed_at,compass_revision,client_id,submitted_at,submit_status,confirmed_at) " +
-                    "SELECT question_id,answer_text,answer_key," +
-                    "CASE WHEN source IN ('source','learned','compass') THEN source ELSE 'source' END," +
-                    "learned_at,reviewed_at,${existing("compass_revision")},${existing("client_id")},${existing("submitted_at")},${existing("submit_status")},${existing("confirmed_at")} FROM qa_answers",
-            )
-            check(count(db, "qa_answers_v2") == answersBefore) { "Answer count changed during upgrade" }
-            db.exec("DROP TABLE qa_answers")
-            db.exec("ALTER TABLE qa_answers_v2 RENAME TO qa_answers")
-            db.exec("CREATE UNIQUE INDEX IF NOT EXISTS qa_answers_client_id ON qa_answers(client_id)")
-            db.exec(SYNC_STATE_TABLE)
-            db.exec("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            if (from < 2) upgradeToV2(db)
+            db.exec(AUTHORITATIVE_TABLE)
             db.exec("PRAGMA user_version = $VERSION")
             db.exec("COMMIT")
         } catch (error: Throwable) {
             runCatching { db.exec("ROLLBACK") }
             throw error
         }
+    }
+
+    private fun upgradeToV2(db: SQLiteConnection) {
+        val answersBefore = count(db, "qa_answers")
+        val questionColumns = columns(db, "qa_questions")
+        if ("compass_entry_id" !in questionColumns) db.exec("ALTER TABLE qa_questions ADD COLUMN compass_entry_id TEXT")
+        if ("compass_revision" !in questionColumns) db.exec("ALTER TABLE qa_questions ADD COLUMN compass_revision INTEGER")
+        if ("compass_created" !in questionColumns) db.exec("ALTER TABLE qa_questions ADD COLUMN compass_created INTEGER NOT NULL DEFAULT 0")
+        db.exec("CREATE INDEX IF NOT EXISTS qa_questions_compass_entry ON qa_questions(compass_entry_id)")
+        val answerColumns = columns(db, "qa_answers")
+        fun existing(name: String) = if (name in answerColumns) name else "NULL"
+        db.exec(ANSWERS_TABLE.replace("qa_answers", "qa_answers_v2"))
+        db.exec(
+            "INSERT INTO qa_answers_v2(question_id,answer_text,answer_key,source,learned_at,reviewed_at,compass_revision,client_id,submitted_at,submit_status,confirmed_at) " +
+                "SELECT question_id,answer_text,answer_key," +
+                "CASE WHEN source IN ('source','learned','compass') THEN source ELSE 'source' END," +
+                "learned_at,reviewed_at,${existing("compass_revision")},${existing("client_id")},${existing("submitted_at")},${existing("submit_status")},${existing("confirmed_at")} FROM qa_answers",
+        )
+        check(count(db, "qa_answers_v2") == answersBefore) { "Answer count changed during upgrade" }
+        db.exec("DROP TABLE qa_answers")
+        db.exec("ALTER TABLE qa_answers_v2 RENAME TO qa_answers")
+        db.exec("CREATE UNIQUE INDEX IF NOT EXISTS qa_answers_client_id ON qa_answers(client_id)")
+        db.exec(SYNC_STATE_TABLE)
+        db.exec("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
     }
 
     /** A consistent copy of the user's file; an existing backup is never overwritten. */
@@ -81,6 +93,15 @@ internal object QuestionAnswerSchema {
           learned_at INTEGER, reviewed_at INTEGER,
           compass_revision INTEGER, client_id TEXT, submitted_at INTEGER, submit_status TEXT, confirmed_at INTEGER,
           PRIMARY KEY(question_id, answer_key)
+        )
+    """.trimIndent()
+
+    /** One row per corrected question, keyed by the file's own identity (it survives the question row). */
+    private val AUTHORITATIVE_TABLE = """
+        CREATE TABLE IF NOT EXISTS qa_authoritative (
+          bank_name TEXT NOT NULL, module TEXT NOT NULL, question_key TEXT NOT NULL,
+          entry_id TEXT NOT NULL, revision INTEGER NOT NULL,
+          PRIMARY KEY(bank_name, module, question_key)
         )
     """.trimIndent()
 

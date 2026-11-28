@@ -38,6 +38,7 @@ class SqliteCosmosQaStore(
                 answers = entry.answers.map { KeyedAnswer(it.text, it.answerKey) },
                 revision = entry.revision,
                 retired = entry.retired,
+                authoritative = entry.authoritative,
             )
         }
         return files.routineStore(file(bank)).applyRemote(values, REVISION_KEY, nextAfter) != null

@@ -22,6 +22,7 @@ data class KeyedAnswer(val text: String, val answerKey: String)
 /**
  * One question received from a remote Q&A service, identified there by [entryId] and by this file's
  * own identity: [bankName], [module] and [questionKey] (`qa_questions.question_key`).
+ * [authoritative] marks an admin's correction: its answers replace every local answer.
  */
 data class RemoteQuestionAnswer(
     val entryId: String,
@@ -33,6 +34,7 @@ data class RemoteQuestionAnswer(
     val answers: List<KeyedAnswer>,
     val revision: Long,
     val retired: Boolean = false,
+    val authoritative: Boolean = false,
 )
 data class RemoteApplyResult(val added: Int = 0, val updated: Int = 0, val removed: Int = 0, val skipped: Int = 0)
 
@@ -125,6 +127,12 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
         val answerKey = normalize(value.answer)
         val existing = answersFor(db, id).map(::normalize).toSet()
         val previous = value.previousAnswer?.let(::normalize)
+        // An admin's correction stands: saving the same answer changes nothing, and an automatic save
+        // (a legacy import, quiz feedback, a reference) never replaces it. Only the user's own
+        // confirmation can, and that answer is kept on this computer instead of being uploaded again.
+        val corrected = isAuthoritative(db, bank, value.module, key) && existing.isNotEmpty()
+        if (corrected && (existing == setOf(answerKey) || !confirmed)) return
+        val superseded = corrected
         if (reviewed && ((previous != null && existing != setOf(previous)) || (previous == null && existing.isNotEmpty() && existing != setOf(answerKey)))) throw WriteConflict()
         if (!reviewed && existing.isNotEmpty() && existing != setOf(answerKey)) throw WriteConflict()
         // The same answer saved again keeps its upload identity, so it is never submitted twice.
@@ -135,7 +143,9 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
         db.prepare("DELETE FROM qa_answers WHERE question_id=?").use { row -> row.bindLong(1, id); row.step() }
         db.prepare("INSERT INTO qa_answers(question_id,answer_text,answer_key,source,learned_at,reviewed_at,client_id,submitted_at,submit_status,confirmed_at) VALUES (?,?,?,'learned',?,?,?,?,?,?)").use { row ->
             val now = System.currentTimeMillis(); row.bindLong(1, id); row.bindText(2, value.answer); row.bindText(3, answerKey); row.bindLong(4, now); if (reviewed) row.bindLong(5, now) else row.bindNull(5)
-            row.bindTextOrNull(6, kept?.get(0) as String?); row.bindLongOrNull(7, kept?.get(1) as Long?); row.bindTextOrNull(8, kept?.get(2) as String?)
+            row.bindTextOrNull(6, kept?.get(0) as String?)
+            if (superseded) { row.bindLong(7, now); row.bindText(8, SUPERSEDED) }
+            else { row.bindLongOrNull(7, kept?.get(1) as Long?); row.bindTextOrNull(8, kept?.get(2) as String?) }
             // Confirmation is kept when the same answer is saved again by an automatic path.
             row.bindLongOrNull(9, if (confirmed && reviewed) now else kept?.get(3) as Long?); row.step()
         }
@@ -173,7 +183,10 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
         }.getOrElse { false }
     }
 
-    /** Adds current bundled questions without discarding answers learned in the user's copy. */
+    /**
+     * Adds current bundled questions without discarding answers learned in the user's copy. A question an
+     * admin corrected is left exactly as the correction (or its retirement) left it.
+     */
     private fun mergeBundledSource(installed: SQLiteConnection, source: SQLiteConnection) {
         installed.prepare("BEGIN IMMEDIATE").use { it.step() }
         try {
@@ -184,6 +197,7 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
                     val module = questions.getText(2)
                     val question = questions.getText(3)
                     val key = questions.getText(4)
+                    if (isAuthoritative(installed, bank, module, key)) continue
                     val installedId = installed.prepare("SELECT id FROM qa_questions WHERE bank_name=? AND module=? AND question_key=?").use { row ->
                         row.bindText(1, bank); row.bindText(2, module); row.bindText(3, key)
                         if (row.step()) row.getLong(0) else null
@@ -230,8 +244,11 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
      * so the saved cursor never runs ahead of the saved data.
      *
      * - A new question is added with `source = 'compass'` answers.
-     * - A question that already has bundled or learned answers keeps them: local answers always win.
-     * - A retired entry removes only the answers (and questions) that came from the remote service.
+     * - A question that already has bundled or learned answers keeps them: local answers win.
+     * - An authoritative entry (an admin's correction) replaces every local answer of its question, and
+     *   the question stays authoritative: later entries for it, authoritative or not, are applied the same way.
+     * - A retired entry removes only the answers (and questions) that came from the remote service; a
+     *   corrected question then stays empty rather than getting its old answer back.
      */
     suspend fun applyRemote(entries: List<RemoteQuestionAnswer>, revisionKey: String, revision: Long): RemoteApplyResult? = write { db ->
         var result = RemoteApplyResult()
@@ -288,6 +305,8 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
             entry.questionKey == questionKey(entry.question, entry.options) &&
             entry.answers.isNotEmpty() && entry.answers.all { answer -> answer.answerKey.isNotBlank() && entry.options.any { normalize(optionText(it)) == normalize(optionText(answer.text)) } }
         val identity = listOf(entry.bankName, entry.module, entry.questionKey)
+        // Once corrected, a question is never downgraded by a later entry without the flag.
+        val authoritative = entry.authoritative || isAuthoritative(db, entry.bankName, entry.module, entry.questionKey)
         var removed = 0
         // Retired, unusable, or moved to another identity: withdraw what this entry added before.
         linked.filter { (_, linkedIdentity) -> entry.retired || !usable || linkedIdentity != identity }.forEach { (id, _) -> if (unlinkRemote(db, id)) removed++ }
@@ -305,10 +324,18 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
                 row.bindLong(1, id); row.bindLong(2, (index + 1).toLong()); row.bindText(3, option); row.step()
             } }
             insertRemoteAnswers(db, id, entry)
+            if (authoritative) recordAuthoritative(db, entry)
             return result.copy(added = result.added + 1, removed = result.removed + removed)
         }
         db.prepare("UPDATE qa_questions SET compass_entry_id=?,compass_revision=? WHERE id=?").use { row ->
             row.bindText(1, entry.entryId); row.bindLong(2, entry.revision); row.bindLong(3, existing); row.step()
+        }
+        if (authoritative) {
+            // Bundled, learned and earlier remote answers all give way; a learned answer removed here is never uploaded.
+            db.prepare("DELETE FROM qa_answers WHERE question_id=?").use { row -> row.bindLong(1, existing); row.step() }
+            insertRemoteAnswers(db, existing, entry)
+            recordAuthoritative(db, entry)
+            return result.copy(updated = result.updated + 1, removed = result.removed + removed)
         }
         val local = db.prepare("SELECT 1 FROM qa_answers WHERE question_id=? AND source<>'compass' LIMIT 1").use { row -> row.bindLong(1, existing); row.step() }
         if (local) return result.copy(skipped = result.skipped + 1, removed = result.removed + removed)
@@ -337,6 +364,17 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
             db.prepare("UPDATE qa_questions SET compass_entry_id=NULL,compass_revision=NULL WHERE id=?").use { row -> row.bindLong(1, id); row.step() }
         }
         return true
+    }
+
+    private fun isAuthoritative(db: SQLiteConnection, bankName: String, module: String, questionKey: String): Boolean =
+        db.prepare("SELECT 1 FROM qa_authoritative WHERE bank_name=? AND module=? AND question_key=?").use { row ->
+            row.bindText(1, bankName); row.bindText(2, module); row.bindText(3, questionKey); row.step()
+        }
+
+    private fun recordAuthoritative(db: SQLiteConnection, entry: RemoteQuestionAnswer) {
+        db.prepare("INSERT OR REPLACE INTO qa_authoritative(bank_name,module,question_key,entry_id,revision) VALUES (?,?,?,?,?)").use { row ->
+            row.bindText(1, entry.bankName); row.bindText(2, entry.module); row.bindText(3, entry.questionKey); row.bindText(4, entry.entryId); row.bindLong(5, entry.revision); row.step()
+        }
     }
 
     private fun putSyncValue(db: SQLiteConnection, key: String, value: String) {
@@ -375,6 +413,8 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
 
     private companion object {
         /** Learned answers the user confirmed ("Save and continue" or a post-attempt review), not yet uploaded. */
+        /** `submit_status` of a learned answer that disagrees with an admin's correction: never uploaded. */
+        const val SUPERSEDED = "superseded"
         const val PENDING = "a.source='learned' AND a.reviewed_at IS NOT NULL AND a.confirmed_at IS NOT NULL AND a.submit_status IS NULL"
     }
 }

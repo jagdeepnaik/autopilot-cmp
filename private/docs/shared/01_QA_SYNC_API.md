@@ -17,6 +17,7 @@ On this page:
 - [Downloading approved entries](#downloading-approved-entries)
 - [Submitting learned answers](#submitting-learned-answers)
 - [Reviewing submissions (Cosmos website)](#reviewing-submissions-cosmos-website)
+- [Correcting the database (admin)](#correcting-the-database-admin)
 - [Seeding the server](#seeding-the-server)
 - [Errors](#errors)
 - [Rules both sides follow](#rules-both-sides-follow)
@@ -87,8 +88,16 @@ An **entry** is one question with its options and its accepted answers. Its iden
   with the same wording but different options are different entries.
 - **`answerKey`** is AutoPilot's key for one accepted answer of that question (`qa_answers.answer_key`): the
   normalised answer text, for example `shipyard manager`. It is not a hash.
-- **Keys are opaque to Cosmos.** Cosmos stores and compares them byte for byte and never computes them. Changing how
-  AutoPilot computes them is a breaking change to this contract.
+- **The text rules** (AutoPilot's `QuestionAnswerText`), used by both sides:
+    - `normalize(t)`: replace U+00A0 with a space, collapse every run of whitespace to one space, trim, then lowercase
+      (Unicode default lowercasing, not locale-specific).
+    - `optionText(t)`: replace U+00A0 with a space, trim, then remove one leading display label matching
+      `^\d+[.)]\s+` (for example `2. ` or `3) `, but not `2.1`).
+    - `normalizedOption(t) = normalize(optionText(t))`.
+    - `questionKey = sha256hex(normalize(question) + U+001F + sorted(normalizedOption(each option)).join(U+001E))`.
+    - `answerKey(answer) = normalize(answer)`.
+- Cosmos compares keys byte for byte. It computes them only for admin corrections and problem checks below, with exactly
+  these rules. Changing a rule is a breaking change to this contract.
 - **Revision:** every change to an entry (approval, new answer, retirement) gives it a new `revision`, a number that
   only grows across the whole server. Apps remember the highest revision they have seen per bank.
 
@@ -109,6 +118,7 @@ An **entry** is one question with its options and its accepted answers. Its iden
     "answers": [{ "text": "Three", "answerKey": "three" }],
     "source": "bundled",
     "status": "approved",
+    "authoritative": false,
     "revision": 1042,
     "updatedAt": "2026-11-28T09:12:00.000Z"
 }
@@ -220,6 +230,37 @@ The list response:
 `conflict` is `null` unless an approved entry with the same identity has different answers. Approve, reject and retire
 return `200` with the updated submission (or `{ "entry": { "id", "status", "revision" } }` for retire). A list item
 never shows the submitter's email or tokens.
+
+## Correcting the database (admin)
+
+Admins browse every bank on the Cosmos website, find problems and correct entries in place. A correction is an ordinary
+entry change: it gets a new `revision`, so every app picks it up on its next sync.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/qa/entries?bank=&q=&problem=&status=&page=&pageSize=` | Search entries (question text contains `q`, case-insensitive); `pageSize` at most 50 |
+| `GET /api/qa/entries/:id` | One entry with its problems and its change history |
+| `PATCH /api/qa/entries/:id` | `{ "answerPositions": [2], "note"?: string }`: the correct answers, by option position; at least one, each an existing option |
+| `POST /api/qa/entries/:id/retire` · `POST /api/qa/entries/:id/restore` | Withdraw an entry, or bring it back |
+| `GET /api/qa/problems?bank=&kind=&page=&pageSize=` | Entries with problems, newest first, with counts per kind |
+
+Problem kinds, computed by Cosmos with the text rules above:
+
+| `kind` | Meaning |
+| --- | --- |
+| `no_answer` | The entry has no answer |
+| `answer_not_in_options` | An answer's `answerKey` is not `normalizedOption` of any option |
+| `duplicate_options` | Two options have the same `normalizedOption` |
+| `conflicting_answers` | Another entry with the same `questionKey` (in another bank name, module or bank) has a different set of answers |
+| `pending_conflict` | A pending submission disagrees with this entry's approved answers |
+
+- A correction stores each answer as the chosen option's `text` (with `optionText` applied) and `answerKey =
+  normalize(that text)`, records who changed what and when (with the note), and marks the entry **authoritative**:
+  `"authoritative": true` in `Entry`. Retire and restore are recorded the same way.
+- **Authoritative entries win in the app.** When AutoPilot applies an entry with `"authoritative": true`, its answers
+  replace every local answer for that `(bankName, module, questionKey)`, whatever their source (bundled, learned or
+  earlier Cosmos rows). Entries without it keep today's rule: bundled and learned answers win.
+- Approving a submission also makes the entry authoritative.
 
 ## Seeding the server
 

@@ -77,7 +77,11 @@ sealed class CosmosApiException(message: String) : Exception(message) {
 /** [answerKey] is the routine file's own `qa_answers.answer_key`, opaque to Cosmos. */
 @Serializable data class CosmosAnswer(val text: String, val answerKey: String)
 
-/** Identity: (bank, bankName, module, questionKey), the unique key of the routine file's `qa_questions`. */
+/**
+ * Identity: (bank, bankName, module, questionKey), the unique key of the routine file's `qa_questions`.
+ * [authoritative] marks an admin's correction, whose answers replace every local answer; servers that
+ * predate it leave it out, which reads as false.
+ */
 @Serializable data class CosmosEntry(
     val id: String,
     val bank: String,
@@ -91,6 +95,7 @@ sealed class CosmosApiException(message: String) : Exception(message) {
     val status: String,
     val revision: Long,
     val updatedAt: String? = null,
+    val authoritative: Boolean = false,
 ) {
     val retired get() = status == "retired"
 }

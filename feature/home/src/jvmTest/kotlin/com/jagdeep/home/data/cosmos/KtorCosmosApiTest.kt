@@ -143,9 +143,19 @@ class KtorCosmosApiTest {
         assertEquals(1042, result.nextAfter)
         assertEquals("Three", result.entries.single().answers.single().text)
         assertEquals("sagarmeinyog-ver-1.0.json", result.entries.single().bankName)
+        // A server that predates admin corrections leaves the flag out: not authoritative.
+        assertFalse(result.entries.single().authoritative)
         val request = requests.single()
         assertEquals("https://cosmos.test/api/qa/banks/smy/entries?after=1000&limit=500", request.url.toString())
         assertEquals("Bearer test-access", request.headers[HttpHeaders.Authorization])
+    }
+
+    @Test fun given_an_authoritative_entry_when_the_page_is_read_then_the_flag_is_kept() = runBlocking {
+        val page = """{"entries":[{"id":"e_2","bank":"smy","bankName":"sagarmeinyog-ver-1.0.json","module":"Module 3","question":"Q?","questionKey":"${"a".repeat(64)}",
+            "options":[{"position":1,"text":"Two"},{"position":2,"text":"Three"}],
+            "answers":[{"text":"Two","answerKey":"two"}],"source":"bundled","status":"approved","authoritative":true,"revision":1043}],
+            "nextAfter":1043,"hasMore":false}"""
+        assertTrue(api { json(page) }.entries("test-access", "smy", 1042, 500).entries.single().authoritative)
     }
 
     @Test fun given_submissions_when_sent_then_the_body_has_no_unknown_fields() = runBlocking {
