@@ -96,6 +96,8 @@ An **entry** is one question with its options and its accepted answers. Its iden
     - `normalizedOption(t) = normalize(optionText(t))`.
     - `questionKey = sha256hex(normalize(question) + U+001F + sorted(normalizedOption(each option)).join(U+001E))`.
     - `answerKey(answer) = normalize(answer)`.
+- Lowercasing is plain Unicode lowercasing (Kotlin `lowercase()`, JavaScript `toLowerCase()`), **not** case folding:
+  the micro sign `µ` (U+00B5) stays `µ`. Python's `casefold()` changes it and must not be used.
 - Cosmos compares keys byte for byte. It computes them only for admin corrections and problem checks below, with exactly
   these rules. Changing a rule is a breaking change to this contract.
 - **Revision:** every change to an entry (approval, new answer, retirement) gives it a new `revision`, a number that
@@ -268,7 +270,8 @@ Problem kinds, computed by Cosmos with the text rules above:
 bundled AutoPilot database as approved `bundled` entries. It is idempotent: an entry that already exists keeps its
 revision unless its options or answers changed. It reads `qa_questions` (`id`, `bank_name`, `module`, `question_text`,
 `question_key`), `qa_options` (`question_id`, `position`, `option_text`) and the `qa_answers` rows (`question_id`,
-`answer_text`, `answer_key`) whose `source` is `'source'`; learned answers in a file are never imported.
+`answer_text`, `answer_key`) whose `source` is `'source'`; learned answers in a file are never imported. Entries an admin has corrected (`authoritative`) are
+never changed by an import, so a re-import cannot bring back a corrected bundled answer.
 
 ## Errors
 
