@@ -60,6 +60,9 @@ internal class AppServices private constructor() {
     private val courseProgress = createCourseProgressRepository()
     private val courseCertificates = createCourseCertificateStore()
     val answerBanks = createCourseAnswerBankStore()
+    /** Opt-in Compass Q&A sync; idle until the user signs in. Never pauses a routine. */
+    val compassSync: com.jagdeep.shared.compass.CompassSync =
+        com.jagdeep.autopilot.platform.createCompassSync(answerBanks, scope) { line -> liveLog.log(LiveSource.App) { line } }
     private val dgsTimeOrigin=kotlin.time.TimeSource.Monotonic.markNow()
     val page = PageController(
         automation = automation,
@@ -122,6 +125,12 @@ internal class AppServices private constructor() {
                 })
                 kotlinx.coroutines.delay(1_000)
             }
+        }
+        // Floating controls (Android) offer Stop while any routine runs; desktop ignores this.
+        scope.launch {
+            combine(controller.state, page.state) { run, chrome -> run != RunState.Idle || chrome.activity != null }
+                .distinctUntilChanged()
+                .collect(automation::showRoutineActive)
         }
         scope.launch {
             preferences.data.map { it.developerMode }.distinctUntilChanged().collect { on ->

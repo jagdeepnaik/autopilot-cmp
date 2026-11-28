@@ -26,11 +26,16 @@ kotlin {
             implementation(project(":core:ui"))
             implementation(project(":feature:shared"))
         }
+        jvmMain.dependencies {
+            // Compass Q&A sync client (the engine is supplied by the desktop app).
+            implementation(libs.ktor.client.core)
+        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
         jvmTest.dependencies {
+            implementation(libs.ktor.client.mock)
             implementation(libs.androidx.sqlite.bundled)
             implementation(compose.desktop.currentOs)
             implementation(compose.desktop.uiTestJUnit4)

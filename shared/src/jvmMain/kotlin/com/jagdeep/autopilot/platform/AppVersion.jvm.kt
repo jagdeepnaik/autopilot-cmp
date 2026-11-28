@@ -10,3 +10,7 @@ internal const val APP_BUILD_IDENTITY_PROPERTY = "autopilot.buildIdentity"
 
 internal actual val appVersionName: String =
     System.getProperty(APP_VERSION_PROPERTY)?.takeIf { it.isNotBlank() } ?: AppConfig.APP_VERSION_NAME
+
+/** The full SemVer identity, sent to Compass as `X-AutoPilot-App-Version`. */
+internal val appBuildIdentity: String =
+    System.getProperty(APP_BUILD_IDENTITY_PROPERTY)?.takeIf { it.isNotBlank() } ?: AppConfig.APP_VERSION_NAME

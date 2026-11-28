@@ -133,6 +133,14 @@ fun SettingsScreen(
                     trailingContent={ Icon(Icons.Default.ChevronRight,null) })
             }
 
+            if (desktop) {
+                Group("Compass sync")
+                com.jagdeep.settings.ui.components.CompassSyncSection(
+                    state.compass, state.compassSigningIn, state.compassSignInProblem,
+                    onSignIn = viewModel::signInToCompass, onSyncNow = viewModel::syncCompassNow, onSignOut = viewModel::signOutOfCompass,
+                )
+            }
+
             if (state.access != InputAccess.Unsupported) {
                 Group("Controls")
                 ListItem(modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open keyboard shortcuts") { shortcutsOpen = true },
@@ -178,7 +186,7 @@ fun SettingsScreen(
             Group("About")
             ListItem(colors = transparent(), headlineContent = { Text("Version") }, trailingContent = { Text(appVersion) })
             ListItem(colors = transparent(), headlineContent = { Text("Privacy") }, supportingContent = {
-                Text("Settings, routines and saved progress stay on this computer. Browser actions happen on the website you open. Only shortcut keys are monitored; typed text is not recorded.")
+                Text("Settings, routines and saved progress stay on this computer. Browser actions happen on the website you open. Only shortcut keys are monitored; typed text is not recorded. If you sign in to Compass sync, only Q&A answers are shared with Compass.")
             })
         }
     }

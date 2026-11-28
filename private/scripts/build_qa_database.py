@@ -271,13 +271,18 @@ def split_routine_databases(master_path: Path) -> list[Path]:
         if path.exists():
             path.unlink()
     databases = {name: sqlite3.connect(path) for name, path in outputs.items()}
+    # Routine file schema version 2 (PRAGMA user_version), the same schema the app's in-place upgrade
+    # (core:persistence QuestionAnswerSchema) gives older files: Compass sync bookkeeping columns, the
+    # 'compass' answer source and the sync_state table. Bundled rows leave the new columns empty.
     schema = """
         CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         CREATE TABLE qa_questions (
           id INTEGER PRIMARY KEY, bank_name TEXT NOT NULL, module TEXT NOT NULL,
           question_text TEXT NOT NULL, question_key TEXT NOT NULL,
+          compass_entry_id TEXT, compass_revision INTEGER, compass_created INTEGER NOT NULL DEFAULT 0,
           UNIQUE(bank_name, module, question_key)
         );
+        CREATE INDEX qa_questions_compass_entry ON qa_questions(compass_entry_id);
         CREATE TABLE qa_options (
           question_id INTEGER NOT NULL REFERENCES qa_questions(id) ON DELETE CASCADE,
           position INTEGER NOT NULL, option_text TEXT NOT NULL,
@@ -286,10 +291,14 @@ def split_routine_databases(master_path: Path) -> list[Path]:
         CREATE TABLE qa_answers (
           question_id INTEGER NOT NULL REFERENCES qa_questions(id) ON DELETE CASCADE,
           answer_text TEXT NOT NULL, answer_key TEXT NOT NULL,
-          source TEXT NOT NULL CHECK(source IN ('source','learned')),
+          source TEXT NOT NULL CHECK(source IN ('source','learned','compass')),
           learned_at INTEGER, reviewed_at INTEGER,
+          compass_revision INTEGER, client_id TEXT, submitted_at INTEGER, submit_status TEXT, confirmed_at INTEGER,
           PRIMARY KEY(question_id, answer_key)
         );
+        CREATE UNIQUE INDEX qa_answers_client_id ON qa_answers(client_id);
+        CREATE TABLE sync_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        PRAGMA user_version = 2;
     """
     for database in databases.values():
         database.execute("PRAGMA foreign_keys = ON")

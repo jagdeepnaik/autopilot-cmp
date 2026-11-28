@@ -4,7 +4,7 @@
 
 This document follows the app from launch to the last click: what each part does, how the parts talk to each other, and how the app talks to Chrome. For setup and build commands, see the [README](../../../README.md) and [one-command builds](20_ONE_COMMAND_BUILDS.md).
 
-Updated 13 November 2026, for the `shared` / `androidApp` / `desktopApp` layout, the course routines (Sagar Mein Yog automation, DGS E-Learning) and the `~/.autopilot` data folder. The web page helper and course helper routines were retired on 9 November 2026.
+Updated 28 November 2026 for Compass Q&A sync; 13 November 2026 for the `shared` / `androidApp` / `desktopApp` layout, the course routines (Sagar Mein Yog automation, DGS E-Learning) and the `~/.autopilot` data folder. The web page helper and course helper routines were retired on 9 November 2026.
 
 ## Contents
 
@@ -403,6 +403,16 @@ Both course routines run in `PageController` like Scroll and click, but the exte
 
 The app uses the Sagar Mein Yog SQLite database in `~/.autopilot/databases/qa/` ([updating the sources](23_UPDATE_ANSWER_BANK.md)). Approved corrections are saved to that same routine database. Compatible JSON banks in `~/.autopilot/answer-banks/` are imported once.
 
+### Compass Q&A sync
+
+Sync is opt-in and desktop only: nothing reaches the network until you sign in to Compass under **Settings → Compass sync**. The contract is [the Q&A sync API](../shared/01_QA_SYNC_API.md).
+
+- **Signing in.** Email and password go once to `POST /api/auth/app/login`; the password isn't kept. The refresh token is stored only in platform secure storage (macOS Keychain, Windows DPAPI in `~/.autopilot/secure/`, or the Linux Secret Service); the 15-minute access token lives only in memory. On a `401` the app refreshes once (the refresh token rotates, so the new one is saved before it's used; a lost refresh reply is retried once with the same token, which Compass accepts for 60 seconds) and retries; if Compass refuses again, the session is wiped and Settings asks you to sign in again. **Sign out** wipes the token and tells Compass when it's reachable.
+- **Downloading.** For each bank (`smy`, `olp`, `seagull`, `marinesamraj`) the app asks for entries after the last revision it saw, 500 at a time, and stores them in that routine's `.db` with `source = 'compass'`, under the entry's own `bankName`, `module` and `questionKey` (the file's `qa_questions` identity; an entry whose key doesn't match its question and options is skipped). Each page and its revision cursor are saved in one transaction. A question that already has a bundled or learned answer keeps it; a retired entry removes only what Compass added.
+- **Uploading.** Learned answers you confirmed yourself (saved with **Save and continue**, or reviewed after an attempt; recorded as `confirmed_at`) get a permanent `client_id` and go up in batches of up to 100, with their file's `bankName`, `questionKey` and `answerKey`. Answers from practice-quiz feedback, legacy JSON imports and answers learned before this change are not uploaded. `pending`, `duplicate`, `already_known` and `conflict` all mark the answer sent, so retries never send it twice. Unreviewed reference captures are never uploaded.
+- **When.** At sign-in, at launch when a session is saved, about 10 seconds after a routine saves a confirmed answer, and on **Sync now**. Network and server failures retry with back-off (2 s, 4 s), `429` waits for `Retry-After`, and a failed sync tries again later (1, 5, 15, then 60 minutes). A sync never pauses a routine; routines keep reading the same files, and both sides wait for each other's short write transactions.
+- **Where.** `CompassSyncEngine` (`feature:home` `domain/compass`) holds the rules; `KtorCompassApi` and `SqliteCompassQaStore` (`data/compass`, desktop) do the HTTP and file work; `shared` wires them with the address from the build's `compassUrl` and the `X-AutoPilot-App-Version` SemVer identity. Settings sees only the `CompassSync` contract in `feature:shared`.
+
 ### DGS E-Learning
 
 `DgsSession` reads DGS e-books (dgsstcwlms.aduacademy.in) until the study-time target:
@@ -614,7 +624,7 @@ The log is `LiveLog` in `feature:shared`, implemented by `MemoryLiveLog` in `sha
 
 ## 15. Privacy and security
 
-**No outside connections.** The app and extension contact nothing but each other, on this computer. There's no account, analytics or telemetry.
+**One opt-in outside connection.** The app and extension contact nothing but each other, on this computer, until you sign in to Compass sync. Then the desktop app also talks to Compass over HTTPS, and only about Q&A banks: it downloads approved answers and sends the answers you confirmed, with their question, options, module, times and the app version. There's no analytics or telemetry. See [Compass Q&A sync](#compass-qa-sync).
 
 **What reaches the app from a page:**
 

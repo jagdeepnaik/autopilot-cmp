@@ -31,6 +31,11 @@ data class SettingsUiState(
     val transferringRoutines: Boolean = false,
     val displayWakeProblem: String? = null,
     val answerBankFolder: String? = null,
+    val compass: com.jagdeep.shared.compass.CompassSyncState = com.jagdeep.shared.compass.CompassSyncState(),
+    /** True while a Compass sign-in request is on its way. */
+    val compassSigningIn: Boolean = false,
+    /** Why the last sign-in didn't work, in plain words; null when there's nothing to explain. */
+    val compassSignInProblem: String? = null,
 )
 
 private enum class HotKeyJob(val description: String, val keyIn: (AppPreferences) -> HotKey) {
@@ -50,6 +55,7 @@ class SettingsViewModel(
     private val answerBanks: com.jagdeep.shared.answers.AnswerBankFiles = com.jagdeep.shared.answers.NoAnswerBankFiles,
     extensionStatus: Flow<com.jagdeep.shared.browser.BrowserExtensionStatus> = flowOf(com.jagdeep.shared.browser.BrowserExtensionStatus()),
     private val testSound: suspend () -> String? = { "Sound testing isn't available on this platform." },
+    private val compassSync: com.jagdeep.shared.compass.CompassSync = com.jagdeep.shared.compass.NoCompassSync,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(SettingsUiState(access = accessGate.access(), routineFilesAvailable = routineTransfer.isAvailable, answerBankFolder=answerBanks.folderPath))
     val state = mutableState.asStateFlow()
@@ -73,7 +79,35 @@ class SettingsViewModel(
             finally { mutableState.update { it.copy(transferringRoutines = false) } }
         }
     }
+    /** The password is passed straight to the sign-in request; it is never kept in state. */
+    fun signInToCompass(email: String, password: String) {
+        if (state.value.compassSigningIn) return
+        if (email.isBlank() || password.isEmpty()) {
+            mutableState.update { it.copy(compassSignInProblem = "Enter your Compass email and password.") }
+            return
+        }
+        mutableState.update { it.copy(compassSigningIn = true, compassSignInProblem = null) }
+        viewModelScope.launch {
+            val result = try { compassSync.signIn(email, password) }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { com.jagdeep.shared.compass.CompassSignInResult.ServerTrouble }
+            mutableState.update { it.copy(compassSigningIn = false, compassSignInProblem = compassSignInProblem(result)) }
+            if (result == com.jagdeep.shared.compass.CompassSignInResult.SignedIn) mutableMessages.send("Signed in to Compass. Syncing answers now.")
+        }
+    }
+
+    fun syncCompassNow() = compassSync.syncNow()
+
+    fun signOutOfCompass() {
+        viewModelScope.launch {
+            try { compassSync.signOut(); mutableMessages.send("Signed out of Compass. Answers already on this computer stay here.") }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { mutableMessages.send("Couldn't finish signing out. Try again.") }
+        }
+    }
+
     init {
+        viewModelScope.launch { compassSync.state.collect { sync -> mutableState.update { it.copy(compass = sync) } } }
         viewModelScope.launch { extensionStatus.collect { status -> mutableState.update { it.copy(extension = status) } } }
         viewModelScope.launch { displayWakeProblem.collect { problem -> mutableState.update { it.copy(displayWakeProblem = problem) } } }
         viewModelScope.launch { routineTransfer.routines.collect { items -> mutableState.update { it.copy(transferableRoutines = items) } } }
@@ -148,4 +182,14 @@ class SettingsViewModel(
         mutableState.update { it.copy(preferences = preferences) }
         viewModelScope.launch { preferencesStore.save(preferences) }
     }
+}
+
+internal fun compassSignInProblem(result: com.jagdeep.shared.compass.CompassSignInResult): String? = when (result) {
+    com.jagdeep.shared.compass.CompassSignInResult.SignedIn -> null
+    com.jagdeep.shared.compass.CompassSignInResult.WrongEmailOrPassword -> "That email and password don't match a Compass account. Check them and try again."
+    com.jagdeep.shared.compass.CompassSignInResult.Offline -> "Couldn't reach Compass. Check your internet connection and try again."
+    com.jagdeep.shared.compass.CompassSignInResult.RateLimited -> "Too many sign-in attempts. Wait a few minutes, then try again."
+    com.jagdeep.shared.compass.CompassSignInResult.ServerTrouble -> "Compass isn't responding properly right now. Try again later."
+    com.jagdeep.shared.compass.CompassSignInResult.SecureStorageUnavailable -> "AutoPilot couldn't save your session securely, so you weren't signed in. Check that your system keychain is unlocked."
+    com.jagdeep.shared.compass.CompassSignInResult.Unavailable -> "Compass sync isn't available on this device."
 }

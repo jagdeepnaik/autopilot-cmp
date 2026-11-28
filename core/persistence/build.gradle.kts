@@ -90,7 +90,8 @@ kotlin {
 
         jvmMain {
             dependencies {
-
+                // Windows DPAPI for SystemSecurePreferencesStore.
+                implementation(libs.jna.platform)
             }
         }
 

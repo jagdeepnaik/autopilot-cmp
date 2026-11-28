@@ -24,6 +24,16 @@ class SqliteCourseAnswerBanks(
     private val migration = Mutex()
     private var migrated = false
     private val stores = mutableMapOf<String, SqliteQuestionAnswerStore>()
+    private val mutableReviewedSaves = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
+    /** Emits after the user confirms answers ("Save and continue" or a post-attempt review): the ones Compass sync uploads. */
+    val reviewedSaves: kotlinx.coroutines.flow.SharedFlow<Unit> = mutableReviewedSaves
+
+    /** The routine file named [databaseName] (for example `smy.db`), after any pending migration. */
+    suspend fun routineStore(databaseName: String): SqliteQuestionAnswerStore {
+        require(databaseName in ROUTINE_DATABASES)
+        prepare()
+        return store(databaseName)
+    }
     override val available = true
     override val folderPath get() = databaseFolder.absolutePath
 
@@ -36,10 +46,12 @@ class SqliteCourseAnswerBanks(
             return store(routineDatabase(name)).save(name, listOf(PersistedLearnedAnswer(module, answer.question, answer.options, text)), reviewed = false) == PersistedWriteResult.Saved
         }
         override suspend fun saveReviewed(module: String, answers: List<ReviewedAnswer>) = saveName(name, module, answers, true)
+        override suspend fun saveConfirmed(module: String, answers: List<ReviewedAnswer>) = saveName(name, module, answers, true, confirmed = true)
     }
     override suspend fun load() = loadName(com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE)
     override suspend fun save(module: String, answer: CourseAnswer) = forName(com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE).save(module, answer)
     override suspend fun saveReviewed(module: String, answers: List<ReviewedAnswer>) = forName(com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE).saveReviewed(module, answers)
+    override suspend fun saveConfirmed(module: String, answers: List<ReviewedAnswer>) = forName(com.jagdeep.shared.answers.DEFAULT_ANSWER_BANK_FILE).saveConfirmed(module, answers)
     override suspend fun names(): List<String> { prepare(); return ROUTINE_DATABASES.flatMap { store(it).bankNames() }.distinct().sorted() }
     override suspend fun validate(name: String): String = if (loadName(name) == null) "That Q&A bank is not present in the ${routineDatabase(name)} database." else "$name is valid."
     override suspend fun openFolder(): String? { prepare(); showFolder(databaseFolder); return null }
@@ -58,7 +70,7 @@ class SqliteCourseAnswerBanks(
         return "Imported $name into ${routineDatabase(name)}."
     }
 
-    private fun store(name: String) = stores.getOrPut(name) {
+    @Synchronized private fun store(name: String) = stores.getOrPut(name) {
         SqliteQuestionAnswerStore(File(databaseFolder, name)) { bundledDatabase(name) }
     }
     private fun routineDatabase(bank: String) = when {
@@ -75,11 +87,14 @@ class SqliteCourseAnswerBanks(
             questions.map { entry -> CourseAnswer(entry.question, entry.options, entry.answers.singleOrNull()) }
         }))
     }
-    private suspend fun saveName(name: String, module: String, answers: List<ReviewedAnswer>, reviewed: Boolean): AnswerBankSaveResult {
+    private suspend fun saveName(name: String, module: String, answers: List<ReviewedAnswer>, reviewed: Boolean, confirmed: Boolean = false): AnswerBankSaveResult {
         prepare()
         val values = answers.mapNotNull { review -> review.answer.answer?.let { PersistedLearnedAnswer(module, review.answer.question, review.answer.options, it, review.previousAnswer) } }
-        return when (store(routineDatabase(name)).save(name, values, reviewed)) {
-            PersistedWriteResult.Saved -> loadName(name)?.let(AnswerBankSaveResult::Saved) ?: AnswerBankSaveResult.Unavailable
+        return when (store(routineDatabase(name)).save(name, values, reviewed, confirmed)) {
+            PersistedWriteResult.Saved -> {
+                if (confirmed) mutableReviewedSaves.tryEmit(Unit)
+                loadName(name)?.let(AnswerBankSaveResult::Saved) ?: AnswerBankSaveResult.Unavailable
+            }
             PersistedWriteResult.Conflict -> AnswerBankSaveResult.Conflict
             PersistedWriteResult.Invalid -> AnswerBankSaveResult.Invalid
             PersistedWriteResult.Unavailable -> AnswerBankSaveResult.Unavailable
@@ -124,7 +139,7 @@ class SqliteCourseAnswerBanks(
         }
     }
 
-    private companion object {
+    internal companion object {
         const val SMY_DATABASE = "smy.db"
         val ROUTINE_DATABASES = listOf(SMY_DATABASE, "olp.db", "seagull.db", "marinesamraj.db")
     }

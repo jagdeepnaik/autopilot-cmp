@@ -21,6 +21,19 @@ val generateAnswerBankIndex by tasks.registering {
     }
 }
 
+// compass/compass.properties: the Compass Q&A sync address, from the version catalog's compassUrl
+// (or -PcompassUrl=…), so the address is set in exactly one place.
+val compassUrl = providers.gradleProperty("compassUrl").orElse(libs.versions.compassUrl.get())
+val generateCompassConfig by tasks.registering {
+    val url = compassUrl
+    val output = layout.buildDirectory.dir("generated/compass-config")
+    inputs.property("compassUrl", url)
+    outputs.dir(output)
+    doLast {
+        output.get().file("compass/compass.properties").asFile.apply { parentFile.mkdirs(); writeText("url=${url.get()}\n") }
+    }
+}
+
 val desktopVersion = rootProject.extra["desktopVersion"] as String
 val desktopBuildIdentity = rootProject.extra["desktopBuildIdentity"] as String
 
@@ -92,6 +105,9 @@ kotlin {
             implementation(libs.kotlinx.coroutinesSwing)
             // Windows title bar colours (DWM).
             implementation(libs.jna.platform)
+            // Compass Q&A sync: the HTTPS engine for feature:home's client.
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.cio)
         }
 
         commonTest.dependencies {
@@ -103,7 +119,7 @@ kotlin {
             implementation(compose.desktop.uiTestJUnit4)
         }
         // answer-banks/index.txt: lists every bank in resources/answer-banks, so adding a bank file is enough.
-        jvmMain { resources.srcDir(generateAnswerBankIndex) }
+        jvmMain { resources.srcDir(generateAnswerBankIndex); resources.srcDir(generateCompassConfig) }
     }
 }
 

@@ -129,6 +129,11 @@ interface CourseAnswerBankStore : com.jagdeep.shared.answers.AnswerBankFiles {
     /** Collect a reference without materializing the entire growing bank as an assessment snapshot. */
     suspend fun saveReference(module: String, answer: CourseAnswer): Boolean = save(module, answer) is AnswerBankSaveResult.Saved
     suspend fun saveReviewed(module: String, answers: List<ReviewedAnswer>): AnswerBankSaveResult = AnswerBankSaveResult.Unavailable
+    /**
+     * Answers the user confirmed themselves: "Save and continue", or a review after an attempt.
+     * Saved like [saveReviewed]; only these may be shared through Compass sync.
+     */
+    suspend fun saveConfirmed(module: String, answers: List<ReviewedAnswer>): AnswerBankSaveResult = saveReviewed(module, answers)
     /** Combines independent, size-limited bank files without weakening per-file validation. */
     suspend fun loadAll(names: List<String>): CourseAnswerBank? {
         var merged: CourseAnswerBank? = null

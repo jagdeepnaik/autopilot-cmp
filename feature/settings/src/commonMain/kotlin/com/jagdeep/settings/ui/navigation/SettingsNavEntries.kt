@@ -26,10 +26,11 @@ fun EntryProviderScope<NavKey>.settingsEntryProvider(
     answerBanks: com.jagdeep.shared.answers.AnswerBankFiles = com.jagdeep.shared.answers.NoAnswerBankFiles,
     extensionStatus: Flow<com.jagdeep.shared.browser.BrowserExtensionStatus> = kotlinx.coroutines.flow.flowOf(com.jagdeep.shared.browser.BrowserExtensionStatus()),
     onTestSound: suspend () -> String? = { "Sound testing isn't available." },
+    compassSync: com.jagdeep.shared.compass.CompassSync = com.jagdeep.shared.compass.NoCompassSync,
 ) {
     entry<RouteTopLevel.Settings> {
         val viewModel: SettingsViewModel = viewModel(factory = viewModelFactory {
-            initializer { SettingsViewModel(preferencesStore, accessGate, browserConnected, onInstallExtension, routineTransfer, displayWakeProblem, answerBanks, extensionStatus, onTestSound) }
+            initializer { SettingsViewModel(preferencesStore, accessGate, browserConnected, onInstallExtension, routineTransfer, displayWakeProblem, answerBanks, extensionStatus, onTestSound, compassSync) }
         })
         SettingsScreen(viewModel, onBack = navigator::goBack, appVersion = appVersion)
     }

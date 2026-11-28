@@ -253,7 +253,7 @@ class PageController(
         mutableState.update { it.copy(activity = activity.copy(savingAnswer = save, answerSaveError = null)) }
         scope.launch {
             val result = if (save) try {
-                bankStore.saveReviewed(request.module, listOf(ReviewedAnswer(CourseAnswer(request.question, request.options, request.answer), request.previousAnswer)))
+                bankStore.saveConfirmed(request.module, listOf(ReviewedAnswer(CourseAnswer(request.question, request.options, request.answer), request.previousAnswer)))
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (_: Exception) { AnswerBankSaveResult.Unavailable }
             else null
@@ -286,7 +286,7 @@ class PageController(
         }
         mutableState.update { it.copy(activity = activity.copy(savingAnswer = true, answerSaveError = null)) }
         scope.launch {
-            val result = try { bankStore.saveReviewed(failure.module, reviewed) }
+            val result = try { bankStore.saveConfirmed(failure.module, reviewed) }
             catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (_: Exception) { AnswerBankSaveResult.Unavailable }
             if (courseAutomation !== runner || runner.failure?.token != token) return@launch
