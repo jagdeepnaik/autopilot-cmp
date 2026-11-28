@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Publishing fetches installers with a resumable download that picks up where a dropped connection stopped (Legion's link drops long transfers).
+
 ## [1.5.0] - 2026-11-28
 
 - Removed: the authenticator-code step when the admin signs in to Cosmos (Cosmos no longer asks for one).

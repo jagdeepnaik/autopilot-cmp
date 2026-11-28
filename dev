@@ -150,15 +150,21 @@ windows_scp() {
     fi
 }
 
-# Copies a build back to the Mac, trying three times: the jump through Legion to its VM can drop a long copy.
-# Top level (not inside desktop_main), because publish_main uses it too.
+# Copies a build back to the Mac over a fresh SSH connection, resuming where a dropped transfer stopped (sftp
+# "reget"): Legion's connection drops long transfers, and a stale shared (ControlMaster) connection closes them at once.
+# Usage: scp_retry host:remote-path local-file. A Windows path (C:/...) is given to sftp as /C:/...; a host reached
+# through a jump host gets its own fresh jump connection too. The caller still checks the hash.
 scp_retry() {
-    local attempt
-    for attempt in 1 2 3; do
-        # A fresh connection each time: a stale shared (ControlMaster) connection to Legion closes every copy at once.
-        scp -q -o ControlPath=none -o ServerAliveInterval=10 "$1" "$2" && return 0
-        echo "Copy attempt $attempt of 3 failed; retrying in 10 s." >&2
-        sleep 10
+    local host="${1%%:*}" remote="${1#*:}" local_file="$2" jump attempt
+    case "$remote" in [A-Za-z]:/*) remote="/$remote" ;; esac
+    local options=(-q -o ControlPath=none -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
+    jump="$(ssh -G "$host" 2>/dev/null | awk '$1 == "proxyjump" && $2 != "none" { print $2 }')"
+    [ -n "$jump" ] && options+=(-o "ProxyCommand=ssh -o ControlPath=none -o ServerAliveInterval=10 -W %h:%p $jump")
+    rm -f "$local_file"
+    for attempt in $(seq 1 30); do
+        printf 'reget "%s" "%s"\n' "$remote" "$local_file" | sftp "${options[@]}" -b - "$host" >/dev/null 2>&1 && return 0
+        echo "Copy attempt $attempt of 30 stopped at $( [ -f "$local_file" ] && wc -c <"$local_file" | tr -d ' ' || echo 0) bytes; resuming." >&2
+        sleep 3
     done
     return 1
 }
