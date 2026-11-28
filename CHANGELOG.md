@@ -5,6 +5,14 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Windows 10: a dark window frame now also works on Windows 10 releases before 20H1, and the documentation says what Windows 10 needs (nothing extra) and that it isn't tested yet.
+- Sagar Mein Yog: a run that stops moving for 90 seconds (outside a wait for you, a timed wait or an assessment) now reloads the course tab once by itself and carries on from the page shown, instead of waiting for you to refresh it. Assessment, quiz and result pages are never reloaded, so nothing is answered or submitted twice; if the reload doesn't help, the five-minute stall alert follows as before. Every step is in the run log.
+- Sagar Mein Yog: reloading or updating the Chrome extension no longer needs a refresh of the course tab: the extension puts its course script back into open course tabs, and into a course tab that stops answering during a run.
+- Sagar Mein Yog: a run no longer slows to one step a minute when Chrome's window is hidden, minimised or covered (Chrome slows such tabs' timers; the extension now wakes the course tab every second).
+- Sagar Mein Yog: a video that says it's playing but whose time stands still for 20 seconds is paused and played again, and when Chrome blocks playback with sound the run says to click once on the page. The run log records why a play request failed.
+- Chrome link: messages from the extension are queued in the app, so a slow database write no longer drops page snapshots or action replies (a dropped reply used to leave a run waiting until the page was refreshed), and one failing message no longer stops all later ones. The extension gives up on requests that never get an answer and asks again.
+- Chrome extension 1.16.0 (adds the `scripting` permission, used only for sagarmeinyog.com tabs). Reload AutoPilot Page Helper in `chrome://extensions` once after updating.
+
 ## [1.7.2] - 2026-11-28
 
 - New app icon on every platform (macOS, Windows, Linux, Android and the in-app mark), drawn from one source, `desktopApp/app-icons/AutoPilot.svg`. Android 8 and later get an adaptive icon that follows the launcher's shape, and Android 13 and later can show it as a themed icon.

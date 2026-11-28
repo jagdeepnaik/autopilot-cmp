@@ -1,7 +1,21 @@
 // Independent of content.js: inventory and document-bound actions for Course automation only.
 (() => {
-  if (window.__courseAutomation) return;
-  window.__courseAutomation = true;
+  // The worker injects this again into a tab whose copy was cut off by an extension reload or update.
+  // Keep a copy that is still working; replace one that is cut off, silent, or from before 1.16.0 (`true`).
+  if (window.__courseAutomation?.alive?.()) return;
+  let orphaned = false, stopped = false, ticking = false, tickTimer = null, lastTickAt = Date.now();
+  const instance = { alive: () => !orphaned && !stopped && Date.now() - lastTickAt < 15000 };
+  window.__courseAutomation = instance;
+  // A reply that never comes (the worker stopped mid-message) must not stop the loop for good.
+  const MESSAGE_TIMEOUT_MILLIS = 30000;
+  const send = (message) => {
+    const sent = chrome.runtime.sendMessage(message); // Throws at once in a cut-off copy.
+    let timer;
+    const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), MESSAGE_TIMEOUT_MILLIS); });
+    return Promise.race([sent, late]).finally(() => clearTimeout(timer));
+  };
+  const sleep = (millis) => new Promise(resolve => setTimeout(resolve, millis));
+  const playProblem = (error) => ({ NotAllowedError: 'notAllowed', NotSupportedError: 'notSupported', AbortError: 'aborted' })[error?.name] || 'playFailed';
   // Some embedded/non-secure frames expose getRandomValues but not randomUUID.
   // This is an opaque document identity, never a credential or a site/session identifier.
   const random = globalThis.crypto;
@@ -11,6 +25,7 @@
   const ids = new WeakMap();
   let nextId = 0;
   let session = null;
+  let handledSession = null; // Kept across a brief loss of the worker, so no action runs twice.
   let handled = new Set();
   let elements = new Map();
   const practiceChoices = new Map();
@@ -288,37 +303,45 @@
       // an embedded frame.
       const onCoursePage = window === window.top && location.origin === 'https://sagarmeinyog.com' &&
         /^\/dashboard\/courses\/[A-Za-z0-9_-]+$/.test(location.pathname);
-      await chrome.runtime.sendMessage({ type: 'courseAction', session, document: documentId, request: action.request, success: onCoursePage });
+      await send({ type: 'courseAction', session, document: documentId, request: action.request, success: onCoursePage });
       if (onCoursePage) location.assign('/dashboard');
       return;
     }
     const node = elements.get(action.element);
     let success = false;
+    let problem = null;
     if (node?.isConnected && visible(node) && !node.matches(':disabled') && !node.closest('[inert],[aria-disabled="true"]')) {
       if (action.kind === 'play' && node.tagName === 'VIDEO') {
         node.scrollIntoView({ block: 'center' });
+        // The app saw this video "playing" with its time standing still: pause it so play() restarts it.
+        if (action.restart && !node.paused) {
+          try { node.pause(); } catch {}
+          await sleep(200);
+        }
         try {
           await node.play();
           // A fulfilled play() promise is not enough on every embedded player: some pause
           // again immediately. Report success only when a later snapshot can see playback.
-          await new Promise(resolve => setTimeout(resolve, 150));
+          await sleep(150);
           success = !node.paused;
-        } catch {}
+          if (!success) problem = 'pausedAgain';
+        } catch (error) { problem = playProblem(error); }
         // Linux Chrome can reject script-initiated video playback after the AutoPilot window
         // takes focus. Ask the worker for a tightly validated browser-level click only for this
         // current video/action; it creates the user activation that the player requires.
         if (!success && window === window.top) {
           try {
-            const fallback = await chrome.runtime.sendMessage({
+            const fallback = await send({
               type: 'courseBrowserPlay', session, document: documentId,
               request: action.request, element: action.element,
             });
             if (fallback?.accepted) {
-              await new Promise(resolve => setTimeout(resolve, 250));
+              await sleep(250);
               success = !node.paused;
             }
           } catch {}
         }
+        if (success) problem = null;
       } else if ((action.kind === 'click' && !/quiz|assessment|exam|submit|delete|purchase/i.test(label(node))) || progressActionAllowed(action, node) || assessmentActionAllowed(action, node)) {
         node.scrollIntoView({ block: 'center' });
         // A radio click does not navigate away. Verify that the site actually selected the
@@ -331,12 +354,12 @@
           const assessment = assessmentInventory();
           success = assessment?.questions.some((question) => question.options.some((option) =>
             option.id === action.element && option.selected)) === true;
-          await chrome.runtime.sendMessage({ type: 'courseAction', session, document: documentId, request: action.request, success });
+          await send({ type: 'courseAction', session, document: documentId, request: action.request, success });
           return;
         }
         // Report before clicking, because navigation can destroy this document immediately.
-        await chrome.runtime.sendMessage({ type: 'courseAction', session, document: documentId, request: action.request, success: true });
-        const stillAuthorized = await chrome.runtime.sendMessage({ type: 'courseHello' });
+        await send({ type: 'courseAction', session, document: documentId, request: action.request, success: true });
+        const stillAuthorized = await send({ type: 'courseHello' });
         if (stillAuthorized?.session !== session || !node.isConnected) return;
         node.click();
         // Radix Select opens on pointer-down/keyboard, not a programmatic click. Keep this fallback
@@ -352,7 +375,7 @@
         return;
       }
     }
-    await chrome.runtime.sendMessage({ type: 'courseAction', session, document: documentId, request: action.request, success });
+    await send({ type: 'courseAction', session, document: documentId, request: action.request, success, problem });
   }
   function progressActionAllowed(action, node) {
     if (action.kind !== 'progressPageSize' || window !== window.top || location.origin !== 'https://sagarmeinyog.com' || location.pathname !== '/dashboard/progress') return false;
@@ -394,6 +417,12 @@
     return false;
   }
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+    if (message?.type === 'courseWake') {
+      if (window.__courseAutomation !== instance) return false; // A newer copy answers.
+      respond({ alive: true });
+      if (!ticking && Date.now() - lastTickAt >= 1500) tick(); // Only when its own timer is running late.
+      return false;
+    }
     if (message?.type !== 'courseResolvePlay') return false;
     const node = elements.get(message.element);
     if (message.session !== session || message.document !== documentId || !node?.isConnected ||
@@ -406,20 +435,36 @@
     respond({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: innerWidth, height: innerHeight });
     return false;
   });
+  // Runs every second on its own timer, and also when the worker wakes it (Chrome slows the timers
+  // of a hidden or covered tab). Only one tick runs at a time.
   async function tick() {
+    if (ticking || stopped) return;
+    if (window.__courseAutomation !== instance) { stopped = true; return; }
+    ticking = true;
+    lastTickAt = Date.now();
+    clearTimeout(tickTimer);
     try {
-      const authorization = await chrome.runtime.sendMessage({ type: 'courseHello' });
+      const authorization = await send({ type: 'courseHello' });
       if (authorization?.session) {
-        if (session !== authorization.session) { restoreSpeeds(); session = authorization.session; handled = new Set(); practiceChoices.clear(); }
+        if (session !== authorization.session) {
+          restoreSpeeds();
+          session = authorization.session;
+          if (handledSession !== session) { handledSession = session; handled = new Set(); practiceChoices.clear(); }
+        }
         const { items, truncated } = inventory();
         const assessment = assessmentInventory();
         const snapshot = { session, document: documentId, path: location.pathname, top: window === window.top,
           ready: document.readyState === 'complete', truncated, elements: items, assessment, profileName: profileName(), progress: progressInventory() };
-        const response = await chrome.runtime.sendMessage({ type: 'courseInventory', snapshot });
+        const response = await send({ type: 'courseInventory', snapshot });
         if (response?.session === session) { applySpeed(response.playbackSpeed); await execute(response.action); }
       } else { restoreSpeeds(); session = null; }
-    } catch { if (!chrome.runtime?.id) return; }
-    setTimeout(tick, session ? 1000 : 2000);
+    } catch {
+      // The extension was reloaded: this copy is cut off for good, and the worker injects a new one.
+      if (!chrome.runtime?.id) { orphaned = true; stopped = true; }
+    } finally {
+      ticking = false;
+    }
+    if (!stopped) tickTimer = setTimeout(tick, session ? 1000 : 2000);
   }
   tick();
 })();

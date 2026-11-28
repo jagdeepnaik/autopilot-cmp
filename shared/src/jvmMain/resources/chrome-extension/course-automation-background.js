@@ -6,6 +6,14 @@ const courseDocuments = new Map();
 let courseTop = null;
 let handledSmyPageRequest = 0;
 let smyDiscoveryTimer = null;
+let handledSmyReloadRequest = 0;
+let smyWakeTimer = null;
+const smyInjectedAt = new Map(); // tabId -> when the course script was last injected
+const SMY_ORIGIN = 'https://sagarmeinyog.com';
+// The app's reload request is a timestamp. A worker that restarts mid-run must not replay an old one.
+const SMY_RELOAD_FRESH_MILLIS = 15000;
+const SMY_WAKE_MILLIS = 1000;
+const SMY_INJECT_RETRY_MILLIS = 10000;
 
 async function courseAuthorization(sender) {
   const current = command?.enabled ? command.courseAutomation : null;
@@ -40,7 +48,7 @@ async function courseAuthorization(sender) {
 }
 
 async function courseReport(event) {
-  const response = await fetch(`${BASE}/event`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(event) });
+  const response = await fetchApp('/event', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(event) }, EVENT_TIMEOUT_MILLIS);
   if (!response.ok) throw new Error('Course report refused');
 }
 
@@ -74,9 +82,101 @@ async function discoverSmyPage(request) {
   }
 }
 
+// A short code (letters only) saying why something failed; anything else is dropped.
+function problemCode(value) {
+  return typeof value === 'string' && /^[A-Za-z]{1,40}$/.test(value) ? value : null;
+}
+
+function isSmyTab(tab) {
+  try { return !!tab && new URL(tab.url).origin === SMY_ORIGIN; } catch { return false; }
+}
+
+// The course tab this run is bound to, or else the active Sagar Mein Yog tab.
+async function smyTab() {
+  if (courseTab !== null) {
+    try { const tab = await chrome.tabs.get(courseTab); if (isSmyTab(tab)) return tab; } catch {}
+  }
+  const tabs = await chrome.tabs.query({ url: `${SMY_ORIGIN}/*` });
+  return tabs.find(tab => tab.active && isSmyTab(tab)) || tabs.find(isSmyTab) || null;
+}
+
+// Puts the course script back into a tab whose copy is gone (the extension was reloaded or updated,
+// which cuts off the scripts already in open tabs). Without it only a page refresh brought it back.
+async function injectCourseScript(tabId, session) {
+  const last = smyInjectedAt.get(tabId) ?? 0;
+  if (Date.now() - last < SMY_INJECT_RETRY_MILLIS || !chrome.scripting?.executeScript) return;
+  smyInjectedAt.set(tabId, Date.now());
+  let success = false, problem = null;
+  try {
+    await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ['course-automation.js'] });
+    success = true;
+  } catch {
+    // Another site's frame (a video player) can refuse; the page itself is what matters.
+    try { await chrome.scripting.executeScript({ target: { tabId }, files: ['course-automation.js'] }); success = true; }
+    catch { problem = 'injectFailed'; }
+  }
+  if (session) courseReport({ type: 'smyScriptInjected', session, success, problem }).catch(() => {});
+}
+
+// While a run is on, the worker wakes the course tab every second. Chrome slows a hidden or covered
+// tab's own timers to once a minute, which made runs look hung; a message isn't slowed. A tab that
+// doesn't answer has lost its script, so it gets a new copy. These calls also keep this worker alive.
+let smyWakeInFlight = false;
+async function wakeSmyTab() {
+  const course = command?.enabled ? command.courseAutomation : null;
+  if (!course) { stopSmyWake(); return; }
+  if (smyWakeInFlight) return; // A busy tab answers late; don't pile up wake-ups.
+  smyWakeInFlight = true;
+  try {
+    const tab = await smyTab();
+    if (!tab || tab.id === undefined || !tab.active || tab.status !== 'complete') return;
+    try {
+      // A frozen tab may never answer; give up on this wake-up after 5 seconds.
+      let timer;
+      await Promise.race([chrome.tabs.sendMessage(tab.id, { type: 'courseWake' }),
+        new Promise(resolve => { timer = setTimeout(resolve, 5000); })]).finally(() => clearTimeout(timer));
+    } catch (error) {
+      if (/Receiving end does not exist/i.test(String(error?.message ?? error))) await injectCourseScript(tab.id, course.session);
+    }
+  } catch {} finally { smyWakeInFlight = false; }
+}
+
+function stopSmyWake() {
+  if (smyWakeTimer !== null) clearInterval(smyWakeTimer);
+  smyWakeTimer = null;
+}
+
+// The app asks for this when a run has made no progress for a while: what the user used to do by hand.
+async function reloadSmyPage(course, request) {
+  let success = false, problem = null;
+  try {
+    const tab = await smyTab();
+    if (!tab || tab.id === undefined) problem = 'noTab';
+    else if (!tab.active) problem = 'inactiveTab'; // Never take over a tab the user moved away from.
+    else {
+      courseTop = null;
+      courseDocuments.clear();
+      await chrome.tabs.reload(tab.id);
+      success = true;
+    }
+  } catch { problem = 'reloadFailed'; }
+  if (command?.courseAutomation?.session !== course.session) return;
+  try { await courseReport({ type: 'smyPageReloaded', session: course.session, request, success, problem }); } catch {}
+}
+
+function applySmyReloadRequest(course) {
+  const request = Number(course.reloadPageRequest ?? 0);
+  if (!request || request <= handledSmyReloadRequest) return;
+  handledSmyReloadRequest = request;
+  if (Math.abs(Date.now() - request) > SMY_RELOAD_FRESH_MILLIS) return;
+  reloadSmyPage(course, request);
+}
+
 function applySmyPageRequest(next) {
   const course = next?.enabled ? next.courseAutomation : null;
-  if (!course) { stopSmyDiscovery(); return; }
+  if (!course) { stopSmyDiscovery(); stopSmyWake(); return; }
+  if (smyWakeTimer === null) smyWakeTimer = setInterval(wakeSmyTab, SMY_WAKE_MILLIS);
+  applySmyReloadRequest(course);
   const request = Number(course.findSmyPageRequest ?? 0);
   if (request <= handledSmyPageRequest) return;
   handledSmyPageRequest = request;
@@ -132,7 +232,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (message.type === 'courseAction') {
       const action = authorized.action;
       if (action && action.request === message.request && action.document === message.document && courseDocuments.get(frame) === message.document) {
-        await courseReport({ type: 'courseAction', session: authorized.session, request: message.request, success: message.success === true });
+        await courseReport({ type: 'courseAction', session: authorized.session, request: message.request, success: message.success === true, problem: problemCode(message.problem) });
       }
       return null;
     }
@@ -165,4 +265,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     return fresh && fresh.session === authorized.session ? { session: fresh.session, action: fresh.action, playbackSpeed: fresh.playbackSpeed } : null;
   })().then(respond, () => respond(null));
   return true;
+});
+
+// After an install, update or reload, open course tabs still run the old, cut-off script.
+chrome.runtime.onInstalled.addListener(async () => {
+  try {
+    const tabs = await chrome.tabs.query({ url: `${SMY_ORIGIN}/*` });
+    for (const tab of tabs) if (tab.id !== undefined && tab.status === 'complete') injectCourseScript(tab.id, null);
+  } catch {}
 });

@@ -104,6 +104,33 @@ class BrowserExtensionTest {
     }
 
     @Test
+    fun `extension permissions stay limited to alarms, the DGS debugger and re-attaching the course script`() {
+        val manifest = kotlinx.serialization.json.Json.parseToJsonElement(bundled("manifest.json")) as kotlinx.serialization.json.JsonObject
+        assertEquals("[\"alarms\",\"debugger\",\"scripting\"]", manifest["permissions"].toString())
+        // Injection is only ever into Sagar Mein Yog tabs, which the host permissions already cover.
+        val worker = bundled("course-automation-background.js")
+        assertTrue("files: ['course-automation.js']" in worker)
+        assertTrue("url: `${'$'}{SMY_ORIGIN}/*`" in worker)
+    }
+
+    @Test
+    fun `SMY helper survives an extension reload, a hidden tab and a lost reply`() {
+        val course = bundled("course-automation.js")
+        // A cut-off copy (or a pre-1.16 `true` flag) is replaced; a working copy is kept.
+        assertTrue("if (window.__courseAutomation?.alive?.()) return;" in course)
+        assertTrue("message?.type === 'courseWake'" in course)
+        assertTrue("MESSAGE_TIMEOUT_MILLIS" in course)
+        // A brief loss of the worker must not reset which actions already ran.
+        assertTrue("if (handledSession !== session)" in course)
+        val worker = bundled("course-automation-background.js")
+        assertTrue("type: 'courseWake'" in worker)
+        assertTrue("SMY_RELOAD_FRESH_MILLIS" in worker)
+        assertTrue("!tab.active) problem = 'inactiveTab'" in worker)
+        val background = bundled("background.js")
+        assertTrue("POLL_TIMEOUT_MILLIS" in background && "AbortSignal.timeout" in background)
+    }
+
+    @Test
     fun `given an outdated extension folder when syncing then only changed files are rewritten`() {
         val folder = Files.createTempDirectory("extension").toFile()
         try {

@@ -2,6 +2,10 @@
 // text click once. Sagar Mein Yog automation uses a separate inventory/action channel below.
 const BASE = "http://127.0.0.1:47613";
 const STALE_MILLIS = 3000;
+// The app holds a poll for up to 20 seconds. A request that outlives these never got an answer (the app
+// hung, or the connection died while the computer slept): give up and ask again rather than wait forever.
+const POLL_TIMEOUT_MILLIS = 30000;
+const EVENT_TIMEOUT_MILLIS = 10000;
 importScripts("course-automation-background.js", "dgs-elearning-background.js", "dgs-browser-clicks.js", "oceantg-background.js", "marinesamraj-background.js");
 
 let command = null;
@@ -14,13 +18,19 @@ const frames = new Map(); // "tabId:frameId" -> scroll, video and requested-text
 
 const sleep = (millis) => new Promise((resolve) => setTimeout(resolve, millis));
 
+// fetch() with a deadline. AbortSignal.timeout is in every Chrome that runs this manifest.
+function fetchApp(path, options, timeoutMillis) {
+  const signal = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(timeoutMillis) : undefined;
+  return fetch(`${BASE}${path}`, { ...options, signal });
+}
+
 async function pollApp() {
   if (polling) return;
   polling = true;
   let version = -1;
   for (;;) {
     try {
-      const response = await fetch(`${BASE}/state?after=${version}`);
+      const response = await fetchApp(`/state?after=${version}`, {}, POLL_TIMEOUT_MILLIS);
       if (!response.ok) throw new Error(String(response.status));
       const body = await response.json();
       version = body.version;
@@ -94,7 +104,7 @@ function scrollerFrame(tabId) {
 }
 
 function report(event) {
-  fetch(`${BASE}/event`, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(event) }).catch(() => {});
+  fetchApp("/event", { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(event) }, EVENT_TIMEOUT_MILLIS).catch(() => {});
 }
 
 function reportPage(page) {

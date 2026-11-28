@@ -143,8 +143,9 @@ The source files are bundled under [`shared/src/jvmMain/resources/chrome-extensi
 The manifest currently grants only the permissions needed by the extension:
 
 - `alarms` keeps the service worker recoverable;
-- `debugger` supports the controlled DGS/native-click path;
-- `http://127.0.0.1:47613/*` permits the local bridge calls.
+- `debugger` supports the controlled DGS/native-click path and the Sagar Mein Yog video-play click;
+- `scripting` puts `course-automation.js` back into an open sagarmeinyog.com tab whose copy was cut off by an extension reload or update (only that file, only that site);
+- `http://127.0.0.1:47613/*` permits the local bridge calls, and `https://sagarmeinyog.com/*` the course tab.
 
 The content scripts use page matches, but each specialized script performs its own origin and frame checks before doing work. After an app update, reload **AutoPilot Page Helper** from `chrome://extensions` so Chrome loads the changed unpacked files.
 
@@ -238,6 +239,8 @@ It only authorizes:
 
 It removes assessment/profile/progress data from child frames and limits cross-origin frames to video state. It rejects oversized snapshots and sends accepted snapshots back as `courseChunk` events.
 
+It also keeps the course tab working (1.16.0): every second during a run it sends `courseWake` to the course tab, so the page script reads the page even when Chrome slows a hidden or covered tab's timers; a tab that doesn't answer gets a new copy of the script (`chrome.scripting`, at most every 10 seconds), as does every open course tab after an install, update or reload. On the app's `reloadPageRequest` it reloads the course tab once, only if that tab is active, and replies `smyPageReloaded`. See [when a run stops moving](30_HOW_AUTOPILOT_WORKS.md#when-a-sagar-mein-yog-run-stops-moving).
+
 Snapshots are split into 1000-character chunks because the local bridge limits event bodies to 16 KiB. A snapshot has a generated id, an ordered index and a total count. The Kotlin assembler refuses missing, duplicated, mixed-session or out-of-order chunks.
 
 ### `CourseAutomation.kt`: the decision maker
@@ -268,7 +271,8 @@ The extension never makes these policy decisions. It only reports the page and c
 - updates live status and the running screen;
 - handles user approvals, manual answers, retries and module actions;
 - records progress and run history;
-- stops and clears all active sessions safely.
+- stops and clears all active sessions safely;
+- reloads the course tab once when the run stops moving outside a wait or an assessment (`CourseStallRecovery`).
 
 The command is suppressed while a progress/profile confirmation or manual-answer decision blocks the course. This is why the page can remain visible in Chrome while the app waits for the user's choice.
 

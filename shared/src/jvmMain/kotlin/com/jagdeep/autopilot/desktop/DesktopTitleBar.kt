@@ -40,17 +40,24 @@ internal object DesktopTitleBar {
             isMac -> window.background = java.awt.Color(background.toArgb())
             isWindows -> runCatching {
                 val hwnd = HWND(Native.getComponentPointer(window) ?: return)
-                setAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, if (dark) 1 else 0)
+                applyDarkMode(dark) { attribute, value -> setAttribute(hwnd, attribute, value) }
+                // Windows 11 only: Windows 10 returns an error for these, which leaves its default colours.
                 setAttribute(hwnd, DWMWA_CAPTION_COLOR, background.toColorRef())
                 setAttribute(hwnd, DWMWA_TEXT_COLOR, content.toColorRef())
             }.onFailure { Log.w("Title bar colours not applied: ${it.message}", TAG) }
         }
     }
 
-    private fun setAttribute(hwnd: HWND, attribute: Int, value: Int) {
-        // Older Windows rejects attributes it doesn't know; that only means the default title bar.
+    /**
+     * Dark mode is attribute 20 from Windows 10 20H1 (build 19041) and on Windows 11, and was 19 on
+     * Windows 10 1809 to 1909. The first one Windows accepts wins; if neither is, the frame stays light.
+     */
+    internal fun applyDarkMode(dark: Boolean, set: (attribute: Int, value: Int) -> Int): Boolean =
+        DARK_MODE_ATTRIBUTES.any { attribute -> set(attribute, if (dark) 1 else 0) == S_OK }
+
+    /** Returns the HRESULT. Older Windows rejects attributes it doesn't know; that only means the default title bar. */
+    private fun setAttribute(hwnd: HWND, attribute: Int, value: Int): Int =
         Dwmapi.INSTANCE.DwmSetWindowAttribute(hwnd, attribute, IntByReference(value).pointer, Int.SIZE_BYTES)
-    }
 
     /** COLORREF is 0x00BBGGRR. */
     private fun Color.toColorRef(): Int {
@@ -71,7 +78,8 @@ internal object DesktopTitleBar {
     }
 
     private const val TAG = "DesktopTitleBar"
-    private const val DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+    private const val S_OK = 0
+    internal val DARK_MODE_ATTRIBUTES = listOf(20, 19) // DWMWA_USE_IMMERSIVE_DARK_MODE, then its pre-20H1 value
     private const val DWMWA_CAPTION_COLOR = 35
     private const val DWMWA_TEXT_COLOR = 36
 }

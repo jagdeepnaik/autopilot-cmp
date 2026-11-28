@@ -22,6 +22,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -215,6 +216,7 @@ class PageController(
         if (channel !in progressMarkers && progressMarkers.size >= 32) progressMarkers.remove(progressMarkers.keys.first())
         progressMarkers[channel] = marker
         mutableState.update { it.copy(progressRevision = it.progressRevision + 1, inactivityWarning = null) }
+        stallRecovery?.let { recovery -> onRecoveryStep(recovery.progressed(now())) }
     }
     fun reportInactivity(message: String?) {
         val previous = state.value.inactivityWarning
@@ -415,7 +417,16 @@ class PageController(
     private val oceanProgressMutex = Mutex()
     private var activeAnswerBankStore: CourseAnswerBankStore = answerBankStore
     private var courseProgress: CourseProgressSession? = null
+    /** Reloads the Sagar Mein Yog tab once when a run stops moving; null outside such a run. */
+    private var stallRecovery: CourseStallRecovery? = null
     private val courseChunks = CourseSnapshotAssembler()
+    /**
+     * Messages from Chrome wait here, so a slow step (a database write, an answer-bank save) never
+     * holds up the bridge: its own buffer is small and drops what doesn't fit, which used to lose
+     * snapshot chunks and action replies and leave a run waiting for a reply that had been dropped.
+     */
+    private val inbox = Channel<String>(INBOX_CAPACITY)
+    private var inboxDropped = 0L
     private var courseRunSequence = 0L
     private var lastCourseSnapshotSummary: String? = null
     // Run-log state: reset when each Chrome routine starts.
@@ -513,7 +524,24 @@ class PageController(
             }
         }
         scope.launch { progressRepository.accounts().collect { accounts -> mutableState.update { it.copy(progressAccounts = accounts) } } }
-        scope.launch { bridge.incoming.collect(::onMessage) }
+        scope.launch {
+            bridge.incoming.collect { raw ->
+                if (inbox.trySend(raw).isFailure && inboxDropped++ == 0L) {
+                    runLog.event(RunLogSource.Bridge, "bridge.inboxFull", mapOf("capacity" to INBOX_CAPACITY), RunLogLevel.Warn)
+                }
+            }
+        }
+        scope.launch {
+            for (raw in inbox) {
+                // One bad message must not stop every later one, which would freeze the run.
+                try { onMessage(raw) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (e: Exception) {
+                    Log.w("Chrome message failed: ${e.message}", TAG)
+                    runLog.error(RunLogSource.Bridge, "bridge.messageFailed", e)
+                }
+            }
+        }
         scope.launch {
             automation.hotKeys.presses.collect { key ->
                 val prefs = currentPreferences.value
@@ -582,6 +610,7 @@ class PageController(
                     .also { session -> session.onAnswerLookup = { question, found -> logLookup(question, found, session.currentModule) } }
                 courseProgress = if (progressRepository.available) CourseProgressSession(progressRepository, courseAutomation!!.session, routine.waitAfterClickMillis) else null
                 courseChunks.clear()
+                stallRecovery = CourseStallRecovery()
                 launchActivity(
                     PageActivity.Automation(
                         routine.copy(answerBankFile = bankFile),
@@ -645,6 +674,7 @@ class PageController(
         if (state.value.activity is PageActivity.Automation) {
             courseAutomation = null
             courseProgress = null
+            stallRecovery = null
             courseChunks.clear()
             publish()
         }
@@ -816,6 +846,7 @@ class PageController(
                 }
                 val finished = courseProgressMutex.withLock { runner?.completed == true && courseProgress?.isChecking != true }
                 if (finished) { outcome = RunOutcome.Completed; break }
+                if (runner != null) checkStallRecovery(runner)
                 kotlinx.coroutines.delay(100)
             }
         } catch (e: CancellationException) { throw e }
@@ -904,6 +935,7 @@ class PageController(
         marineSamraj = null
         marineSamrajChunks.clear()
         courseProgress = null
+        stallRecovery = null
         courseChunks.clear()
         questionAlertKey = null
         questionAlertAt = null
@@ -1156,7 +1188,7 @@ class PageController(
             dgs = dgsSession?.command,
             courseAutomation = courseAutomation?.let {
                 CourseCommand(it.session, if (courseProgress?.blocksActions == true) null else courseProgress?.action ?: it.action,
-                    it.playbackSpeed, focusBrowserRequest)
+                    it.playbackSpeed, focusBrowserRequest, stallRecovery?.pendingRequest ?: 0)
             },
             oceanTG = oceanTG?.let { OceanCommand(it.session, it.action) },
             marineSamraj = marineSamraj?.let {
@@ -1179,9 +1211,33 @@ class PageController(
 
     private suspend fun handleCourseMessage(raw: String): Boolean {
         val event = runCatching { json.decodeFromString(CourseWireEvent.serializer(), raw) }.getOrNull() ?: return false
-        if (event.type != "courseChunk" && event.type != "courseAction" && event.type != "smyPageFound") return false
+        if (event.type !in setOf("courseChunk", "courseAction", "smyPageFound", "smyPageReloaded", "smyScriptInjected")) return false
         val runner = courseAutomation ?: return true
         if (event.session != runner.session) return true
+        if (event.type == "smyScriptInjected") {
+            runLog.event(RunLogSource.Extension, "extension.scriptInjected", mapOf("success" to event.success, "problem" to event.problem),
+                if (event.success) RunLogLevel.Info else RunLogLevel.Warn)
+            live.log(LiveSource.Chrome) { if (event.success) "The extension reattached to the course tab" else "The extension couldn't reattach to the course tab" }
+            return true
+        }
+        if (event.type == "smyPageReloaded") {
+            courseProgressMutex.withLock {
+                val recovery = stallRecovery ?: return true
+                if (recovery.pendingRequest != event.request) return true
+                runLog.event(RunLogSource.Routine, if (event.success) "recovery.reloaded" else "recovery.reloadRefused",
+                    mapOf("request" to event.request, "problem" to event.problem), if (event.success) RunLogLevel.Info else RunLogLevel.Warn)
+                live.log(LiveSource.Chrome) { if (event.success) "Reloaded the course tab" else "Couldn't reload the course tab (${event.problem})" }
+                if (event.success) {
+                    runner.pageReloaded()
+                    courseChunks.clear()
+                    lastCourseInventoryAt = now()
+                    updateDetail(runner.detail)
+                }
+                onRecoveryStep(recovery.acknowledged(event.request, event.success, event.problem, now()))
+                publish()
+            }
+            return true
+        }
         if (event.type == "smyPageFound") {
             runLog.event(RunLogSource.Page, "page.smyFound", mapOf("success" to event.success), if (event.success) RunLogLevel.Info else RunLogLevel.Warn)
             if (event.success) {
@@ -1197,8 +1253,8 @@ class PageController(
         if (event.type == "courseAction") {
             live.log(LiveSource.Chrome) { "Course action ${event.request}: ${if (event.success) "accepted" else "refused"}" }
             runLog.event(RunLogSource.Extension, "extension.ack", mapOf("routine" to "courseAutomation", "request" to event.request, "success" to event.success,
-                "progressAction" to (courseProgress?.action?.request == event.request)), if (event.success) RunLogLevel.Info else RunLogLevel.Warn)
-            if (courseProgress?.acknowledge(event.request, event.success, now()) != true) runner.acknowledge(event.request, event.success, now())
+                "progressAction" to (courseProgress?.action?.request == event.request), "problem" to event.problem), if (event.success) RunLogLevel.Info else RunLogLevel.Warn)
+            if (courseProgress?.acknowledge(event.request, event.success, now()) != true) runner.acknowledge(event.request, event.success, now(), event.problem)
         } else courseChunks.accept(event)?.let { snapshot ->
             lastCourseSnapshot = snapshot
             lastCourseInventoryAt = now()
@@ -1346,6 +1402,50 @@ class PageController(
         }
     }
 
+    /** Reloads the course tab once when the run has stopped moving (see [CourseStallRecovery]). */
+    private suspend fun checkStallRecovery(runner: CourseAutomationSession) = courseProgressMutex.withLock {
+        val recovery = stallRecovery ?: return@withLock
+        if (courseAutomation !== runner) return@withLock
+        val at = now()
+        val tracking = courseProgress
+        val blocker = runner.recoveryBlocker(at) ?: when {
+            tracking?.request != null -> "profileChoice"
+            tracking?.isChecking == true || tracking?.blocksActions == true -> "progressCheck"
+            !state.value.isConnected -> "disconnected"
+            else -> null
+        }
+        val step = recovery.check(at, blocker != null)
+        if (step is CourseStallRecovery.Step.Reload) {
+            runLog.event(RunLogSource.Routine, "recovery.reloadRequested", mapOf("request" to step.request, "reload" to step.reload,
+                "stalledMs" to step.stalledMillis, "sinceSnapshotMs" to at - lastCourseInventoryAt, "actionKind" to runner.action?.kind,
+                "actionRequest" to runner.action?.request, "snapshotSeen" to (lastCourseSnapshot != null)) + bridgeData(), RunLogLevel.Warn)
+            live.log(LiveSource.Routine) { "No progress for ${step.stalledMillis / 1000} seconds: reloading the course tab (${step.reload} of ${CourseStallRecovery.MAX_RELOADS})" }
+            updateDetail("Nothing changed for ${step.stalledMillis / 1000} seconds. Reloading the course page once, then continuing from where it is.")
+            publish()
+        } else onRecoveryStep(step)
+    }
+
+    private fun onRecoveryStep(step: CourseStallRecovery.Step) {
+        when (step) {
+            CourseStallRecovery.Step.None, is CourseStallRecovery.Step.Reload -> Unit
+            is CourseStallRecovery.Step.PageFound -> runLog.event(RunLogSource.Routine, "recovery.pageFound", mapOf("afterMs" to step.afterMillis))
+            is CourseStallRecovery.Step.Recovered -> {
+                runLog.event(RunLogSource.Routine, "recovery.recovered", mapOf("afterMs" to step.afterMillis))
+                live.log(LiveSource.Routine) { "The run is moving again after the reload" }
+            }
+            is CourseStallRecovery.Step.GaveUp -> {
+                runLog.event(RunLogSource.Routine, "recovery.gaveUp", mapOf("reason" to step.reason), RunLogLevel.Warn)
+                live.log(LiveSource.Routine) { "Automatic recovery stopped (${step.reason}); the stall alert follows if nothing changes" }
+                publish()
+            }
+        }
+    }
+
+    private fun updateDetail(detail: String) = mutableState.update { state ->
+        val activity = state.activity as? PageActivity.Automation ?: return@update state
+        state.copy(activity = activity.copy(detail = detail))
+    }
+
     private fun moduleStatuses(summary: CourseProgressSummary?): List<CourseModuleStatus> {
         val profile = summary?.displayName ?: return SAGAR_MEIN_YOG_MODULES.map { CourseModuleStatus(it, false, false, false) }
         val records = summary.records
@@ -1423,6 +1523,7 @@ class PageController(
         const val NOT_STARTED = "NotStarted"
         const val TICK_MILLIS = 1_000L
         const val STALL_MILLIS = 5 * 60_000L
+        const val INBOX_CAPACITY = 20_000
         val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     }
 }

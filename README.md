@@ -29,7 +29,7 @@ With **Stop for videos** on, it stops at each video it reaches and plays it so y
 2. Scroll to the bottom of the page, press **Pick steps on screen**, and press **F7** over each button to press there, in order. Each step has its own name, wait and button, like a multi-point click. A step can instead be a **button text**, such as "Back to Course": the extension finds that button wherever it is on the page and clicks it, waiting up to 30 seconds for it to appear. Set the number of rounds and save.
 3. Select the routine and press **Start**. Chrome comes to the front by itself. Clicking pauses whenever another app is in front, so leave Chrome there.
 
-After adding or reloading the extension, refresh any page that's already open.
+After adding or reloading the extension, refresh any page that's already open. Sagar Mein Yog tabs are the exception from extension 1.16.0: the extension puts its script back into them itself, and a Sagar Mein Yog run that stops moving reloads its tab once on its own.
 
 It stops after the last round, or if a click leaves the page unchanged for 15 seconds. The usual stops below also work, and each run appears in Activity. The spot is a position on the screen, so keep the Chrome window where it was when you picked it.
 
@@ -96,7 +96,8 @@ The hot keys and both pointer stops can be changed in Settings.
 | Platform | Status | Notes |
 | --- | --- | --- |
 | macOS (Apple Silicon) | Tested | Needs Accessibility permission, which the app asks for. |
-| Windows | Not tested yet | The code compiles, but it hasn't run on Windows. Apps running as administrator can't be clicked. |
+| Windows 11 (x64) | Tested on Legion | Install, launch and Smart App Control are checked there (`./dev run legion`). Apps running as administrator can't be clicked. |
+| Windows 10 (x64, 22H2) | Expected to work, not tested yet | A static audit found nothing Windows 11-only that it depends on; see [the Windows 10 notes](private/docs/project/30_HOW_AUTOPILOT_WORKS.md#windows-10). |
 | Linux | Not supported yet | The app opens but can't click. |
 | Android, iOS | Not supported yet | The app opens and says it's desktop-only. |
 
@@ -106,7 +107,7 @@ On macOS, a run from the IDE or a terminal uses that app's Accessibility permiss
 
 ## Requirements
 
-- JDK 21 (Gradle provisions it; Android Studio's bundled JDK can launch Gradle)
+- JDK 25 (Microsoft build; Gradle provisions it from `gradle/gradle-daemon-jvm.properties`)
 - Android Studio with the Kotlin Multiplatform plugin, Android SDK 37
 - Xcode 16.2 or later for iOS
 
@@ -209,7 +210,7 @@ Windows MSI builds and Mac-to-Windows debugging: [setup and commands](private/sc
 
 ### Extension version and alert checks
 
-Settings → Browser connection always shows the version bundled with this app and the version actually reported by Chrome. Startup updates the unpacked extension files. Chrome still needs a manual extension reload and page refresh to load changed scripts. Browser routines refuse to start with an unverified/mismatched version or a folder-update failure and explain the next step.
+Settings → Browser connection always shows the version bundled with this app and the version actually reported by Chrome. Startup updates the unpacked extension files. Chrome still needs a manual extension reload to load changed scripts, and a page refresh for every site except Sagar Mein Yog (whose tabs get the new script automatically). Browser routines refuse to start with an unverified/mismatched version or a folder-update failure and explain the next step.
 
 Settings → Alert sounds is enabled by default and includes Test sound. Question reminders use two notes every 30 seconds; failed assessments use three descending notes. A routine with no progress for five minutes uses a distinct four-note alert, repeating every five minutes until progress resumes or the routine stops. Warnings remain visible with sound disabled. Advancing video time, scrolling, lesson navigation and answers count as progress; elapsed-time labels and unchanged heartbeats do not. Scheduled click waits and countdowns are intentional waits, not stalls. No volume or Windows audio settings are changed automatically.
 

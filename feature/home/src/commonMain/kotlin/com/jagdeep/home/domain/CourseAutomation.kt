@@ -67,7 +67,9 @@ internal data class CourseSnapshot(
 )
 
 @Serializable
-internal data class CourseAction(val request: Long, val document: String, val element: String, val kind: String = "click", val expectedLabel: String? = null)
+internal data class CourseAction(val request: Long, val document: String, val element: String, val kind: String = "click", val expectedLabel: String? = null,
+    /** For "play" only: pause first, then play, because the video reports playing while its time stands still. */
+    val restart: Boolean = false)
 
 @Serializable
 internal data class CourseCommand(
@@ -75,6 +77,8 @@ internal data class CourseCommand(
     val action: CourseAction? = null,
     val playbackSpeed: Double = 1.0,
     val findSmyPageRequest: Long = 0,
+    /** While non-zero: reload the course tab once for this request (see [CourseStallRecovery]). */
+    val reloadPageRequest: Long = 0,
 )
 
 internal data class CourseCompletion(
@@ -244,6 +248,8 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private var pendingAt = 0L
     private var nextActionAt = 0L
     private val lastVideoPlayAt = mutableMapOf<String, Long>()
+    /** Per playing video: the last position that moved and when, to notice a player that is stuck. */
+    private val videoMotion = mutableMapOf<String, Pair<Double, Long>>()
     private val videoStartedAt = mutableMapOf<String, Long>()
     private val completedVideoMillis = mutableMapOf<String, Long>()
     private val assessmentStartedAt = mutableMapOf<String, Long>()
@@ -358,8 +364,11 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     internal fun canVerifyProgress(snapshot: CourseSnapshot): Boolean = snapshot.top && action == null &&
         viewOf(snapshot) in setOf(CourseView.Dashboard, CourseView.Course)
 
-    fun acknowledge(request: Long, success: Boolean, now: Long = pendingAt) {
+    fun acknowledge(request: Long, success: Boolean, now: Long = pendingAt, problem: String? = null) {
         val pending = action?.takeIf { it.request == request } ?: return
+        if (!success && pending.kind == "play" && problem == "notAllowed") {
+            detail = "Chrome blocked playback with sound. Click once on the course page in Chrome; AutoPilot keeps retrying."
+        }
         if (success && pending.kind != "play") clicks++
         if (success) nextActionAt = maxOf(nextActionAt, now + waitAfterClickMillis.coerceIn(0, 86_400_000))
         if (!success && pending.kind == "certificateDownload") {
@@ -376,6 +385,38 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             blockedDocument = pending.document
         }
         action = null
+    }
+
+    /**
+     * Why reloading the course tab now could be unsafe or pointless, or null when it's safe: a wait for
+     * the user, a timed wait, an assessment or quiz in progress, or a pending action that could submit.
+     */
+    internal fun recoveryBlocker(now: Long): String? = when {
+        completed -> "completed"
+        approval != null -> "approval"
+        manualAnswer != null -> "manualAnswer"
+        failure != null -> "failure"
+        attention != null -> "attention"
+        currentView == CourseView.Assessment -> "assessment"
+        action?.let { it.kind != "click" && it.kind != "play" && it.kind != "courseDashboard" } == true -> "assessmentAction"
+        now < nextActionAt -> "timedWait"
+        else -> null
+    }
+
+    /**
+     * The extension reloaded the course tab. The old document is gone, so its pending action and blocks
+     * can never apply again; the next snapshot, from a new document, is read as a fresh page. Nothing
+     * that was answered or submitted is repeated: those views never reload ([recoveryBlocker]), and
+     * the extension acts only on an action addressed to the document that is showing.
+     */
+    fun pageReloaded() {
+        action = null
+        blockedDocument = null
+        blockedPath = null
+        lastPath = null
+        lastVideoPlayAt.clear()
+        videoMotion.clear()
+        detail = "Reloaded the course page after no progress. Reading it again."
     }
 
     private fun requestManualCertificate(now: Long) {
@@ -431,6 +472,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             lastPath = pageId
             videos.clear()
             lastVideoPlayAt.clear()
+            videoMotion.clear()
             videoStartedAt.clear()
             blockedDocument = null
             blockedPath = null
@@ -465,12 +507,12 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         }
         val elements = snapshot.elements.filter { it.visible && it.enabled }
         val focusedHere = focusedModule != null && CourseAnswerBank.normalize(currentModule.orEmpty()) == focusedModule
-        fun issue(element: CourseElement, kind: String = "click", message: String, repeat: Boolean = false) {
+        fun issue(element: CourseElement, kind: String = "click", message: String, repeat: Boolean = false, restart: Boolean = false) {
             val key = "$pageId:${snapshot.document}:${element.id}:$kind"
             if (!repeat && !attempted.add(key)) { detail = "Waiting for the page to change. Stop and start again if it stays here."; return }
             action = CourseAction(++sequence, snapshot.document, element.id, kind, element.label.takeIf {
                 kind.startsWith("assessment") || kind == "quizOpen" || kind in setOf("certificateDownload", "certificateClose")
-            })
+            }, restart = restart)
             pendingAt = now
             detail = message
         }
@@ -815,7 +857,23 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             val video = elements.firstOrNull { it.tag == "video" && !it.decorative && !it.ended }
             if (video != null) {
                 if (!video.paused) {
-                    "${snapshot.document}:${video.id}".let { key -> if (key !in videoStartedAt) videoStartedAt[key] = now }
+                    val key = "${snapshot.document}:${video.id}"
+                    if (key !in videoStartedAt) videoStartedAt[key] = now
+                    // A player can say "playing" while its time stands still (a stalled stream or
+                    // decoder). Pause and play it once a minute until it moves; the stall recovery
+                    // reloads the page if that doesn't help.
+                    val position = video.mediaPosition
+                    val motion = videoMotion[key]
+                    if (position != null && (motion == null || position - motion.first > 0.25 || position < motion.first)) {
+                        videoMotion[key] = position to now
+                    } else if (position != null && now - motion!!.second >= FROZEN_VIDEO_MILLIS) {
+                        val lastPlayAt = lastVideoPlayAt[key]
+                        if (lastPlayAt == null || now - lastPlayAt >= FROZEN_VIDEO_RETRY_MILLIS) {
+                            lastVideoPlayAt[key] = now
+                            issue(video, "play", "The video says it's playing, but its time isn't moving. Pausing and playing it again.", repeat = true, restart = true)
+                            return
+                        }
+                    }
                     detail = "Watching the video. It continues when the video ends."; return
                 }
                 // Use the player's own start control first: it may initialize its media source.
@@ -1134,3 +1192,9 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
         .replace(Regex("\\s+"), " ").trim() + ":row:$index")
     private fun forbidden(text: String) = Regex("quiz|assessment|exam|submit|delete|purchase", RegexOption.IGNORE_CASE).containsMatchIn(text)
 }
+
+/** How long a "playing" video's time may stand still before it is paused and played again. */
+internal const val FROZEN_VIDEO_MILLIS = 20_000L
+
+/** At most one pause-and-play per stuck video in this time. */
+internal const val FROZEN_VIDEO_RETRY_MILLIS = 60_000L

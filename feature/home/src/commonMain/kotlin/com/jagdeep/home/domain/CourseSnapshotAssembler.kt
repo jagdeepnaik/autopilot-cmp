@@ -13,6 +13,8 @@ internal data class CourseWireEvent(
     val chunk: String = "",
     val request: Long = 0,
     val success: Boolean = false,
+    /** A short code saying why an action, reload or script injection failed (extension 1.16.0+), for the run log. */
+    val problem: String? = null,
 )
 
 /** Bounded, ordered assembly. A partial, duplicated or mixed inventory never triggers an action. */

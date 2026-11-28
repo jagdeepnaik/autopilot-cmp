@@ -224,6 +224,63 @@ class CourseAutomationTest {
         assertNull(runner.action, "Wait before retrying a paused or refused player")
     }
 
+    @Test fun `given a playing video whose time stands still then pause and play it once a minute`() {
+        val runner = CourseAutomationSession("session")
+        val video = CourseElement("video", tag = "video", paused = false, mediaPosition = 12.0)
+        runner.read(snapshot(lesson, video), 0)
+        runner.read(snapshot(lesson, video.copy(mediaPosition = 30.0)), 10_000)
+        runner.read(snapshot(lesson, video.copy(mediaPosition = 30.0)), 29_000)
+        assertNull(runner.action, "A video that moved recently is still playing")
+        runner.read(snapshot(lesson, video.copy(mediaPosition = 30.0)), 30_000)
+        assertEquals("play", runner.action?.kind)
+        assertTrue(runner.action!!.restart, "A stuck player is paused first, so play() restarts it")
+        runner.ack()
+        runner.read(snapshot(lesson, video.copy(mediaPosition = 30.0)), 60_000)
+        assertNull(runner.action, "At most one restart a minute")
+        runner.read(snapshot(lesson, video.copy(mediaPosition = 30.0)), 90_000)
+        assertTrue(runner.action!!.restart)
+    }
+
+    @Test fun `given Chrome blocks playback with sound then say what to do and keep retrying`() {
+        val runner = CourseAutomationSession("session")
+        val video = CourseElement("video", tag = "video", paused = true)
+        runner.read(snapshot(lesson, video), 0)
+        runner.acknowledge(runner.action!!.request, false, 0, problem = "notAllowed")
+        assertTrue(runner.detail.contains("blocked playback with sound"))
+        runner.read(snapshot(lesson, video), 6_000)
+        assertEquals("play", runner.action?.kind)
+    }
+
+    @Test fun `given a reloaded page then a document blocked by a lost reply is read afresh`() {
+        val runner = CourseAutomationSession("session")
+        val watch = CourseElement("watch", label = "Watch video", href = lesson, context = "Part:1 Not Started")
+        runner.read(snapshot(course, watch, document = "spa"), 0)
+        assertEquals("watch", runner.action?.element)
+        runner.read(snapshot(course, watch, document = "spa"), 16_000) // No reply for 15 seconds.
+        assertNull(runner.action)
+        runner.read(snapshot(course, watch, document = "spa"), 17_000)
+        assertNull(runner.action, "The same document stays blocked: this used to need a manual refresh")
+        assertNull(runner.recoveryBlocker(17_000))
+
+        runner.pageReloaded()
+        runner.read(snapshot(course, watch, document = "after-reload"), 20_000)
+        assertEquals("watch", runner.action?.element)
+        assertEquals("after-reload", runner.action?.document)
+    }
+
+    @Test fun `recovery never reloads an assessment, a wait for the user or a timed wait`() {
+        val runner = CourseAutomationSession("session", waitAfterClickMillis = 10_000, answerAssessments = true)
+        val watch = CourseElement("watch", label = "Watch video", href = lesson, context = "Part:1 Not Started")
+        runner.read(snapshot(course, watch), 0)
+        runner.ack()
+        assertEquals("timedWait", runner.recoveryBlocker(5_000))
+        assertNull(runner.recoveryBlocker(10_000))
+        val question = CourseQuestion("q", "Which option is correct?", listOf(CourseOption("a", "First"), CourseOption("b", "Second")))
+        runner.read(CourseSnapshot("session", "test", "$course/test/attempt", elements = listOf(CourseElement("crumb", tag = "a", href = course, label = "Wellness")),
+            assessment = CourseAssessment("Wellness", listOf(question))), 20_000)
+        assertTrue(runner.recoveryBlocker(20_000) in setOf("assessment", "approval", "attention", "manualAnswer"))
+    }
+
     @Test fun `given a paused video with a resume control then retry that control safely`() {
         val runner = CourseAutomationSession("session")
         val video = CourseElement("video", tag = "video", paused = true)

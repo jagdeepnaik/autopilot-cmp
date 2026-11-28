@@ -610,6 +610,62 @@ class PageControllerTest {
         assertEquals(1, history.records.value.single().clicks)
     }
 
+    @Test
+    fun `given a course run that stops moving then reload the tab once and continue on the new page`() = runTest {
+        val controller = controller()
+        assertNull(controller.start(CourseAutomationRoutine("auto", "Course", waitAfterClickMillis = 0)))
+        runCurrent()
+        val session = lastCommand().courseAutomation!!.session
+        var sent = 0
+        suspend fun send(snapshot: CourseSnapshot) {
+            val chunks = json.encodeToString(CourseSnapshot.serializer(), snapshot).chunked(1000)
+            val id = "snapshot-${++sent}"
+            chunks.forEachIndexed { index, chunk ->
+                bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("courseChunk", session, id, index, chunks.size, chunk)))
+                runCurrent()
+            }
+        }
+        val watch = CourseElement("watch", label = "Watch video", href = "/dashboard/courses/abc/def", context = "Part:1 Not Started")
+        val page = CourseSnapshot(session, "spa", "/dashboard/courses/abc", elements = listOf(watch))
+        send(page)
+        assertEquals("watch", lastCommand().courseAutomation!!.action?.element)
+        // The reply to that click never arrives (it was lost), so the document is blocked: this used to
+        // stay put until someone refreshed the page by hand.
+        advanceTimeBy(16_000); send(page)
+        assertNull(lastCommand().courseAutomation!!.action)
+        assertEquals(0, lastCommand().courseAutomation!!.reloadPageRequest)
+        advanceTimeBy(75_000); runCurrent()
+        val request = lastCommand().courseAutomation!!.reloadPageRequest
+        assertTrue(request > 0, "No progress for 90 seconds asks the extension to reload the tab")
+
+        bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("smyPageReloaded", session, request = request, success = true)))
+        runCurrent()
+        assertEquals(0, lastCommand().courseAutomation!!.reloadPageRequest)
+        send(page.copy(document = "after-reload"))
+        assertEquals("watch", lastCommand().courseAutomation!!.action?.element)
+        assertEquals("after-reload", lastCommand().courseAutomation!!.action?.document, "Actions go only to the page now showing")
+        controller.stop(); runCurrent()
+    }
+
+    @Test
+    fun `given a course run that waits for an approval then it is never reloaded`() = runTest {
+        val controller = controller()
+        assertNull(controller.start(CourseAutomationRoutine("auto", "Course", answerAssessments = true)))
+        runCurrent()
+        val session = lastCommand().courseAutomation!!.session
+        val failed = CourseSnapshot(session, "result-doc", "/dashboard/courses/abc/assessment/result/result1", elements = listOf(CourseElement("retry", label = "Re-attempt")),
+            assessment = CourseAssessment("Wellness", result = "failed", retry = "retry"))
+        val chunks = json.encodeToString(CourseSnapshot.serializer(), failed).chunked(1000)
+        chunks.forEachIndexed { index, chunk ->
+            bridge.messages.emit(json.encodeToString(CourseWireEvent.serializer(), CourseWireEvent("courseChunk", session, "s", index, chunks.size, chunk)))
+            runCurrent()
+        }
+        assertNotNull((controller.state.value.activity as PageActivity.Automation).failure)
+        advanceTimeBy(600_000); runCurrent()
+        assertEquals(0, lastCommand().courseAutomation!!.reloadPageRequest)
+        controller.stop(); runCurrent()
+    }
+
     private fun TestScope.found(label: String?) {
         val body = if (label == null) """{"type":"found","label":null}""" else """{"type":"found","label":"$label"}"""
         bridge.messages.tryEmit(body)

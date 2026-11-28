@@ -247,6 +247,8 @@ There are two endpoints:
 
 So a command reaches Chrome almost instantly without constant requests. The app compares with "not equal" rather than "greater than", so an extension still holding a version from before an app restart catches up.
 
+The extension gives up on a poll after 30 seconds and on an event after 10 seconds, then asks again, so a request that never gets an answer (for example after the computer slept) can't stop the link for good. In the app, `PageController` moves each incoming message straight into its own queue (up to 20,000 messages) and handles it from there, so a slow step such as a database write never holds up the bridge, whose own buffer is small and drops what doesn't fit. One message that fails is logged (`bridge.messageFailed`) and the next is handled as usual.
+
 ```mermaid
 sequenceDiagram
     participant E as background.js
@@ -325,9 +327,9 @@ This stops **web pages** from driving the app. It doesn't stop **another program
 
 ## 8. The Chrome extension
 
-The files are in `shared/src/jvmMain/resources/chrome-extension/` and ship inside the app (version **1.14.1**, "AutoPilot Page Helper"). At every start the app writes them to `~/.autopilot/extensions/chrome/`, rewriting only changed files, and Chrome loads them from there as an unpacked extension. After an update, press reload on the extension in `chrome://extensions`; Settings shows the bundled and running versions.
+The files are in `shared/src/jvmMain/resources/chrome-extension/` and ship inside the app (version **1.16.0**, "AutoPilot Page Helper"). At every start the app writes them to `~/.autopilot/extensions/chrome/`, rewriting only changed files, and Chrome loads them from there as an unpacked extension. After an update, press reload on the extension in `chrome://extensions`; Settings shows the bundled and running versions.
 
-**Permissions:** `alarms`; `debugger`, used only for DGS navigation (it attaches to the bound, foreground DGS tab for one pending request, then detaches, and is never used to read pages or network traffic); and `host_permissions` for `127.0.0.1:47613` only. `content.js` runs on all pages, because Scroll and click works on whichever page you use; the course scripts run only on their sites (sagarmeinyog.com, DGS and its YouTube embeds). A test confirms the only address in the scripts is the local one.
+**Permissions:** `alarms`; `debugger`, used only for DGS navigation (it attaches to the bound, foreground DGS tab for one pending request, then detaches, and is never used to read pages or network traffic) and for the Sagar Mein Yog video-play click; `scripting`, used only to put `course-automation.js` back into an open sagarmeinyog.com tab whose copy was cut off (see [reloading the extension](#reloading-the-extension)); and `host_permissions` for `127.0.0.1:47613` and `sagarmeinyog.com` only. `content.js` runs on all pages, because Scroll and click works on whichever page you use; the course scripts run only on their sites (sagarmeinyog.com, DGS and its YouTube embeds). A test confirms the only address in the scripts is the local one.
 
 ### Two scripts, two roles
 
@@ -379,11 +381,16 @@ A page can have many frames, so `background.js` keeps a record of each (entries 
 
 ### Staying alive
 
-Chrome stops idle service workers after about 30 seconds. To avoid that, the worker makes a harmless API call every 20 seconds, and a one-minute alarm restarts it if Chrome stops it anyway.
+Chrome stops idle service workers after about 30 seconds. To avoid that, the worker makes a harmless API call every 20 seconds, and a one-minute alarm restarts it if Chrome stops it anyway. During a Sagar Mein Yog run the worker also messages the course tab every second (below), which keeps it busy too.
+
+A stopped worker doesn't cut off the page scripts: their next message starts it again, and it reconnects to the app. It does forget which course tab and document it had bound, so an action reply from before the restart can be refused; the app then treats that action as unconfirmed, and the [stall recovery](#when-a-sagar-mein-yog-run-stops-moving) takes over if the run stops moving.
 
 ### Reloading the extension
 
-Reloading cuts off the `content.js` already running in open tabs, and Chrome doesn't inject the new one until the tab is refreshed. **So after a reload, refresh the page.** Until you do, a run shows "Reading the page", because nothing is reporting.
+Reloading or updating the extension cuts off the scripts already running in open tabs ("Extension context invalidated"), and Chrome doesn't inject the new ones until the tab is refreshed.
+
+- **Sagar Mein Yog tabs refresh themselves, in effect.** After an install, update or reload the worker injects `course-automation.js` into every open sagarmeinyog.com tab, and during a run it injects it again into a course tab that stops answering (at most every 10 seconds). The new copy replaces a cut-off one, or an older version's, and leaves a working one alone. Each injection is logged (`extension.scriptInjected`).
+- **Other pages still need a refresh.** For Scroll and click, `content.js` runs on every site, and the extension has no permission to inject into them. Until you refresh, a run shows "Reading the page", because nothing is reporting.
 
 ---
 
@@ -402,6 +409,20 @@ Both course routines run in `PageController` like Scroll and click, but the exte
 5. The **Running routine** screen shows the current module, question, approvals and progress. Stop stays at the bottom.
 
 The app uses the Sagar Mein Yog SQLite database in `~/.autopilot/databases/qa/` ([updating the sources](23_UPDATE_ANSWER_BANK.md)). Approved corrections are saved to that same routine database. Compatible JSON banks in `~/.autopilot/answer-banks/` are imported once.
+
+### When a Sagar Mein Yog run stops moving
+
+A run can stop moving for reasons outside the app: an action's reply got lost, the page kept a cut-off script, the player froze. People used to fix this by refreshing the course tab. The app now does that itself, once (`CourseStallRecovery`, called from `PageController`):
+
+1. **Noticing.** Progress is any change in what the page reports: the page, its video position or state, its chapters, links and questions (`CourseSnapshot.progressMarker`). No change for **90 seconds** is a stall, except while the run waits for you (an approval, a question, a failed result, the profile choice), for a timer (the wait after a click), or is checking saved progress. Those waits restart the clock.
+2. **Never in an assessment.** A live test, quiz or result page is never reloaded, and neither is a page with a pending assessment, quiz or certificate action (`CourseAutomationSession.recoveryBlocker`), so nothing is answered or submitted twice. There the five-minute stall alert stays the only response.
+3. **Reloading.** The app publishes `courseAutomation.reloadPageRequest` (a timestamp). The worker reloads the bound course tab, or the active sagarmeinyog.com tab, only if it is the active tab in its window: a tab you moved away from is left alone. It replies `smyPageReloaded` with success or a reason (`noTab`, `inactiveTab`, `reloadFailed`). A worker that restarts ignores a request older than 15 seconds, so a reload is never replayed.
+4. **Carrying on.** The reloaded page is a new document, so the old document's pending action and blocks are dropped (`pageReloaded`), and the next snapshot is read as a fresh page: the run continues from the step it shows. The extension only acts on an action addressed to the document showing, so no click from before the reload repeats.
+5. **Bounded.** One reload per stall. If the page doesn't come back and move within 60 seconds, recovery stops for that stall and the five-minute alert follows as before. A run reloads at most 5 times in all.
+
+Each step is in the run log: `recovery.reloadRequested` (how long it stalled, time since the last snapshot, the pending action), `recovery.reloaded` or `recovery.reloadRefused` (with the reason), `recovery.pageFound`, `recovery.recovered`, and `recovery.gaveUp` (`stillStalled`, `pageNotFound`, `noReloadReply`, `reloadRefused:<reason>` or `reloadLimit`).
+
+**A hidden or covered tab.** Chrome slows the timers of a tab that is hidden, minimised or covered by another window, after five minutes to once a minute, which made runs look hung between videos. During a run the worker messages the course tab every second (`courseWake`), and the page script reads the page when woken; messages aren't slowed. A tab that doesn't answer has lost its script, and gets a new copy. Each message from the page script to the worker gives up after 30 seconds, so a lost reply can't stop its loop.
 
 ### Cosmos Q&A sync
 
@@ -445,7 +466,7 @@ Cosmos accounts are made only by the admin, and each works only on computers the
 Every routine run, of every kind (click, multi-point, scroll and click, Sagar Mein Yog, DGS, OLP and MarineSamraj), is logged so stuck runs (Chrome needing a refresh, a video that never plays) can be diagnosed. The contract is [diagnostics and downloads](../shared/02_DIAGNOSTICS_AND_DOWNLOADS_API.md).
 
 - **The file.** `~/.autopilot/logs/runs/<YYYY-MM-DD>/<runId>.jsonl`: a `run.start` header (routine kind, name, numeric settings, app version, OS), one `event` per line (`seq`, `level`, `source`, `event`, flat `data`), and `run.end` (outcome, event count, duration). `FileRunLog` (`shared` `data/`) writes it as the run happens and flushes at least twice a second, and at once on an error, so a hang or crash still leaves the log. Folders older than 30 days are deleted at start-up. Refused starts (Chrome not connected, extension out of date, no Accessibility access) are logged as short `NotStarted` runs.
-- **What is logged.** Routine steps as reason templates (the status line with quoted text, names and numbers removed), every action sent to the page (kind, request, element id, label up to 40 characters), decisions (approvals, attention, manual answers, failures), answer lookups by `questionKey` and hit or miss, pauses and safety stops, the stall monitor, alerts, bridge connect/disconnect/problems, message types and sizes (the first of each type, then a summary every 5 seconds), silences over 5 seconds, every published command (size and action), and video state changes (paused, ended, `readyState`, `networkState`, error code, muted, buffering) with a heartbeat every 5 seconds that warns when a playing video's time stops moving. Clicks are sampled: the first ten one by one, then a count every 5 seconds. Extension 1.15.24 reports the player state for this (state only).
+- **What is logged.** Routine steps as reason templates (the status line with quoted text, names and numbers removed), every action sent to the page (kind, request, element id, label up to 40 characters), decisions (approvals, attention, manual answers, failures), answer lookups by `questionKey` and hit or miss, pauses and safety stops, the stall monitor, alerts, bridge connect/disconnect/problems, message types and sizes (the first of each type, then a summary every 5 seconds), silences over 5 seconds, every published command (size and action), and video state changes (paused, ended, `readyState`, `networkState`, error code, muted, buffering) with a heartbeat every 5 seconds that warns when a playing video's time stops moving. Clicks are sampled: the first ten one by one, then a count every 5 seconds. Extension 1.15.24 reports the player state for this (state only); 1.16.0 adds why a play request failed (`problem` on `extension.ack`: `notAllowed`, `notSupported`, `aborted`, `playFailed`, `pausedAgain`), script injections and the stall recovery's steps.
 - **Privacy.** `RunLogSanitizer` (`feature:shared`) runs on every line before it is written: strings become one line of at most 200 characters (labels 40), URLs, e-mail addresses, tokens, user folders and the computer's user name are replaced, and strings under keys that name page text, questions, answers, titles, accounts, paths or course names are dropped.
 - **Upload.** Only while signed in to Cosmos: after each run ends, and at start-up for runs not yet sent, `CosmosSyncEngine.uploadRunLogs` sends each finished run (never the open one) as gzipped JSON to `POST /api/diagnostics/runs`, at most 50,000 events (the first 49,000 and last 1,000, marked `truncated`) and 10 MB. `RunLogUploadBody` re-checks the contract's shape rules (only its fields, flat `data` of at most 50 keys, rising `seq`, length limits). `stored` and `duplicate` write a `<runId>.sent` marker; a `400` or `413` writes `.rejected` so it isn't resent forever; failures retry later with back-off and never touch a routine. **Settings → Cosmos sync** shows how many are waiting and **Open logs folder**.
 
@@ -542,6 +563,8 @@ With **Stop for videos** on, `content.js` does this on each tick (`checkVideos`)
 | Not started yet | Centre it and call `play()` | `playing` |
 | Started, now paused | Leave it alone, because pausing is your choice | `needsPlay` |
 
+(That table is Scroll and click's `content.js`. Sagar Mein Yog videos are handled by the app, below.)
+
 4. **If no real video needs anything,** look for a play button ([below](#pictures-with-a-play-button)).
 
 `background.js` combines all frames into one state, and turns scrolling off for the page while it's anything but `none`. The app sees the same state in the `page` event and won't click. Moving the pointer doesn't end the run while a video plays, so you can use the player's controls.
@@ -549,6 +572,16 @@ With **Stop for videos** on, `content.js` does this on each tick (`checkVideos`)
 **A finished video** means `ended` is set, or playback is within 0.5 seconds of the end, because some players pause just before it. A video that starts playing again counts as playing again, which covers players reusing one element for several clips.
 
 **Speed:** the code never changes playback speed and never seeks.
+
+### Sagar Mein Yog videos
+
+The app decides; `course-automation.js` carries out one `play` action at a time:
+
+- **Paused or not started:** press the player's own Play or Resume control if it has one, otherwise call `play()`. If `play()` is refused, or the video pauses again within 150 ms, the page asks the worker for one real click on the centre of that video (through `debugger`, top frame only). A failure is reported with its reason, and the app retries every 5 seconds. A `notAllowed` refusal (Chrome's autoplay rule) shows "Chrome blocked playback with sound. Click once on the course page in Chrome".
+- **"Playing" but its time doesn't move for 20 seconds** (a stalled stream or player): the app sends `play` with `restart`, and the page pauses the video and plays it again, at most once a minute per video. If that doesn't help, the stall recovery reloads the page.
+- **A replaced player:** each tick reads the page again and gives elements new ids, so a play request for an element that's gone fails and is retried on the new one.
+- **Videos in another site's frame** are seen (state only) and `play()` is tried there, but the real-click fallback works only for a video in the page itself.
+- **Muting is never used.** Chrome would allow muted autoplay, but whether a muted video counts for the course is the owner's decision, so the app reports the refusal instead.
 
 ### Chrome's autoplay rules
 
@@ -742,6 +775,28 @@ AUTOPILOT_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInp
 - Real autoplay rules, real sound, real players, and the extension loaded through `chrome://extensions` all need a person to try.
 - Windows is exercised on Legion (install, launch, Smart App Control), but clicking in real Windows apps needs a person at the desktop.
 
+### Windows 10
+
+Windows 10 hasn't run AutoPilot yet; a static audit (28 November 2026) found nothing that needs Windows 11. Treat it as
+expected to work until a real Windows 10 PC confirms it.
+
+- **Runtime:** the MSI bundles the Microsoft Build of OpenJDK 25 (x64), with its own Visual C++ and Universal C runtime
+    DLLs in `runtime\bin`, so nothing else needs installing. Windows 10 22H2 x64 is the target; ARM64 and 32-bit Windows
+    aren't built.
+- **Drawing:** Skiko uses Direct3D 12 on Windows and falls back to OpenGL, then software, when the graphics driver
+    can't. To force one, set `SKIKO_RENDER_API=OPENGL` (or `SOFTWARE`) before starting the app.
+- **Window frame:** dark mode uses DWM attribute 20, then 19 (Windows 10 before 20H1); the caption and text colours are
+    Windows 11 only and Windows 10 ignores them. Snap Layouts on the maximize button are Windows 11 only; on Windows 10
+    the button still maximizes and restores. The custom caption needs Windows 10 1607 or later (`GetDpiForWindow`).
+- **Input, hot keys, display wake, secure storage, machine ID:** `SendInput` through AWT `Robot`, `GetAsyncKeyState`,
+    `SetThreadExecutionState`, DPAPI and the registry `MachineGuid` all exist on Windows 10 unchanged.
+- **Installer:** the same per-machine MSI (it asks for administrator approval) and upgrade code. Smart App Control
+    doesn't exist on Windows 10; SmartScreen may still warn because the MSI isn't code-signed (**More info → Run
+    anyway**).
+- **Chrome:** Google still ships Chrome for Windows 10 and the extension loads the same way (Developer mode → **Load
+    unpacked**). Google hasn't published an end date for consumers; enterprise support under Windows 10 ESU runs to
+    October 2028.
+
 ---
 
 ## 18. Limits and troubleshooting
@@ -765,7 +820,9 @@ AUTOPILOT_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInp
 | "Can't reach Chrome", port in use | Another copy of the app is running | Quit it and reopen |
 | "Allow access" won't go away | The old permission belongs to an earlier build | Remove AutoPilot from the Accessibility list, add it again, reopen the app |
 | Clicks do nothing | Same as above | Same as above |
-| "Reading the page" stays | The tab wasn't refreshed after a reload, or the page can't run extensions (such as `chrome://` pages or the Chrome Web Store) | Refresh, or use another page |
+| "Reading the page" stays | The tab wasn't refreshed after a reload, or the page can't run extensions (such as `chrome://` pages or the Chrome Web Store) | Refresh, or use another page (Sagar Mein Yog tabs reattach by themselves) |
+| A Sagar Mein Yog run reloads its tab | Nothing changed for 90 seconds outside a wait | Nothing; it continues from the page shown. If it stalls again, the five-minute alert follows: check the run log's `recovery.*` events |
+| "Chrome blocked playback with sound" | Chrome's autoplay rule for this site | Click once on the course page in Chrome |
 | "Bring Chrome to the front" | Another app, including AutoPilot, is in front | Click Chrome and leave it there |
 | "Press play on the video in Chrome" | Chrome blocked autoplay, or the video was paused | Press play once |
 | Scrolls past a video | The player has no standard video, or its button wasn't recognised | Turn the speed down, or press play yourself |
@@ -798,6 +855,14 @@ AUTOPILOT_LIVE_INPUT_TEST=1 ./gradlew :core:automation:jvmTest --tests '*LiveInp
 | Content tick, on and off | 700 ms, 2 seconds | `content.js` |
 | Frame record lifetime | 3 seconds | `background.js` |
 | Service worker keep-alive | 20 seconds, plus a 1-minute alarm | `background.js` |
+| Poll and event deadlines | 30 and 10 seconds | `background.js` |
+| Course tab wake-up, script re-injection | 1 second, at most every 10 seconds | `course-automation-background.js` |
+| Page-script message deadline | 30 seconds | `course-automation.js` |
+| Sagar Mein Yog action reply | 15 seconds | `CourseAutomationSession` |
+| Frozen-video restart | after 20 seconds still, at most once a minute | `CourseAutomationSession` |
+| Stall before a reload; reload deadline; reloads per run | 90 seconds; 60 seconds; 5 | `CourseStallRecovery` |
+| Stall alert | 5 minutes, repeating | `RoutineInactivityMonitor` |
+| App message queue | 20,000 messages | `PageController` |
 | Bottom tolerance | 2 pixels | `content.js` |
 | No movement counted as the bottom | 3 seconds | `content.js` |
 | Longest wait for a page to finish loading | 15 seconds | `content.js` |
