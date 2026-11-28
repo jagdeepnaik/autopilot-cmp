@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Publishing copies installers over a fresh SSH connection each time; a stale shared connection to Legion made every copy fail (the 1.4.0 MSI was added by hand).
+
 ## [1.4.0] - 2026-11-28
 
 - The Cosmos admin signs in with a code from an authenticator app (or a recovery code) after the password; Settings asks for it, says when a code didn't work, and explains when two-step sign-in still needs setting up on the server.
