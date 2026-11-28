@@ -58,6 +58,7 @@ DESKTOP WORKFLOWS
   Targets:
     mac                   This Mac.
     legion                Physical Legion Windows laptop.
+    legion-linux          Debian VM on Legion: x86-64 Linux DEB (release builds).
     home-server            Debian home server and Linux DEB build.
     home-server-vm-win     Windows build VM hosted on home-server.
     mac-vm-win             Windows VM running on this Mac.
@@ -102,7 +103,7 @@ VERSION RELEASE AND PUBLISH
   ./dev version major          Increment the breaking-change version, tag, push, then publish.
   ./dev version patch --no-publish   Release without publishing.
   ./dev publish                Build the DMG and APK here, the MSI on Legion and the DEB on
-                               mac-vm-linux from the pushed commit, then publish to Compass.
+                               legion-linux from the pushed commit, then publish to Compass.
   ./dev publish --dry-run      Print the plan and the manifest; build and change nothing remote.
   ./dev publish --skip windows Leave a platform out (macos, android, windows, linux; repeatable).
 
@@ -165,6 +166,7 @@ desktop_main() {
 #
 #   target   mac      this Mac: macOS app in /Applications
 #            legion   Windows laptop (ssh home-legion): MSI, installed on Legion
+#            legion-linux  Debian VM on Legion (ssh home-legion-debian1): x86-64 DEB, copied to the Mac
 #            home-server   Debian home server (ssh home-server): Linux DEB, copied to the Mac
 #            home-server-vm-win Windows VM on the home server (SSH through home-server): MSI, copied to the Mac
 #            mac-vm-win  Windows VM on this Mac (SSH host/path supplied by environment variables)
@@ -211,6 +213,10 @@ MAC_WINDOWS_HOST="${MAC_WINDOWS_HOST:-mac-vm-windows}"
 MAC_WINDOWS_DIR="${MAC_WINDOWS_DIR:-C:\Users\Jagdeep\Projects\AutoPilot}"
 MAC_LINUX_HOST="${MAC_LINUX_HOST:-mac-vm-debian}"
 MAC_LINUX_DIR="${MAC_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
+# The x86-64 Debian 13 VirtualBox VM on Legion (ssh through home-legion): builds the release DEB, so the home
+# server only serves. 2 GB of RAM, so it uses the same low-memory Gradle profile as the Mac's Linux VM.
+LEGION_LINUX_HOST="${LEGION_LINUX_HOST:-home-legion-debian1}"
+LEGION_LINUX_DIR="${LEGION_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
 DOWNLOADS="$HOME/Downloads/AutoPilot/Builds"
 SYNC_DATA_ROOT="${SYNC_DATA_ROOT:-$HOME/Downloads/AutoPilot/Sync}"
 LEGION_HOME='C:/Users/jagdeep'
@@ -242,7 +248,7 @@ done
 
 TARGET=''
 ACTIONS=()
-is_target() { case "$1" in mac|legion|home-server|home-server-vm-win|mac-vm-win|mac-vm-linux|local-all|all) return 0 ;; *) return 1 ;; esac; }
+is_target() { case "$1" in mac|legion|legion-linux|home-server|home-server-vm-win|mac-vm-win|mac-vm-linux|local-all|all) return 0 ;; *) return 1 ;; esac; }
 is_action() { case "$1" in sync|sync-database|sync-certificates|merge-answer-bank|build|run|fetch|debug) return 0 ;; *) return 1 ;; esac; }
 
 if [ "${#POSITIONAL[@]}" -eq 2 ] && is_action "${POSITIONAL[0]}" && is_target "${POSITIONAL[1]}"; then
@@ -510,6 +516,21 @@ local_all_install() {
     mac_install
     local_windows_install
     local_linux_install
+}
+
+# --- Legion's Debian VM (release DEB) -----------------------------------------------------------
+legion_linux_build() {
+    linux_sync "Legion Linux VM" "$LEGION_LINUX_HOST" "$LEGION_LINUX_DIR"
+    step "Legion Linux VM: $( [ "$TESTS" -eq 1 ] && echo 'focused tests, then ')build the DEB"
+    local tasks=("${LOCAL_LINUX_MEMORY[@]}")
+    [ "$TESTS" -eq 1 ] && tasks+=("${FOCUSED_TESTS[@]}")
+    tasks+=(:desktopApp:packageReleaseDeb)
+    ssh "$LEGION_LINUX_HOST" "cd '$LEGION_LINUX_DIR' && nice -n 10 ./gradlew $(printf "%q " "${tasks[@]}")" \
+        || fail "the Legion Linux VM build failed (see above)."
+}
+
+legion_linux_fetch() {
+    fetch_artifact_group "Legion Linux VM" "$LEGION_LINUX_HOST" "$LEGION_LINUX_DIR/desktopApp/build/compose/binaries/main-release/deb" deb
 }
 
 # --- Home server (Debian DEB) -------------------------------------------------------------------
@@ -956,6 +977,7 @@ run_action() {
         sync:legion) windows_sync Legion "$LEGION_HOST" "$LEGION_DIR" ;;
         sync-database:legion) sync_database_windows legion "$LEGION_HOST" "$LEGION_HOME" ;;
         sync-certificates:legion) copy_windows_certificates legion "$LEGION_HOST" "$LEGION_HOME/Downloads/AutoPilot/Profile" ;;
+        sync:legion-linux) linux_sync "Legion Linux VM" "$LEGION_LINUX_HOST" "$LEGION_LINUX_DIR" ;;
         sync:home-server) server_sync ;;
         sync-database:home-server) sync_database_linux home-server "$SERVER_HOST" "$SERVER_HOME" ;;
         sync-certificates:home-server) copy_unix_certificates home-server "$SERVER_HOST" "$SERVER_HOME/Downloads/AutoPilot/Profile" ;;
@@ -978,6 +1000,7 @@ run_action() {
 
         build:mac) mac_build ;;
         build:legion) legion_build ;;
+        build:legion-linux) legion_linux_build ;;
         build:home-server) server_build ;;
         build:home-server-vm-win) vm_build ;;
         build:mac-vm-win) local_windows_build ;;
@@ -987,6 +1010,7 @@ run_action() {
 
         run:mac) mac_build; mac_install ;;
         run:legion) legion_build; legion_install ;;
+        run:legion-linux) legion_linux_build ;;
         run:home-server) server_build ;;
         run:home-server-vm-win) vm_build; vm_fetch ;;
         run:mac-vm-win) local_windows_build; local_windows_install ;;
@@ -996,6 +1020,7 @@ run_action() {
 
         fetch:all) fetch_all_builds ;;
         fetch:legion) fetch_legion_builds ;;
+        fetch:legion-linux) legion_linux_build; legion_linux_fetch ;;
         fetch:home-server) server_build; server_fetch ;;
         fetch:home-server-vm-win) vm_build; vm_fetch ;;
         fetch:mac|fetch:mac-vm-win|fetch:mac-vm-linux|fetch:local-all)
@@ -1230,7 +1255,7 @@ publish_main() {
 #   ./dev publish [--dry-run] [--skip <platform>]... [--no-tests] [--remote]
 #
 #   platform  macos (DMG, this Mac), android (APK, this Mac), windows (MSI, Legion),
-#             linux (DEB, the Mac's Linux VM mac-vm-linux; never the home server)
+#             linux (DEB, Legion's x86-64 Debian VM legion-linux; never the home server)
 #
 # The home server only serves the files: /srv/sites/compass/downloads/autopilot/<version>/ plus
 # manifest.json, replaced atomically. The three newest version folders are kept. It ends by asking
@@ -1258,7 +1283,7 @@ local server="${PUBLISH_SERVER_HOST:-home-server}" downloads_dir='/srv/sites/com
 [ "$remote" -eq 1 ] && server="${PUBLISH_SERVER_HOST:-home-server-remote}"
 local legion_host=home-legion; [ "$remote" -eq 1 ] && legion_host=home-legion-remote
 local legion_msi_dir='C:/Users/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/msi'
-local linux_host="${MAC_LINUX_HOST:-mac-vm-debian}" linux_dir="${MAC_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
+local linux_host="${LEGION_LINUX_HOST:-home-legion-debian1}" linux_dir="${LEGION_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
 local compass_url
 compass_url="$(sed -n 's/^compassUrl = "\(.*\)"/\1/p' "$ROOT/gradle/libs.versions.toml")"
 
@@ -1318,7 +1343,7 @@ if [ "$dry_run" -eq 1 ]; then
     elif [ -f "$ROOT/keystore.properties" ]; then plan "android: ./gradlew :androidApp:assembleRelease (signed) on this Mac -> AutoPilot-$version-$build.apk"
     else plan "android: no keystore.properties, so the release APK would be unsigned; publishes the debug-signed APK instead -> AutoPilot-$version-$build-debug.apk"; fi
     if skipped windows; then plan "windows: skipped"; else plan "windows: ./dev build legion$( [ "$tests" -eq 1 ] || echo ' --no-tests') on Legion ($legion_host), then copy and verify AutoPilot-$package.msi"; fi
-    if skipped linux; then plan "linux: skipped"; else plan "linux: ./dev build mac-vm-linux$( [ "$tests" -eq 1 ] || echo ' --no-tests') on the Mac's Linux VM ($linux_host), then copy and verify autopilot_${package}_amd64.deb"; fi
+    if skipped linux; then plan "linux: skipped"; else plan "linux: ./dev build legion-linux$( [ "$tests" -eq 1 ] || echo ' --no-tests') on Legion's Debian VM ($linux_host), then copy and verify autopilot_${package}_amd64.deb"; fi
     plan "upload: rsync to $server:$downloads_dir/$version.uploading/, rename it to $version/, then write manifest.json.tmp and mv it over manifest.json"
     plan "prune: keep the three newest version folders in $server:$downloads_dir"
     plan "check: GET $compass_url/api/app/<platform> for each published platform, then print \"Published $version ($build)\""
@@ -1372,15 +1397,15 @@ else
         else rm -f "${stage:?}/${msi:?}"; pwarn "Windows: the Legion build or copy failed (or the hash didn't match); left out."; failed+=(windows); fi
     fi
     if ! skipped linux; then
-        pstep "Linux: build the DEB on the Mac's Linux VM ($linux_host), then copy and verify it"
+        pstep "Linux: build the DEB on Legion's Debian VM ($linux_host), then copy and verify it"
         local deb="autopilot_${package}_amd64.deb" remote_deb='' remote_hash=''
-        if "$ROOT/dev" build mac-vm-linux "${passthrough[@]+"${passthrough[@]}"}" \
+        if "$ROOT/dev" build legion-linux "${passthrough[@]+"${passthrough[@]}"}" \
             && remote_deb=$(ssh "$linux_host" "ls '$linux_dir'/desktopApp/build/compose/binaries/main-release/deb/*$package*.deb | head -1") \
             && [ -n "$remote_deb" ] && scp -q "$linux_host:$remote_deb" "$stage/$deb" \
             && remote_hash=$(ssh "$linux_host" "sha256sum '$remote_deb'" | awk '{print $1}') \
             && [ "$remote_hash" = "$(shasum -a 256 "$stage/$deb" | awk '{print $1}')" ]; then
             add_file linux deb "$stage/$deb" "Debian 12 / Ubuntu 22.04, x86-64"
-        else rm -f "${stage:?}/${deb:?}"; pwarn "Linux: the VM build or copy failed (or the hash didn't match); left out."; failed+=(linux); fi
+        else rm -f "${stage:?}/${deb:?}"; pwarn "Linux: the Legion Linux VM build or copy failed (or the hash didn't match); left out."; failed+=(linux); fi
     fi
 fi
 

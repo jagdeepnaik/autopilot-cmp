@@ -5,6 +5,9 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Release DEBs are built on Legion's x86-64 Debian VM (`./dev build legion-linux`), so Linux PCs get an x86-64 package and the home server only serves.
+- Gradle waits up to two minutes to download itself, so a slow first download no longer stops the Windows build.
+
 ## [1.2.0] - 2026-11-28
 
 - Every routine run is logged on this computer (steps, timings, video and page state; never page text or answers) and uploaded to Compass while signed in.

@@ -19,7 +19,7 @@
 | `./dev run <target> [--no-tests] [--remote]` | Builds, installs and checks the target where installation is supported. |
 | `./dev fetch <target> [--no-tests] [--remote]` | Copies and verifies existing artifacts for `all` and `legion`; `home-server` and `home-server-vm-win` build first. Output: `~/Downloads/AutoPilot/Builds`. Other fetch targets are unsupported. |
 | `./dev debug <target> [--remote]` | Syncs the target, starts its debug run and prepares the port-5005 debug connection. |
-| `./dev publish [--dry-run] [--skip <platform>] [--no-tests] [--remote]` | Builds every installer from the pushed release commit (DMG and APK here, MSI on Legion, DEB on `mac-vm-linux`) and publishes them to Compass downloads. `--dry-run` prints the plan and manifest only. |
+| `./dev publish [--dry-run] [--skip <platform>] [--no-tests] [--remote]` | Builds every installer from the pushed release commit (DMG and APK here, MSI on Legion, DEB on Legion's Debian VM `legion-linux`) and publishes them to Compass downloads. `--dry-run` prints the plan and manifest only. |
 | `./dev merge-answer-bank all` | Merges legacy JSON answer-bank exports from synced machine folders; it does not merge SQLite databases. |
 
 `--remote` and `--no-tests` may appear anywhere in the command. The preferred style is flag-last,
@@ -92,7 +92,7 @@ Signed-in Compass accounts download AutoPilot from the Compass website. `./dev p
 | macOS | this Mac (`:desktopApp:packageReleaseDmg`) | `AutoPilot-<major>.<minor>.<build>.dmg` |
 | Android | this Mac: `:androidApp:assembleRelease` when `keystore.properties` exists; otherwise the debug-signed APK, labelled `-debug` | `AutoPilot-<version>-<build>.apk` |
 | Windows | Legion (`./dev build legion`), copied and hash-checked | `AutoPilot-<major>.<minor>.<build>.msi` |
-| Linux | the Mac's Linux VM `mac-vm-linux` (`./dev build mac-vm-linux`), copied and hash-checked | `autopilot_<major>.<minor>.<build>_amd64.deb` |
+| Linux | Legion's x86-64 Debian 13 VM `legion-linux` (`./dev build legion-linux`, SSH host `home-legion-debian1` through Legion), copied and hash-checked. The Mac's Linux VM is ARM, so its DEB would not install on x86-64 PCs | `autopilot_<major>.<minor>.<build>_amd64.deb` |
 
 - It needs a clean `main` that matches GitHub: every machine builds the pushed release commit. The home server never builds; it only serves `/srv/sites/compass/downloads/autopilot/`.
 - Files are staged in `~/Downloads/AutoPilot/Publish/<version>/`. Each gets its size and full SHA-256; a platform that fails to build or copy is reported and left out, and the rest are still published.
@@ -498,6 +498,7 @@ MAC_LINUX_HOME='/home/otheruser' ./dev sync-database mac-vm-linux
 <tr><td>Home server, Debian<br><code>home-server</code></td><td><code>home-server</code></td><td>Linux DEB<br><code>packageReleaseDeb</code><br>Low priority</td><td>No: headless website host.<br><code>dev fetch home-server</code> can copy its DEB; <code>dev run all</code> leaves it remote.</td><td>No</td></tr>
 <tr><td>Home server Windows VM<br><code>ssh -J home-server -p 2222 builduser@127.0.0.1</code></td><td><code>home-server-vm-win</code></td><td>Windows MSI<br><code>Build-Distribution.ps1</code></td><td>No. Its MSI is copied to <code>~/Downloads/AutoPilot/Builds</code>; install it on Legion.</td><td>No</td></tr>
 <tr><td>Windows VM on this Mac</td><td><code>mac-vm-win</code></td><td>Windows MSI<br><code>Build-Distribution.ps1</code></td><td><code>run mac-vm-win</code> runs <code>Install-Msi.ps1 -LaunchCheck -SkipIfInstalled</code> inside the VM.</td><td><code>debug mac-vm-win</code> starts <code>AutoPilot-Debug</code> and tunnels port 5005.</td></tr>
+<tr><td>Debian VM on Legion</td><td><code>legion-linux</code></td><td>x86-64 Linux DEB for releases<br><code>packageReleaseDeb</code></td><td><code>fetch legion-linux</code> builds and copies the DEB to <code>~/Downloads/AutoPilot/Builds</code> with a hash check.</td><td>Not supported; debug on <code>mac-vm-linux</code>.</td></tr>
 <tr><td>Linux VM on this Mac</td><td><code>mac-vm-linux</code></td><td>Linux DEB<br><code>packageReleaseDeb</code></td><td><code>run mac-vm-linux</code> installs the newest DEB with <code>sudo apt-get</code> inside the VM.</td><td><code>debug mac-vm-linux</code> runs <code>:desktopApp:run --debug-jvm</code> and tunnels port 5005; the VM needs a desktop session.</td></tr>
 </tbody>
 </table>
