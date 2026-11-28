@@ -94,7 +94,7 @@ Signed-in Cosmos accounts download AutoPilot from the Cosmos website. `./dev pub
 | Windows | Legion (`./dev build legion`), copied and hash-checked | `AutoPilot-<major>.<minor>.<build>.msi` |
 | Linux | Legion's x86-64 Debian 13 VM `legion-linux` (`./dev build legion-linux`, SSH host `home-legion-debian1` through Legion), copied and hash-checked; if that fails, the home server builds it (`./dev build home-server`, low priority) so every release ships for Linux. The Mac's Linux VM is ARM, so its DEB would not install on x86-64 PCs | `autopilot_<major>.<minor>.<build>_amd64.deb` |
 
-- It needs a clean `main` that matches GitHub: every machine builds the pushed release commit. The home server never builds; it only serves `/srv/sites/cosmos/downloads/autopilot/`.
+- It needs a clean `main` that matches GitHub: every machine builds the pushed release commit. The home server builds only the DEB, and only when Legion's Debian VM fails; otherwise it only serves `/srv/sites/cosmos/downloads/autopilot/`.
 - Files are staged in `~/Downloads/AutoPilot/Publish/<version>/`. Each gets its size and full SHA-256; a platform that fails to build or copy is reported and left out, and the rest are still published.
 - The release notes are the `## [<version>]` section of `CHANGELOG.md`, or the commit subjects since the previous `v*` tag.
 - On the server the version folder is uploaded as `<version>.uploading` and renamed into place, then `manifest.json` (this release plus up to two previous ones) is written as `manifest.json.tmp` and renamed over the old one. Only the three newest version folders are kept.
