@@ -29,6 +29,11 @@ val keystoreProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+val gitCommitCount: Provider<Int> = providers.exec {
+    commandLine("git", "rev-list", "--count", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.trim().toIntOrNull() ?: 0 }
+
 android {
     namespace = "com.jagdeep.autopilot"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -37,7 +42,9 @@ android {
         applicationId = libs.versions.androidApplicationId.get()
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = libs.versions.versionCode.get().toInt()
+        // Android's build number is the commit count, the same number ./dev publish records as the release's build,
+        // so every release installs over the one before. The catalog value is the fallback outside a Git checkout.
+        versionCode = gitCommitCount.orNull?.takeIf { it > 0 } ?: libs.versions.versionCode.get().toInt()
         versionName = libs.versions.versionName.get()
     }
     packaging {

@@ -120,9 +120,12 @@ fun SettingsScreen(
                 trailingContent = { TextButton(onClick = viewModel::testAssessmentSound,
                     enabled = preferences.assessmentSoundsEnabled && !state.testingSound) { Text(if (state.testingSound) "Playing…" else "Test sound") } })
 
-            Group("Safety")
-            SwitchRow("Stop when I move the pointer", "For routines that click fixed screen positions.", preferences.stopWhenPointerMoves, viewModel::updateStopWhenPointerMoves)
-            SwitchRow("Stop at a screen corner", "Move the pointer to any screen corner to stop the routine.", preferences.stopAtScreenCorner, viewModel::updateStopAtScreenCorner)
+            // A phone has no pointer and no keyboard shortcuts, so these sections are desktop only.
+            if (desktop) {
+                Group("Safety")
+                SwitchRow("Stop when I move the pointer", "For routines that click fixed screen positions.", preferences.stopWhenPointerMoves, viewModel::updateStopWhenPointerMoves)
+                SwitchRow("Stop at a screen corner", "Move the pointer to any screen corner to stop the routine.", preferences.stopAtScreenCorner, viewModel::updateStopAtScreenCorner)
+            }
 
             if (state.routineFilesAvailable) {
                 Group("Routine files")
@@ -149,7 +152,7 @@ fun SettingsScreen(
                 )
             }
 
-            if (state.access != InputAccess.Unsupported) {
+            if (desktop && state.access != InputAccess.Unsupported) {
                 Group("Controls")
                 ListItem(modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open keyboard shortcuts") { shortcutsOpen = true },
                     colors = transparent(), headlineContent = { Text("Keyboard shortcuts") },
@@ -202,7 +205,8 @@ fun SettingsScreen(
                     })
             }
             ListItem(colors = transparent(), headlineContent = { Text("Privacy") }, supportingContent = {
-                Text("Settings, routines and saved progress stay on this computer. Browser actions happen on the website you open. Only shortcut keys are monitored; typed text is not recorded. Each routine run is logged on this computer (steps and timings, never page text or answers). If you sign in to Cosmos sync, only Q&A answers, those run logs and an anonymous ID for this computer (for the admin's approval) are shared with Cosmos. AutoPilot also asks Cosmos whether a newer version is published.")
+                if (!desktop) Text("Settings, routines and diagnostic logs stay on this phone. Cosmos sync isn't available on Android yet.")
+                else Text("Settings, routines and saved progress stay on this computer. Browser actions happen on the website you open. Only shortcut keys are monitored; typed text is not recorded. Each routine run is logged on this computer (steps and timings, never page text or answers). If you sign in to Cosmos sync, only Q&A answers, those run logs and an anonymous ID for this computer (for the admin's approval) are shared with Cosmos. AutoPilot also asks Cosmos whether a newer version is published.")
             })
         }
     }
