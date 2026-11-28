@@ -134,6 +134,8 @@ kotlin {
 
         jvmTest.dependencies {
             implementation(compose.desktop.uiTestJUnit4)
+            // BundledQaKeysTest reads the packaged routine Q&A files.
+            implementation(libs.androidx.sqlite.bundled)
         }
         // answer-banks/index.txt: lists every bank in resources/answer-banks, so adding a bank file is enough.
         jvmMain { resources.srcDir(generateAnswerBankIndex); resources.srcDir(generateCosmosConfig) }

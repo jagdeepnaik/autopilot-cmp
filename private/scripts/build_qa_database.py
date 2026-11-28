@@ -11,7 +11,9 @@ import hashlib
 import json
 import os
 import shutil
+import re
 import sqlite3
+import unicodedata
 from pathlib import Path
 
 
@@ -21,15 +23,44 @@ OUT = QA / "autopilot_qa.db"
 RUNTIME_RESOURCES = ROOT / "shared" / "src" / "jvmMain" / "resources" / "qa-routines"
 
 
+# The app's text rules (core:persistence QuestionAnswerText, and the Q&A sync contract's "text rules"),
+# reproduced exactly so every stored question_key and answer_key is the one the app computes at run time.
+# Kotlin's Regex("\\s") and "\\d" are ASCII-only (java.util.regex defaults), Kotlin's trim() removes
+# Char.isWhitespace() characters, and lowercase() is plain Unicode lowercasing (Locale.ROOT), so
+# str.lower() is used, never str.casefold(): case folding changes the micro sign U+00B5 to U+03BC and
+# "ß" to "ss". shared's BundledQaKeysTest checks every bundled key against the app.
+_JAVA_WHITESPACE_RUN = re.compile(r"[ \t\n\x0b\f\r]+")
+_DISPLAY_LABEL = re.compile(r"^[0-9]+[.)][ \t\n\x0b\f\r]+")
+# Characters outside the Zs/Zl/Zp categories that Kotlin's Char.isWhitespace() also accepts.
+_KOTLIN_EXTRA_WHITESPACE = frozenset("\t\n\x0b\f\r\x1c\x1d\x1e\x1f")
+
+
+def _kotlin_is_whitespace(char: str) -> bool:
+    return char in _KOTLIN_EXTRA_WHITESPACE or unicodedata.category(char) in ("Zs", "Zl", "Zp")
+
+
+def _kotlin_trim(value: str) -> str:
+    start, end = 0, len(value)
+    while start < end and _kotlin_is_whitespace(value[start]):
+        start += 1
+    while end > start and _kotlin_is_whitespace(value[end - 1]):
+        end -= 1
+    return value[start:end]
+
+
 def norm(value: str) -> str:
-    return " ".join(value.replace("\u00a0", " ").split()).casefold()
+    """QuestionAnswerText.normalize: U+00A0 to a space, collapse whitespace runs, trim, lowercase."""
+    return _kotlin_trim(_JAVA_WHITESPACE_RUN.sub(" ", value.replace("\u00a0", " "))).lower()
 
 
 def text_option(value: str) -> str:
-    value = value.replace("\u00a0", " ").strip()
-    # Match the app's display-prefix rule while retaining meaningful numeric values.
-    import re
-    return re.sub(r"^\d+[.)]\s+", "", value)
+    """QuestionAnswerText.optionText: removes a display label such as "2. " but keeps numbers like 2.1."""
+    return _DISPLAY_LABEL.sub("", _kotlin_trim(value.replace("\u00a0", " ")), count=1)
+
+
+def _utf16_order(value: str) -> bytes:
+    """Kotlin sorts strings by UTF-16 code units; Python by code points."""
+    return value.encode("utf-16-be", "surrogatepass")
 
 
 def digest(payload: bytes) -> str:
@@ -256,7 +287,8 @@ def routine_database_name(routine: str) -> str:
 
 
 def answer_key(question: str, options: list[str]) -> str:
-    payload = norm(question) + "\x1f" + "\x1e".join(sorted(norm(text_option(option)) for option in options))
+    """QuestionAnswerText.questionKey: SHA-256 hex of the normalised question, U+001F, sorted normalised options."""
+    payload = norm(question) + "\x1f" + "\x1e".join(sorted((norm(text_option(option)) for option in options), key=_utf16_order))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -271,10 +303,10 @@ def split_routine_databases(master_path: Path) -> list[Path]:
         if path.exists():
             path.unlink()
     databases = {name: sqlite3.connect(path) for name, path in outputs.items()}
-    # Routine file schema version 3 (PRAGMA user_version), the same schema the app's in-place upgrade
+    # Routine file schema version 4 (PRAGMA user_version), the same schema the app's in-place upgrade
     # (core:persistence QuestionAnswerSchema) gives older files: remote-sync bookkeeping columns, the
     # 'compass' answer source, the sync_state table (version 2) and the qa_authoritative table of
-    # admin-corrected questions (version 3). Bundled rows leave the new columns and table empty. The
+    # admin-corrected questions (version 3); version 4 only repairs keys in older files. Bundled rows leave the new columns and table empty. The
     # compass_* names and the 'compass' value are shipped storage identifiers (the Cosmos service's former
     # name), kept unchanged so existing user files keep working; changing them needs an approved migration.
     schema = """
@@ -306,7 +338,7 @@ def split_routine_databases(master_path: Path) -> list[Path]:
           entry_id TEXT NOT NULL, revision INTEGER NOT NULL,
           PRIMARY KEY(bank_name, module, question_key)
         );
-        PRAGMA user_version = 3;
+        PRAGMA user_version = 4;
     """
     for database in databases.values():
         database.execute("PRAGMA foreign_keys = ON")

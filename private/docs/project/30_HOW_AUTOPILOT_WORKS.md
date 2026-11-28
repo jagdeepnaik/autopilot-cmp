@@ -416,6 +416,12 @@ Sync is opt-in and desktop only: nothing reaches the network until you sign in t
     - if the corrected entry is retired, its Cosmos answers go and the question is left with no answer, so the routine pauses and asks instead of falling back to the old bundled answer.
 
     Servers that predate corrections leave `authoritative` out, which reads as `false`.
+- **Keys.** `questionKey` and `answerKey` follow the contract's text rules, implemented once in `QuestionAnswerText`
+  (`core:persistence`): lowercasing is plain Unicode lowercasing (Kotlin `lowercase()`), not case folding, so the micro
+  sign `µ` stays `µ`. `private/scripts/build_qa_database.py` reproduces the same rules for the bundled files (Python
+  `lower()`, never `casefold()`), and `BundledQaKeysTest` (`shared`) checks every bundled key against
+  `QuestionAnswerText`. Earlier bundles used case folding, so 15 questions with `µ` had keys the app never
+  looked up; schema version 4 repairs the keys in existing user files (see the table below).
 - **Uploading.** Learned answers you confirmed yourself (saved with **Save and continue**, or reviewed after an attempt; recorded as `confirmed_at`) get a permanent `client_id` and go up in batches of up to 100, with their file's `bankName`, `questionKey` and `answerKey`. Answers from practice-quiz feedback, legacy JSON imports and answers learned before this change are not uploaded. `pending`, `duplicate`, `already_known` and `conflict` all mark the answer sent, so retries never send it twice. Unreviewed reference captures are never uploaded.
 - **When.** At sign-in, at launch when a session is saved, about 10 seconds after a routine saves a confirmed answer, and on **Sync now**. Network and server failures retry with back-off (2 s, 4 s), `429` waits for `Retry-After`, and a failed sync tries again later (1, 5, 15, then 60 minutes). A sync never pauses a routine; routines keep reading the same files, and both sides wait for each other's short write transactions.
 - **Where.** `CosmosSyncEngine` (`feature:home` `domain/cosmos`) holds the rules; `KtorCosmosApi` and `SqliteCosmosQaStore` (`data/cosmos`, desktop) do the HTTP and file work; `shared` wires them with the address from the build's `cosmosUrl` and the `X-AutoPilot-App-Version` SemVer identity. Settings sees only the `CosmosSync` contract in `feature:shared`.
@@ -594,7 +600,7 @@ On desktop, everything is in `~/.autopilot/` (`%USERPROFILE%\.autopilot\` on Win
 | `history/run_history.preferences_pb` | The newest 200 runs | DataStore, one JSON document |
 | `databases/autopilot.db` | Saved course progress: user profiles, lessons, videos, assessment results, DGS study time | Room (`AppRoomDatabase`, schema version 1) |
 | `databases/course-progress.db` | The older progress database. Imported into `autopilot.db` on its first open and kept as a backup | SQLite |
-| `databases/qa/` | One writable bundled-and-learned Q&A database per routine. Older files are upgraded in place after a `<file>.before-v<version>.bak` copy | SQLite (`PRAGMA user_version` 3) |
+| `databases/qa/` | One writable bundled-and-learned Q&A database per routine. Older files are upgraded in place after a `<file>.before-v<version>.bak` copy; version 4 recomputes every stored `question_key` and `answer_key` with the app's rule, merging a row into a correctly keyed duplicate (learned answers win over bundled, Cosmos corrections over both) | SQLite (`PRAGMA user_version` 4) |
 | `answer-banks/` | Compatible legacy answer-bank imports and backups | JSON |
 | `extensions/chrome/` | The unpacked Chrome extension, rewritten at every start | Files |
 | `logs/` | Debug-run logs (Windows debug launcher) | Text |

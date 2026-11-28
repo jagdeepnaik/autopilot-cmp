@@ -188,11 +188,11 @@ class QuestionAnswerSyncTest {
         assertEquals(listOf("Blue"), entries.single { it.question == "Remote?" }.answers)
         assertEquals("7", store(installed, bundle).syncValue("revision"))
         BundledSQLiteDriver().open(installed.absolutePath).use { db ->
-            assertEquals(3, QuestionAnswerSchema.version(db))
+            assertEquals(QuestionAnswerSchema.VERSION, QuestionAnswerSchema.version(db))
             assertEquals(3L, db.long("SELECT count(*) FROM qa_answers"))
             assertEquals(0L, db.long("SELECT count(*) FROM qa_authoritative"))
         }
-        val backup = File(root, "smy.db.before-v3.bak")
+        val backup = File(root, "smy.db.before-v${QuestionAnswerSchema.VERSION}.bak")
         assertTrue(backup.isFile)
         BundledSQLiteDriver().open(backup.absolutePath).use { db ->
             assertEquals(2, QuestionAnswerSchema.version(db))
@@ -290,6 +290,91 @@ class QuestionAnswerSyncTest {
         assertEquals(listOf("No"), entries.single { it.question == "Learned?" }.answers)
     }
 
+    /** A file exactly as version 3 left it; [change] adds the rows under test. */
+    private fun version3File(name: String, change: (SQLiteConnection) -> Unit): File = File(root, name).also { file ->
+        oldSchemaFile("v3-source.db").copyTo(file)
+        BundledSQLiteDriver().open(file.absolutePath).use { db ->
+            QuestionAnswerSchema.upgrade(db, file, backup = false)
+            db.sql("PRAGMA user_version = 3")
+            change(db)
+        }
+    }
+
+    @Test fun given_a_version_3_file_with_a_case_folded_key_when_opened_then_the_key_is_repaired_and_the_learned_answer_kept() = runBlocking {
+        val options = listOf("4 \u00b5F", "8 \u00b5F")
+        val question = "What is C(s) in \u00b5F?"
+        val installed = version3File("smy.db") { db ->
+            db.sql("INSERT INTO qa_questions(id,bank_name,module,question_text,question_key) VALUES(5,'bank.json','Module','$question','${foldedKeyOf(question, options)}')")
+            db.sql("INSERT INTO qa_options VALUES(5,1,'${options[0]}'), (5,2,'${options[1]}')")
+            db.sql("INSERT INTO qa_answers(question_id,answer_text,answer_key,source,learned_at,reviewed_at,client_id,confirmed_at) VALUES(5,'4 \u00b5F','4 \u03bcf','learned',100,200,'c-1',200)")
+        }
+        val store = store(installed, oldSchemaFile("bundle.db"))
+        assertEquals(listOf("4 \u00b5F"), store.entries("bank.json")!!.single { it.question == question }.answers)
+        BundledSQLiteDriver().open(installed.absolutePath).use { db ->
+            assertEquals(4, QuestionAnswerSchema.version(db))
+            assertEquals(QuestionAnswerText.questionKey(question, options), db.text("SELECT question_key FROM qa_questions WHERE id=5"))
+            assertEquals("4 \u00b5f", db.text("SELECT answer_key FROM qa_answers WHERE question_id=5"))
+            assertEquals(1L, db.long("SELECT count(*) FROM qa_answers WHERE question_id=5 AND client_id='c-1' AND learned_at=100 AND reviewed_at=200 AND confirmed_at=200"))
+        }
+        // The confirmed answer is uploaded under the app's keys.
+        val pending = store.pendingUploads(10)!!.single()
+        assertEquals(QuestionAnswerText.questionKey(question, options) to "4 \u00b5f", pending.questionKey to pending.answerKey)
+        // The app's own lookup now finds the row: saving the same answer again is no conflict and adds no question.
+        assertEquals(QuestionAnswerWriteResult.Saved, store.save("bank.json", listOf(LearnedQuestionAnswer("Module", question, options, "4 \u00b5F")), reviewed = false))
+        assertEquals(1, store.entries("bank.json")!!.count { it.question == question })
+        val backup = File(root, "smy.db.before-v4.bak")
+        assertTrue(backup.isFile)
+        BundledSQLiteDriver().open(backup.absolutePath).use { db ->
+            assertEquals(3, QuestionAnswerSchema.version(db))
+            assertEquals(foldedKeyOf(question, options), db.text("SELECT question_key FROM qa_questions WHERE id=5"))
+        }
+    }
+
+    @Test fun given_a_version_3_file_with_a_correctly_keyed_duplicate_when_opened_then_they_merge_and_learned_answers_win() = runBlocking {
+        val options = listOf("4 \u00b5F", "8 \u00b5F")
+        val first = "Bundled row folded, learned row correct: \u00b5F?"
+        val second = "Learned row folded, bundled row correct: \u00b5F?"
+        val installed = version3File("seagull.db") { db ->
+            listOf(first to 10, second to 20).forEach { (question, id) ->
+                db.sql("INSERT INTO qa_questions(id,bank_name,module,question_text,question_key) VALUES($id,'bank.json','Module','$question','${foldedKeyOf(question, options)}')")
+                db.sql("INSERT INTO qa_questions(id,bank_name,module,question_text,question_key,compass_entry_id,compass_revision) VALUES(${id + 1},'bank.json','Module','$question','${keyOf(question, options)}','e$id',3)")
+                db.sql("INSERT INTO qa_options VALUES($id,1,'${options[0]}'), ($id,2,'${options[1]}'), (${id + 1},1,'${options[0]}'), (${id + 1},2,'${options[1]}')")
+            }
+            // First question: the case-folded bundled row and the app's own learned, confirmed row.
+            db.sql("INSERT INTO qa_answers(question_id,answer_text,answer_key,source) VALUES(10,'4 \u00b5F','4 \u03bcf','source')")
+            db.sql("INSERT INTO qa_answers(question_id,answer_text,answer_key,source,learned_at,reviewed_at,client_id,confirmed_at) VALUES(11,'8 \u00b5F','8 \u00b5f','learned',100,200,'c-1',200)")
+            // Second question: the learned answer sits on the case-folded row, the bundled one on the correct row.
+            db.sql("INSERT INTO qa_answers(question_id,answer_text,answer_key,source,learned_at,reviewed_at,client_id,confirmed_at) VALUES(20,'8 \u00b5F','8 \u03bcf','learned',300,400,'c-2',400)")
+            db.sql("INSERT INTO qa_answers(question_id,answer_text,answer_key,source) VALUES(21,'4 \u00b5F','4 \u00b5f','source')")
+            db.sql("INSERT INTO qa_authoritative VALUES('bank.json','Module','${foldedKeyOf(second, options)}','e20',3)")
+        }
+        val entries = store(installed, oldSchemaFile("bundle.db")).entries("bank.json")!!
+        assertEquals(listOf("8 \u00b5F"), entries.single { it.question == first }.answers)
+        assertEquals(listOf("8 \u00b5F"), entries.single { it.question == second }.answers)
+        BundledSQLiteDriver().open(installed.absolutePath).use { db ->
+            // One row per question, under the app's key, with its options and the remote link; nothing left behind.
+            assertEquals(1L, db.long("SELECT count(*) FROM qa_questions WHERE question_text='$first' AND question_key='${keyOf(first, options)}' AND compass_entry_id='e10'"))
+            assertEquals(1L, db.long("SELECT count(*) FROM qa_questions WHERE question_text='$second' AND question_key='${keyOf(second, options)}' AND compass_entry_id='e20'"))
+            assertEquals(0L, db.long("SELECT count(*) FROM qa_questions WHERE id IN (10,20)"))
+            assertEquals(0L, db.long("SELECT count(*) FROM qa_options WHERE question_id NOT IN (SELECT id FROM qa_questions)"))
+            assertEquals(0L, db.long("SELECT count(*) FROM qa_answers WHERE question_id NOT IN (SELECT id FROM qa_questions)"))
+            assertEquals(2L, db.long("SELECT count(*) FROM qa_options WHERE question_id=21"))
+            assertEquals(1L, db.long("SELECT count(*) FROM qa_answers WHERE question_id=11 AND client_id='c-1' AND confirmed_at=200 AND answer_key='8 \u00b5f'"))
+            assertEquals(1L, db.long("SELECT count(*) FROM qa_answers WHERE question_id=21 AND client_id='c-2' AND confirmed_at=400 AND answer_key='8 \u00b5f' AND source='learned'"))
+            // The correction record follows the question to its new key.
+            assertEquals(keyOf(second, options), db.text("SELECT question_key FROM qa_authoritative WHERE entry_id='e20'"))
+            assertEquals(1L, db.long("SELECT count(*) FROM qa_authoritative"))
+        }
+        assertTrue(File(root, "seagull.db.before-v4.bak").isFile)
+    }
+
+    /** The key the old bundle builder stored: Python's casefold() turned the micro sign into Greek mu. */
+    private fun foldedKeyOf(question: String, options: List<String>): String {
+        fun fold(value: String) = value.replace('\u00b5', '\u03bc')
+        val payload = fold(QuestionAnswerText.normalize(question)) + "\u001f" + options.map { fold(QuestionAnswerText.normalizedOption(it)) }.sorted().joinToString("\u001e")
+        return java.security.MessageDigest.getInstance("SHA-256").digest(payload.toByteArray()).joinToString("") { "%02x".format(it) }
+    }
+
     /** A copy of [bundle] with different contents, so the next open merges it again. */
     private fun changedBundle(bundle: File, change: (SQLiteConnection) -> Unit = {}): File =
         File(root, "bundle-${System.nanoTime()}.db").also { updated ->
@@ -308,4 +393,5 @@ class QuestionAnswerSyncTest {
 
     private fun SQLiteConnection.sql(value: String) = prepare(value).use { it.step() }
     private fun SQLiteConnection.long(value: String) = prepare(value).use { it.step(); it.getLong(0) }
+    private fun SQLiteConnection.text(value: String) = prepare(value).use { it.step(); it.getText(0) }
 }
