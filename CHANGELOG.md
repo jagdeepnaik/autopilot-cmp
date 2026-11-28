@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-28
+
 - Cosmos is the source of truth for every approved Q&A entry, not only admin corrections: a downloaded entry's answer replaces the bundled and learned answers for its question, and app updates or automatic saves never bring the old answer back. Answers for questions Cosmos doesn't have are kept (confirmed ones are still sent for review), and an answer you confirm that disagrees stays in use until the admin acts. Each routine file downloads every entry once more after this update so earlier downloads follow the new rule.
 - Each sync now sends this computer's answers before downloading, so a confirmed answer that differs from Cosmos reaches the admin's review before Cosmos's answer replaces it.
 - An answer you confirm that disagrees with a Cosmos admin correction is now submitted to Cosmos (as a conflict for the admin to review) while it stays in use on this computer until the admin changes the entry; such answers kept back by earlier versions are submitted once. Automatic saves still never override or upload against a correction.
