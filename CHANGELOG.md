@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+- Publishing builds the Linux DEB on the home server when Legion's Debian VM can't build or hand it over, so every release is hosted for all four platforms.
+
 - Publishing fetches installers with a resumable download that picks up where a dropped connection stopped (Legion's link drops long transfers).
 
 ## [1.5.0] - 2026-11-28

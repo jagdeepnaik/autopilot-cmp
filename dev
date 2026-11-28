@@ -1275,7 +1275,7 @@ publish_main() {
 #   ./dev publish [--dry-run] [--skip <platform>]... [--no-tests] [--remote]
 #
 #   platform  macos (DMG, this Mac), android (APK, this Mac), windows (MSI, Legion),
-#             linux (DEB, Legion's x86-64 Debian VM legion-linux; never the home server)
+#             linux (DEB, Legion's x86-64 Debian VM legion-linux; the home server only as a fallback)
 #
 # The home server only serves the files: /srv/sites/cosmos/downloads/autopilot/<version>/ plus
 # manifest.json, replaced atomically. The three newest version folders are kept. It ends by asking
@@ -1363,7 +1363,7 @@ if [ "$dry_run" -eq 1 ]; then
     elif [ -f "$ROOT/keystore.properties" ]; then plan "android: ./gradlew :androidApp:assembleRelease (signed) on this Mac -> AutoPilot-$version-$build.apk"
     else plan "android: no keystore.properties, so the release APK would be unsigned; publishes the debug-signed APK instead -> AutoPilot-$version-$build-debug.apk"; fi
     if skipped windows; then plan "windows: skipped"; else plan "windows: ./dev build legion$( [ "$tests" -eq 1 ] || echo ' --no-tests') on Legion ($legion_host), then copy and verify AutoPilot-$package.msi"; fi
-    if skipped linux; then plan "linux: skipped"; else plan "linux: ./dev build legion-linux$( [ "$tests" -eq 1 ] || echo ' --no-tests') on Legion's Debian VM ($linux_host), then copy and verify autopilot_${package}_amd64.deb"; fi
+    if skipped linux; then plan "linux: skipped"; else plan "linux: ./dev build legion-linux$( [ "$tests" -eq 1 ] || echo ' --no-tests') on Legion's Debian VM ($linux_host) (home server if that fails), then copy and verify autopilot_${package}_amd64.deb"; fi
     plan "upload: rsync to $server:$downloads_dir/$version.uploading/, rename it to $version/, then write manifest.json.tmp and mv it over manifest.json"
     plan "prune: keep the three newest version folders in $server:$downloads_dir"
     plan "check: GET $cosmos_url/api/app/<platform> for each published platform, then print \"Published $version ($build)\""
@@ -1417,15 +1417,29 @@ else
         else rm -f "${stage:?}/${msi:?}"; pwarn "Windows: the Legion build or copy failed (or the hash didn't match); left out."; failed+=(windows); fi
     fi
     if ! skipped linux; then
+        local deb="autopilot_${package}_amd64.deb"
+        # Copies the newest DEB for this build from a Linux build host and checks its hash.
+        fetch_deb() {
+            local host="$1" dir="$2" remote_deb='' remote_hash=''
+            remote_deb=$(ssh -o ControlPath=none "$host" "ls '$dir'/desktopApp/build/compose/binaries/main-release/deb/*$package*.deb | head -1") \
+                && [ -n "$remote_deb" ] && scp_retry "$host:$remote_deb" "$stage/$deb" \
+                && remote_hash=$(ssh -o ControlPath=none "$host" "sha256sum '$remote_deb'" | awk '{print $1}') \
+                && [ "$remote_hash" = "$(shasum -a 256 "$stage/$deb" | awk '{print $1}')" ]
+        }
         pstep "Linux: build the DEB on Legion's Debian VM ($linux_host), then copy and verify it"
-        local deb="autopilot_${package}_amd64.deb" remote_deb='' remote_hash=''
-        if "$ROOT/dev" build legion-linux "${passthrough[@]+"${passthrough[@]}"}" \
-            && remote_deb=$(ssh "$linux_host" "ls '$linux_dir'/desktopApp/build/compose/binaries/main-release/deb/*$package*.deb | head -1") \
-            && [ -n "$remote_deb" ] && scp_retry "$linux_host:$remote_deb" "$stage/$deb" \
-            && remote_hash=$(ssh "$linux_host" "sha256sum '$remote_deb'" | awk '{print $1}') \
-            && [ "$remote_hash" = "$(shasum -a 256 "$stage/$deb" | awk '{print $1}')" ]; then
+        if "$ROOT/dev" build legion-linux "${passthrough[@]+"${passthrough[@]}"}" && fetch_deb "$linux_host" "$linux_dir"; then
             add_file linux deb "$stage/$deb" "Debian 12 / Ubuntu 22.04, x86-64"
-        else rm -f "${stage:?}/${deb:?}"; pwarn "Linux: the Legion Linux VM build or copy failed (or the hash didn't match); left out."; failed+=(linux); fi
+        else
+            # Fallback (owner decision, 28 Nov 2026): when Legion's VM can't build or hand over the DEB, the home
+            # server builds it (low priority, beside the websites) so every release still ships for Linux.
+            rm -f "${stage:?}/${deb:?}"
+            pwarn "Linux: Legion's Debian VM build or copy failed; building the DEB on the home server instead."
+            local server_host="${SERVER_HOST:-home-server}" server_dir='/srv/build/autopilot-cmp'
+            [ "$remote" -eq 1 ] && server_host=home-server-remote
+            if "$ROOT/dev" build home-server "${passthrough[@]+"${passthrough[@]}"}" && fetch_deb "$server_host" "$server_dir"; then
+                add_file linux deb "$stage/$deb" "Debian 12 / Ubuntu 22.04, x86-64"
+            else rm -f "${stage:?}/${deb:?}"; pwarn "Linux: the home server build or copy failed too; left out."; failed+=(linux); fi
+        fi
     fi
 fi
 
