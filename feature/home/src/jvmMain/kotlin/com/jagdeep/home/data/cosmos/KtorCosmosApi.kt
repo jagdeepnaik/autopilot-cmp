@@ -60,8 +60,9 @@ class KtorCosmosApi(
 
     init { require(isAllowedBaseUrl(base)) { "Cosmos URL must use HTTPS" } }
 
-    override suspend fun login(email: String, password: String, deviceName: String, machineId: String, platform: String): CosmosSession =
-        call(HttpMethod.Post, listOf("auth", "app", "login"), body = encode(LoginRequest.serializer(), LoginRequest(email, password, deviceName.take(60), machineId, platform))) { decode(CosmosSession.serializer(), it) }
+    override suspend fun login(email: String, password: String, deviceName: String, machineId: String, platform: String, totpCode: String?): CosmosSession =
+        call(HttpMethod.Post, listOf("auth", "app", "login"),
+            body = encode(LoginRequest.serializer(), LoginRequest(email, password, deviceName.take(60), machineId, platform, totpCode))) { decode(CosmosSession.serializer(), it) }
 
     override suspend fun changePassword(accessToken: String, currentPassword: String, newPassword: String): CosmosSession? =
         call(HttpMethod.Post, listOf("auth", "app", "change-password"), accessToken,
@@ -187,8 +188,8 @@ class KtorCosmosApi(
         catch (_: Exception) { throw CosmosApiException.Offline() }
         val status = response.status.value
         when {
-            status == 401 -> throw CosmosApiException.Unauthorized()
             // Only the contract's `code` is read from an error; its sentence and anything else are dropped.
+            status == 401 -> throw CosmosApiException.Unauthorized(errorCode(response))
             status == 403 -> throw CosmosApiException.Forbidden(errorCode(response))
             status == 409 -> throw CosmosApiException.Conflict(errorCode(response))
             status == 404 -> throw CosmosApiException.NotFound()
@@ -215,7 +216,9 @@ class KtorCosmosApi(
     private fun <T> encode(serializer: KSerializer<T>, value: T) = json.encodeToString(serializer, value)
     private fun <T> decode(serializer: KSerializer<T>, text: String) = json.decodeFromString(serializer, text)
 
-    @Serializable private data class LoginRequest(val email: String, val password: String, val deviceName: String, val machineId: String, val platform: String)
+    /** `totpCode` is left out of the body when null (`explicitNulls = false`). */
+    @Serializable private data class LoginRequest(val email: String, val password: String, val deviceName: String, val machineId: String, val platform: String,
+        val totpCode: String? = null)
     @Serializable private data class ChangePasswordRequest(val currentPassword: String, val newPassword: String)
     @Serializable private data class ErrorResponse(val error: String? = null, val code: String? = null)
     @Serializable private data class AccountResponse(val account: CosmosAccountWire)

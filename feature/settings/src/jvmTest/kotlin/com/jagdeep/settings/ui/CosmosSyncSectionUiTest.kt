@@ -35,8 +35,16 @@ class CosmosSyncSectionUiTest {
         override val state = MutableStateFlow(initial)
         val signIns = mutableListOf<Pair<String, String>>()
         var syncs = 0
-        override suspend fun signIn(email: String, password: String): CosmosSignInResult {
+        /** When set, sign-in needs this authenticator code (TOTP_REQUIRED without it, TOTP_INVALID otherwise). */
+        var requiredCode: String? = null
+        val codes = mutableListOf<String?>()
+        override suspend fun signIn(email: String, password: String, totpCode: String?): CosmosSignInResult {
             signIns += email to password
+            codes += totpCode
+            requiredCode?.let { expected ->
+                if (totpCode == null) return CosmosSignInResult.TotpRequired
+                if (totpCode != expected) return CosmosSignInResult.TotpInvalid
+            }
             state.value = state.value.copy(account = CosmosAccount("Tester"))
             return CosmosSignInResult.SignedIn
         }
@@ -64,6 +72,32 @@ class CosmosSyncSectionUiTest {
         onNodeWithText("Sign out").performClick()
         waitForIdle()
         onNodeWithText("Email").performScrollTo().assertExists()
+    }
+
+    @Test fun given_the_admin_when_cosmos_asks_for_a_code_then_the_code_field_appears_and_signs_in() = runDesktopComposeUiTest(1000, 2400) {
+        val sync = FakeSync(CosmosSyncState(available = true)).apply { requiredCode = "123456" }
+        val vm = SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate, cosmosSync = sync)
+        setContent { AppTheme(darkTheme = false) { SettingsScreen(vm, {}, "1.0.0") } }
+        onNodeWithText("Email").performScrollTo().performTextInput("admin@example.com")
+        onNodeWithText("Password").performTextInput("test-password")
+        onNodeWithText("Sign in").performClick()
+        waitForIdle()
+        onNodeWithText("Authenticator code").performScrollTo().assertExists()
+        onNodeWithText("Enter the code from your authenticator app. You can also use a recovery code.").assertExists()
+        // The password stays (masked) for the second request; Verify waits for a code.
+        onNodeWithText("•".repeat("test-password".length)).assertExists()
+        onNodeWithText("Verify").assertIsNotEnabled()
+        // Only letters, digits and dashes are typed into the field.
+        onNodeWithText("Authenticator code").performTextInput("65 43#21")
+        onNodeWithText("Verify").assertIsEnabled().performClick()
+        waitForIdle()
+        onNodeWithText("That code didn't work. Try the newest one.").performScrollTo().assertExists()
+        onNodeWithText("Authenticator code").performTextInput("123456")
+        onNodeWithText("Verify").performClick()
+        waitForIdle()
+        assertEquals(listOf(null, "654321", "123456"), sync.codes)
+        assertEquals(List(3) { "admin@example.com" to "test-password" }, sync.signIns)
+        onNodeWithText("Signed in to Cosmos as Tester").performScrollTo().assertExists()
     }
 
     @Test fun given_no_secure_storage_then_settings_explains_sync_is_unavailable() = runDesktopComposeUiTest(1000, 2400) {

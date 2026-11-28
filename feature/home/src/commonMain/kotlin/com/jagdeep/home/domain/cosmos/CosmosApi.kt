@@ -8,8 +8,11 @@ import kotlinx.serialization.Serializable
  * machine ID, sanitised routine run logs and the admin's account administration travel through it.
  */
 interface CosmosApi {
-    /** [machineId] is the hashed [MachineIdentity.machineId], never the raw identifier. */
-    suspend fun login(email: String, password: String, deviceName: String, machineId: String, platform: String): CosmosSession
+    /**
+     * [machineId] is the hashed [MachineIdentity.machineId], never the raw identifier. [totpCode] (the admin's
+     * authenticator or recovery code) is sent only when given.
+     */
+    suspend fun login(email: String, password: String, deviceName: String, machineId: String, platform: String, totpCode: String? = null): CosmosSession
     suspend fun refresh(refreshToken: String): CosmosSession
     suspend fun logout(refreshToken: String)
     suspend fun entries(accessToken: String, bank: String, after: Long, limit: Int): CosmosEntriesPage
@@ -35,7 +38,8 @@ interface CosmosApi {
 
 /** Failures carry no response body, token or request detail, so they are safe to log or show. */
 sealed class CosmosApiException(message: String) : Exception(message) {
-    class Unauthorized : CosmosApiException("Cosmos refused the session")
+    /** `401`, with the contract's [code] (for example `TOTP_REQUIRED`) when Cosmos sent one. */
+    class Unauthorized(val code: String? = null) : CosmosApiException("Cosmos refused the session${code?.let { " ($it)" } ?: ""}")
     class RateLimited(val retryAfterSeconds: Long?) : CosmosApiException("Cosmos asked to wait")
     class ServerTrouble(val status: Int) : CosmosApiException("Cosmos server error $status")
     class Offline : CosmosApiException("Cosmos could not be reached")
@@ -51,6 +55,9 @@ sealed class CosmosApiException(message: String) : Exception(message) {
         const val MACHINE_REVOKED = "MACHINE_REVOKED"
         const val ACCOUNT_DISABLED = "ACCOUNT_DISABLED"
         const val PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED"
+        const val TOTP_REQUIRED = "TOTP_REQUIRED"
+        const val TOTP_INVALID = "TOTP_INVALID"
+        const val TOTP_SETUP_REQUIRED = "TOTP_SETUP_REQUIRED"
     }
 }
 

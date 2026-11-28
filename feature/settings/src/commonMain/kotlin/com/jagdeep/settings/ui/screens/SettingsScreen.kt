@@ -140,9 +140,10 @@ fun SettingsScreen(
                 Group("Cosmos sync")
                 com.jagdeep.settings.ui.components.CosmosSyncSection(
                     state.cosmos, state.cosmosSigningIn, state.cosmosSignInProblem,
-                    onSignIn = viewModel::signInToCosmos, onSyncNow = viewModel::syncCosmosNow, onSignOut = viewModel::signOutOfCosmos,
+                    onSignIn = { email, password, code -> viewModel.signInToCosmos(email, password, code) }, onSyncNow = viewModel::syncCosmosNow, onSignOut = viewModel::signOutOfCosmos,
                     runLogsAvailable = state.runLogsAvailable, onOpenRunLogs = viewModel::openRunLogsFolder,
                     machinePending = state.cosmosMachinePending,
+                    totpRequired = state.cosmosTotpRequired, onCancelTotp = viewModel::cancelCosmosTotp,
                     changingPassword = state.cosmosChangingPassword, passwordProblem = state.cosmosPasswordProblem, onChangePassword = viewModel::changeCosmosPassword,
                     openingCosmos = state.cosmosOpeningBrowser, onOpenCosmos = viewModel::openCosmos,
                     onOpenAccounts = onOpenAccounts, onOpenMachines = onOpenMachines,

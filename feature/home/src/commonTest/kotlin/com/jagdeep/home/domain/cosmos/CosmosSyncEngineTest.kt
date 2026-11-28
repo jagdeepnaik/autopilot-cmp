@@ -82,9 +82,17 @@ class CosmosSyncEngineTest {
         }
 
         val logins = mutableListOf<Pair<String, String>>()
-        override suspend fun login(email: String, password: String, deviceName: String, machineId: String, platform: String): CosmosSession {
+        val totpCodes = mutableListOf<String?>()
+        /** When set, sign-in needs this code: none answers TOTP_REQUIRED, any other TOTP_INVALID. */
+        var requiredTotp: String? = null
+        override suspend fun login(email: String, password: String, deviceName: String, machineId: String, platform: String, totpCode: String?): CosmosSession {
             logins += machineId to platform
+            totpCodes += totpCode
             loginFails?.let { throw it }
+            requiredTotp?.let { expected ->
+                if (totpCode == null) throw CosmosApiException.Unauthorized(CosmosApiException.TOTP_REQUIRED)
+                if (totpCode != expected) throw CosmosApiException.Unauthorized(CosmosApiException.TOTP_INVALID)
+            }
             return session(1)
         }
         override suspend fun refresh(refreshToken: String): CosmosSession {
@@ -508,6 +516,61 @@ class CosmosSyncEngineTest {
         // Try again once the admin approved this computer.
         setup.api.loginFails = null
         assertEquals(CosmosSignInResult.SignedIn, setup.engine.signIn("person@example.com", "test-password"))
+    }
+
+    @Test fun given_the_admin_when_signing_in_without_then_with_a_code_then_the_same_sign_in_is_sent_again_with_it() = syncTest { setup ->
+        setup.api.requiredTotp = "123456"
+        setup.engine.start()
+        assertEquals(CosmosSignInResult.TotpRequired, setup.engine.signIn("admin@example.com", "test-password"))
+        assertNull(setup.engine.state.value.account)
+        assertNull(setup.credentials.value.value)
+        assertEquals(CosmosSignInResult.TotpInvalid, setup.engine.signIn("admin@example.com", "test-password", "654321"))
+        assertNull(setup.engine.state.value.account)
+        assertEquals(CosmosSignInResult.SignedIn, setup.engine.signIn("admin@example.com", "test-password", " 123 456 "))
+        advanceUntilIdle()
+        // No code until Cosmos asked for one; spaces dropped; one request per sign-in (never retried).
+        assertEquals(listOf(null, "654321", "123456"), setup.api.totpCodes)
+        assertEquals("Test User", setup.engine.state.value.account?.name)
+        // Neither the password nor any code is logged.
+        assertTrue(setup.logs.none { line -> listOf("test-password", "123456", "654321").any { it in line } }, setup.logs.toString())
+    }
+
+    @Test fun given_each_two_step_answer_when_signing_in_then_it_maps_to_its_own_result() = syncTest { setup ->
+        setup.engine.start()
+        val cases = listOf(
+            CosmosApiException.Unauthorized(CosmosApiException.TOTP_REQUIRED) to CosmosSignInResult.TotpRequired,
+            CosmosApiException.Unauthorized(CosmosApiException.TOTP_INVALID) to CosmosSignInResult.TotpInvalid,
+            CosmosApiException.Unauthorized() to CosmosSignInResult.WrongEmailOrPassword,
+            CosmosApiException.Unauthorized("SOMETHING_NEW") to CosmosSignInResult.WrongEmailOrPassword,
+            CosmosApiException.Forbidden(CosmosApiException.TOTP_SETUP_REQUIRED) to CosmosSignInResult.TotpSetupRequired,
+            CosmosApiException.RateLimited(900) to CosmosSignInResult.RateLimited,
+        )
+        cases.forEach { (error, expected) ->
+            setup.api.loginFails = error
+            assertEquals(expected, setup.engine.signIn("admin@example.com", "test-password", "123456"), error.message)
+        }
+        assertNull(setup.credentials.value.value)
+    }
+
+    @Test fun given_a_code_that_cannot_be_valid_when_signing_in_then_nothing_is_sent() = syncTest { setup ->
+        setup.engine.start()
+        assertEquals(CosmosSignInResult.TotpInvalid, setup.engine.signIn("admin@example.com", "test-password", "12#456"))
+        assertEquals(CosmosSignInResult.TotpInvalid, setup.engine.signIn("admin@example.com", "test-password", "x".repeat(21)))
+        assertTrue(setup.api.logins.isEmpty())
+    }
+
+    @Test fun given_an_admin_session_when_refreshing_then_no_code_is_asked_for() = syncTest { setup ->
+        setup.api.requiredTotp = "123456"
+        setup.engine.start()
+        assertEquals(CosmosSignInResult.SignedIn, setup.engine.signIn("admin@example.com", "test-password", "123456"))
+        advanceUntilIdle()
+        // An expired access token is refreshed with the refresh token alone; sign-in isn't repeated.
+        setup.api.validAccess = "expired"
+        setup.engine.syncNow()
+        advanceUntilIdle()
+        assertEquals(1, setup.api.logins.size)
+        assertTrue(setup.api.refreshCalls > 0)
+        assertEquals(CosmosSyncOutcome.Synced, setup.engine.state.value.lastOutcome)
     }
 
     @Test fun given_a_temporary_password_when_signed_in_then_nothing_syncs_until_it_is_changed() = syncTest { setup ->

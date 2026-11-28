@@ -112,18 +112,28 @@ class CosmosSyncEngine(
         }
     }
 
-    override suspend fun signIn(email: String, password: String): CosmosSignInResult {
+    override suspend fun signIn(email: String, password: String, totpCode: String?): CosmosSignInResult {
         val identity = identity() ?: return CosmosSignInResult.ComputerNotIdentified
-        val session = try { api.login(email.trim(), password, deviceName, identity.machineId, identity.platform) }
+        // A code was typed but isn't one Cosmos could accept: say so without spending a sign-in attempt.
+        val code = CosmosSync.normalizedTotpCode(totpCode)
+        if (totpCode != null && totpCode.isNotBlank() && code == null) return CosmosSignInResult.TotpInvalid
+        // One request only, never retried: a code is accepted once, and a new sign-in always asks for it again.
+        val session = try { api.login(email.trim(), password, deviceName, identity.machineId, identity.platform, code) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (error: CosmosApiException) { return when (error) {
-            is CosmosApiException.Unauthorized, is CosmosApiException.Rejected -> CosmosSignInResult.WrongEmailOrPassword
+            is CosmosApiException.Unauthorized -> when (error.code) {
+                CosmosApiException.TOTP_REQUIRED -> CosmosSignInResult.TotpRequired
+                CosmosApiException.TOTP_INVALID -> CosmosSignInResult.TotpInvalid
+                else -> CosmosSignInResult.WrongEmailOrPassword
+            }
+            is CosmosApiException.Rejected -> CosmosSignInResult.WrongEmailOrPassword
             is CosmosApiException.Offline -> CosmosSignInResult.Offline
             is CosmosApiException.RateLimited -> CosmosSignInResult.RateLimited
             is CosmosApiException.Forbidden -> when (error.code) {
                 CosmosApiException.MACHINE_PENDING -> CosmosSignInResult.MachinePending
                 CosmosApiException.MACHINE_REVOKED -> CosmosSignInResult.MachineRevoked
                 CosmosApiException.ACCOUNT_DISABLED -> CosmosSignInResult.AccountDisabled
+                CosmosApiException.TOTP_SETUP_REQUIRED -> CosmosSignInResult.TotpSetupRequired
                 else -> CosmosSignInResult.ServerTrouble
             }
             is CosmosApiException.ServerTrouble, is CosmosApiException.NotFound, is CosmosApiException.Conflict -> CosmosSignInResult.ServerTrouble
