@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-11-28
+
 - Android: each release now has its own build number (the same build Cosmos lists), so a newer APK always installs over the older one.
 - Android: Settings no longer shows the desktop-only pointer safety switches and keyboard shortcuts, and its privacy note describes the phone.
 
