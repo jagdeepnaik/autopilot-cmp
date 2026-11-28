@@ -549,7 +549,7 @@ server_fetch() {
     local deb name metadata package version deb_arch destination_name remote local_hash
     deb=$(ssh "$SERVER_HOST" "ls -t $SERVER_DIR/desktopApp/build/compose/binaries/main-release/deb/*.deb | head -1") || fail "no DEB on the server."
     name=$(basename "$deb")
-    metadata=$(ssh "$SERVER_HOST" "dpkg-deb -f '$deb' Package Version Architecture" | tr '\n' '|') \
+    metadata=$(ssh "$SERVER_HOST" "dpkg-deb --showformat='\${Package}|\${Version}|\${Architecture}|' -W '$deb'") \
         || fail "couldn't read metadata for $name on the server."
     IFS='|' read -r package version deb_arch _ <<< "$metadata"
     [ -n "$package" ] && [ -n "$version" ] && [ -n "$deb_arch" ] \
@@ -603,7 +603,7 @@ fetch_artifact_group() {
         if [ "$extension" = msi ]; then
             destination_name=$(normalized_msi_name "$name" "$architecture")
         else
-            metadata=$(ssh "$host" "dpkg-deb -f '$remote_dir/$name' Package Version Architecture" | tr '\n' '|') \
+            metadata=$(ssh "$host" "dpkg-deb --showformat='\${Package}|\${Version}|\${Architecture}|' -W '$remote_dir/$name'") \
                 || fail "couldn't read metadata for $name on $label."
             IFS='|' read -r package version deb_arch _ <<< "$metadata"
             [ -n "$package" ] && [ -n "$version" ] && [ -n "$deb_arch" ] \
