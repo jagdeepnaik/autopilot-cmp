@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-28
+
 - Windows 10: a dark window frame now also works on Windows 10 releases before 20H1, and the documentation says what Windows 10 needs (nothing extra) and that it isn't tested yet.
 - Sagar Mein Yog: a run that stops moving for 90 seconds (outside a wait for you, a timed wait or an assessment) now reloads the course tab once by itself and carries on from the page shown, instead of waiting for you to refresh it. Assessment, quiz and result pages are never reloaded, so nothing is answered or submitted twice; if the reload doesn't help, the five-minute stall alert follows as before. Every step is in the run log.
 - Sagar Mein Yog: reloading or updating the Chrome extension no longer needs a refresh of the course tab: the extension puts its course script back into open course tabs, and into a course tab that stops answering during a run.
