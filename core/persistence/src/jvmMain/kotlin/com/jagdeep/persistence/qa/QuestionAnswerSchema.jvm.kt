@@ -13,7 +13,8 @@ import java.io.File
  *
  * Version 3 adds `qa_authoritative`: the questions an admin corrected in the remote service. Their
  * remote answers replace every local answer, and the record outlives the question row, so a later
- * bundle merge or an automatic save never brings the old answer back.
+ * bundle merge or an automatic save never brings the old answer back. Since Cosmos became the source of truth for
+ * every approved entry, the table records every question an applied entry owns, not only corrections (no schema change).
  *
  * Version 4 repairs keys: every `question_key` and `answer_key` is recomputed with [QuestionAnswerText],
  * the app's own rule. Older bundles were built with case folding, which turned the micro sign `µ` into

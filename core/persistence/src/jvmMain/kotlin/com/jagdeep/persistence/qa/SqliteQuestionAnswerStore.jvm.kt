@@ -22,7 +22,8 @@ data class KeyedAnswer(val text: String, val answerKey: String)
 /**
  * One question received from a remote Q&A service, identified there by [entryId] and by this file's
  * own identity: [bankName], [module] and [questionKey] (`qa_questions.question_key`).
- * [authoritative] marks an admin's correction: its answers replace every local answer.
+ * [authoritative] marks an admin's correction. It is kept for compatibility only: Cosmos is the source of truth for
+ * every approved entry, so every entry's answers replace the local ones, flagged or not.
  */
 data class RemoteQuestionAnswer(
     val entryId: String,
@@ -127,11 +128,11 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
         val answerKey = normalize(value.answer)
         val existing = answersFor(db, id).map(::normalize).toSet()
         val previous = value.previousAnswer?.let(::normalize)
-        // An admin's correction stands: saving the same answer changes nothing, and an automatic save
+        // A Cosmos entry stands: saving the same answer changes nothing, and an automatic save
         // (a legacy import, quiz feedback, a reference) never replaces it. Only the user's own
         // confirmation can: that answer is used on this computer and queued for upload like any other
         // confirmed answer, so the admin sees the disagreement (Cosmos answers `conflict`).
-        val corrected = isAuthoritative(db, bank, value.module, key) && existing.isNotEmpty()
+        val corrected = isCosmosOwned(db, bank, value.module, key) && existing.isNotEmpty()
         if (corrected && (existing == setOf(answerKey) || !confirmed)) return
         if (reviewed && ((previous != null && existing != setOf(previous)) || (previous == null && existing.isNotEmpty() && existing != setOf(answerKey)))) throw WriteConflict()
         if (!reviewed && existing.isNotEmpty() && existing != setOf(answerKey)) throw WriteConflict()
@@ -165,12 +166,13 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
             }
             if (!databaseFile.isFile) {
                 Files.move(bundled.toPath(), databaseFile.toPath(), StandardCopyOption.ATOMIC_MOVE)
-                open().use { installed -> QuestionAnswerSchema.upgrade(installed, databaseFile, backup = false) }
+                open().use { installed -> QuestionAnswerSchema.upgrade(installed, databaseFile, backup = false); restartSyncForCosmosRule(installed) }
             } else {
                 open().use { installed ->
                     QuestionAnswerSchema.upgrade(installed, databaseFile, backup = true)
                     installed.prepare("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)").use { it.step() }
                     requeueSuperseded(installed)
+                    restartSyncForCosmosRule(installed)
                     val current = installed.prepare("SELECT value FROM metadata WHERE key='bundled_sha256'").use { row -> if (row.step()) row.getText(0) else null }
                     if (current != fingerprint) {
                         driver.open(bundled.absolutePath).use { source -> mergeBundledSource(installed, source) }
@@ -203,8 +205,29 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
     }
 
     /**
-     * Adds current bundled questions without discarding answers learned in the user's copy. A question an
-     * admin corrected is left exactly as the correction (or its retirement) left it.
+     * Until 1.6.1 only `authoritative` entries replaced local answers, so a file synced by those versions holds
+     * entries whose bundled or learned answer won. Cosmos is now the source of truth for every approved entry: the
+     * sync cursors are cleared once per file (a metadata flag records it), so the next sync downloads every entry
+     * again and applies it under the current rule. No answer is removed here.
+     */
+    private fun restartSyncForCosmosRule(db: SQLiteConnection) {
+        db.prepare("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)").use { it.step() }
+        val done = db.prepare("SELECT 1 FROM metadata WHERE key='$COSMOS_RULE_KEY'").use { it.step() }
+        if (done) return
+        db.prepare("BEGIN IMMEDIATE").use { it.step() }
+        try {
+            db.prepare("DELETE FROM sync_state").use { it.step() }
+            db.prepare("INSERT OR REPLACE INTO metadata(key,value) VALUES ('$COSMOS_RULE_KEY','1')").use { it.step() }
+            db.prepare("COMMIT").use { it.step() }
+        } catch (error: Throwable) {
+            runCatching { db.prepare("ROLLBACK").use { it.step() } }
+            throw error
+        }
+    }
+
+    /**
+     * Adds current bundled questions without discarding answers learned in the user's copy. A question Cosmos has
+     * an entry for is left exactly as that entry (or its retirement) left it.
      */
     private fun mergeBundledSource(installed: SQLiteConnection, source: SQLiteConnection) {
         installed.prepare("BEGIN IMMEDIATE").use { it.step() }
@@ -216,7 +239,7 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
                     val module = questions.getText(2)
                     val question = questions.getText(3)
                     val key = questions.getText(4)
-                    if (isAuthoritative(installed, bank, module, key)) continue
+                    if (isCosmosOwned(installed, bank, module, key)) continue
                     val installedId = installed.prepare("SELECT id FROM qa_questions WHERE bank_name=? AND module=? AND question_key=?").use { row ->
                         row.bindText(1, bank); row.bindText(2, module); row.bindText(3, key)
                         if (row.step()) row.getLong(0) else null
@@ -262,15 +285,18 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
      * Applies remote entries (each under its own bank name) and stores [revisionKey] = [revision] in the same transaction,
      * so the saved cursor never runs ahead of the saved data.
      *
+     * Cosmos is the source of truth for every approved entry (owner decision, 28 November 2026), whether or not it is
+     * flagged `authoritative`:
+     *
      * - A new question is added with `source = 'compass'` answers.
-     * - A question that already has bundled or learned answers keeps them: local answers win.
-     * - An authoritative entry (an admin's correction) replaces every local answer of its question, and
-     *   the question stays authoritative: later entries for it, authoritative or not, are applied the same way.
-     *   One exception: once the user has confirmed a different answer after that correction, the same
-     *   revision arriving again (or an older one) leaves the user's answer in use; only a newer revision
-     *   (the admin acted again) replaces it.
-     * - A retired entry removes only the answers (and questions) that came from the remote service; a
-     *   corrected question then stays empty rather than getting its old answer back.
+     * - An entry's answers replace every local answer of its question (bundled, learned and earlier remote rows), and
+     *   the question is recorded in `qa_authoritative`, so no bundle merge or automatic save brings the local answer
+     *   back. Questions Cosmos has no entry for keep their local answers.
+     *   One exception: once the user has confirmed a different answer after the entry was applied, the same
+     *   revision arriving again (or an older one) leaves the user's answer in use (it is queued for upload); only a
+     *   newer revision (the admin acted again) replaces it.
+     * - A retired entry removes only the answers (and questions) that came from the remote service; the question
+     *   then stays empty rather than getting its old bundled answer back.
      */
     suspend fun applyRemote(entries: List<RemoteQuestionAnswer>, revisionKey: String, revision: Long): RemoteApplyResult? = write { db ->
         var result = RemoteApplyResult()
@@ -327,8 +353,6 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
             entry.questionKey == questionKey(entry.question, entry.options) &&
             entry.answers.isNotEmpty() && entry.answers.all { answer -> answer.answerKey.isNotBlank() && entry.options.any { normalize(optionText(it)) == normalize(optionText(answer.text)) } }
         val identity = listOf(entry.bankName, entry.module, entry.questionKey)
-        // Once corrected, a question is never downgraded by a later entry without the flag.
-        val authoritative = entry.authoritative || isAuthoritative(db, entry.bankName, entry.module, entry.questionKey)
         var removed = 0
         // Retired, unusable, or moved to another identity: withdraw what this entry added before.
         linked.filter { (_, linkedIdentity) -> entry.retired || !usable || linkedIdentity != identity }.forEach { (id, _) -> if (unlinkRemote(db, id)) removed++ }
@@ -346,29 +370,22 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
                 row.bindLong(1, id); row.bindLong(2, (index + 1).toLong()); row.bindText(3, option); row.step()
             } }
             insertRemoteAnswers(db, id, entry)
-            if (authoritative) recordAuthoritative(db, entry)
+            recordCosmosOwned(db, entry)
             return result.copy(added = result.added + 1, removed = result.removed + removed)
         }
         db.prepare("UPDATE qa_questions SET compass_entry_id=?,compass_revision=? WHERE id=?").use { row ->
             row.bindText(1, entry.entryId); row.bindLong(2, entry.revision); row.bindLong(3, existing); row.step()
         }
-        if (authoritative) {
-            // The user confirmed a different answer after this correction: it stays in use until the admin
-            // changes the entry again (a newer revision).
-            val corrected = authoritativeRevision(db, entry.bankName, entry.module, entry.questionKey)
-            if (corrected != null && entry.revision <= corrected && hasConfirmedLearned(db, existing)) {
-                return result.copy(skipped = result.skipped + 1, removed = result.removed + removed)
-            }
-            // Bundled, learned and earlier remote answers all give way; a learned answer removed here is never uploaded.
-            db.prepare("DELETE FROM qa_answers WHERE question_id=?").use { row -> row.bindLong(1, existing); row.step() }
-            insertRemoteAnswers(db, existing, entry)
-            recordAuthoritative(db, entry)
-            return result.copy(updated = result.updated + 1, removed = result.removed + removed)
+        // The user confirmed a different answer after this entry was applied: it stays in use until the admin
+        // changes the entry again (a newer revision).
+        val applied = cosmosRevision(db, entry.bankName, entry.module, entry.questionKey)
+        if (applied != null && entry.revision <= applied && hasConfirmedLearned(db, existing)) {
+            return result.copy(skipped = result.skipped + 1, removed = result.removed + removed)
         }
-        val local = db.prepare("SELECT 1 FROM qa_answers WHERE question_id=? AND source<>'compass' LIMIT 1").use { row -> row.bindLong(1, existing); row.step() }
-        if (local) return result.copy(skipped = result.skipped + 1, removed = result.removed + removed)
-        db.prepare("DELETE FROM qa_answers WHERE question_id=? AND source='compass'").use { row -> row.bindLong(1, existing); row.step() }
+        // Bundled, learned and earlier remote answers all give way; a learned answer removed here is never uploaded.
+        db.prepare("DELETE FROM qa_answers WHERE question_id=?").use { row -> row.bindLong(1, existing); row.step() }
         insertRemoteAnswers(db, existing, entry)
+        recordCosmosOwned(db, entry)
         return result.copy(updated = result.updated + 1, removed = result.removed + removed)
     }
 
@@ -394,12 +411,13 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
         return true
     }
 
-    private fun isAuthoritative(db: SQLiteConnection, bankName: String, module: String, questionKey: String): Boolean =
+    /** Questions an applied Cosmos entry owns (`qa_authoritative`, the table's shipped name). */
+    private fun isCosmosOwned(db: SQLiteConnection, bankName: String, module: String, questionKey: String): Boolean =
         db.prepare("SELECT 1 FROM qa_authoritative WHERE bank_name=? AND module=? AND question_key=?").use { row ->
             row.bindText(1, bankName); row.bindText(2, module); row.bindText(3, questionKey); row.step()
         }
 
-    private fun authoritativeRevision(db: SQLiteConnection, bankName: String, module: String, questionKey: String): Long? =
+    private fun cosmosRevision(db: SQLiteConnection, bankName: String, module: String, questionKey: String): Long? =
         db.prepare("SELECT revision FROM qa_authoritative WHERE bank_name=? AND module=? AND question_key=?").use { row ->
             row.bindText(1, bankName); row.bindText(2, module); row.bindText(3, questionKey); if (row.step()) row.longOrNull(0) else null
         }
@@ -407,7 +425,7 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
     private fun hasConfirmedLearned(db: SQLiteConnection, questionId: Long): Boolean =
         db.prepare("SELECT 1 FROM qa_answers WHERE question_id=? AND source='learned' AND confirmed_at IS NOT NULL LIMIT 1").use { row -> row.bindLong(1, questionId); row.step() }
 
-    private fun recordAuthoritative(db: SQLiteConnection, entry: RemoteQuestionAnswer) {
+    private fun recordCosmosOwned(db: SQLiteConnection, entry: RemoteQuestionAnswer) {
         db.prepare("INSERT OR REPLACE INTO qa_authoritative(bank_name,module,question_key,entry_id,revision) VALUES (?,?,?,?,?)").use { row ->
             row.bindText(1, entry.bankName); row.bindText(2, entry.module); row.bindText(3, entry.questionKey); row.bindText(4, entry.entryId); row.bindLong(5, entry.revision); row.step()
         }
@@ -454,6 +472,8 @@ class SqliteQuestionAnswerStore(private val databaseFile: File, private val bund
          */
         const val SUPERSEDED = "superseded"
         const val REQUEUED_KEY = "superseded_requeued"
+        /** Set once the sync cursors were cleared for the rule that every Cosmos entry replaces local answers. */
+        const val COSMOS_RULE_KEY = "cosmos_owns_entries"
         /** Learned answers the user confirmed ("Save and continue" or a post-attempt review), not yet uploaded. */
         const val PENDING = "a.source='learned' AND a.reviewed_at IS NOT NULL AND a.confirmed_at IS NOT NULL AND a.submit_status IS NULL"
     }

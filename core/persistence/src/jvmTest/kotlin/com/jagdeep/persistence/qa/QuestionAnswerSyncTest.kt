@@ -70,21 +70,22 @@ class QuestionAnswerSyncTest {
         assertTrue(root.listFiles()!!.none { it.name.endsWith(".bak") })
     }
 
-    @Test fun given_remote_entries_when_applied_then_new_questions_are_added_and_local_answers_win() = runBlocking {
+    @Test fun given_remote_entries_when_applied_then_new_questions_are_added_and_cosmos_answers_replace_local_ones() = runBlocking {
         val bundle = oldSchemaFile("bundle.db")
         val store = store(File(root, "smy.db"), bundle)
         val result = store.applyRemote(listOf(
             remote("e1", "Remote?", listOf("Red", "Blue"), listOf("Blue"), 10),
-            // Same question and options as the bundled row, with a different answer: the bundled answer stays.
+            // Same question and options as the bundled row, with a different answer: Cosmos's answer replaces it.
             remote("e2", "Bundled?", listOf("A", "B"), listOf("A"), 11),
             // An answer that isn't one of the options is never stored.
             remote("e3", "Broken?", listOf("X", "Y"), listOf("Z"), 12),
         ), "revision", 12)!!
-        assertEquals(RemoteApplyResult(added = 1, skipped = 2), result)
+        assertEquals(RemoteApplyResult(added = 1, updated = 1, skipped = 1), result)
         val entries = store.entries("bank.json")!!
         assertEquals(listOf("Blue"), entries.single { it.question == "Remote?" }.answers)
         assertEquals("compass", entries.single { it.question == "Remote?" }.source)
-        assertEquals(listOf("B"), entries.single { it.question == "Bundled?" }.answers)
+        assertEquals(listOf("A"), entries.single { it.question == "Bundled?" }.answers)
+        assertEquals("compass", entries.single { it.question == "Bundled?" }.source)
         assertTrue(entries.none { it.question == "Broken?" })
         assertEquals("12", store.syncValue("revision"))
 
@@ -106,7 +107,9 @@ class QuestionAnswerSyncTest {
         assertEquals(2, result.removed)
         val entries = store.entries("bank.json")!!
         assertTrue(entries.none { it.question == "Remote?" })
-        assertEquals(listOf("B"), entries.single { it.question == "Bundled?" }.answers)
+        // The entry replaced the bundled row, so retiring it leaves the question empty: no bundled answer comes back.
+        assertEquals(emptyList(), entries.single { it.question == "Bundled?" }.answers)
+        // A question Cosmos never had keeps its learned answer.
         assertEquals(listOf("No"), entries.single { it.question == "Learned?" }.answers)
     }
 
@@ -186,7 +189,8 @@ class QuestionAnswerSyncTest {
         }
         val entries = store(installed, bundle).entries("bank.json")!!
         assertEquals(listOf("Blue"), entries.single { it.question == "Remote?" }.answers)
-        assertEquals("7", store(installed, bundle).syncValue("revision"))
+        // The sync cursor is cleared once, so every entry is downloaded again under the current rule.
+        assertNull(store(installed, bundle).syncValue("revision"))
         BundledSQLiteDriver().open(installed.absolutePath).use { db ->
             assertEquals(QuestionAnswerSchema.VERSION, QuestionAnswerSchema.version(db))
             assertEquals(3L, db.long("SELECT count(*) FROM qa_answers"))
@@ -200,17 +204,18 @@ class QuestionAnswerSyncTest {
         }
     }
 
-    @Test fun given_bundled_learned_and_remote_answers_when_an_authoritative_entry_is_applied_then_its_answers_replace_them_all() = runBlocking {
+    @Test fun given_bundled_learned_and_remote_answers_when_an_approved_entry_is_applied_then_its_answers_replace_them_all() = runBlocking {
         val store = store(File(root, "smy.db"), oldSchemaFile("bundle.db"))
         // A confirmed learned answer waiting to be uploaded, and an earlier remote answer.
         store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Mine?", listOf("Up", "Down"), "Up")), reviewed = true, confirmed = true)
         store.applyRemote(listOf(remote("e4", "Remote?", listOf("Red", "Blue"), listOf("Blue"), 5)), "revision", 5)
         assertEquals(1, store.pendingUploadCount())
         val result = store.applyRemote(listOf(
-            remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true),
-            remote("e2", "Learned?", listOf("Yes", "No"), listOf("Yes"), 11, authoritative = true),
-            remote("e3", "Mine?", listOf("Up", "Down"), listOf("Down"), 12, authoritative = true),
-            remote("e4", "Remote?", listOf("Red", "Blue"), listOf("Red"), 13, authoritative = true),
+            // Not one of them is flagged authoritative: Cosmos is the source of truth for every approved entry.
+            remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10),
+            remote("e2", "Learned?", listOf("Yes", "No"), listOf("Yes"), 11),
+            remote("e3", "Mine?", listOf("Up", "Down"), listOf("Down"), 12),
+            remote("e4", "Remote?", listOf("Red", "Blue"), listOf("Red"), 13),
         ), "revision", 13)!!
         assertEquals(RemoteApplyResult(updated = 4), result)
         val entries = store.entries("bank.json")!!.associateBy { it.question }
@@ -224,11 +229,11 @@ class QuestionAnswerSyncTest {
         assertTrue(store.pendingUploads(100)!!.isEmpty())
     }
 
-    @Test fun given_a_corrected_question_when_the_bundle_changes_or_the_app_starts_again_then_the_correction_is_kept() = runBlocking {
+    @Test fun given_a_synced_question_when_the_bundle_changes_or_the_app_starts_again_then_the_cosmos_answer_is_kept() = runBlocking {
         var bundle = oldSchemaFile("bundle.db")
         val installed = File(root, "smy.db")
         val store = SqliteQuestionAnswerStore(installed) { bundle.inputStream() }
-        store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10)
+        store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10)), "revision", 10)
         bundle = changedBundle(bundle)
         assertEquals(listOf("A"), store.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
         // A new start: a fresh store on the same file, and the legacy import's automatic save of the old answer.
@@ -285,14 +290,14 @@ class QuestionAnswerSyncTest {
 
     @Test fun given_a_confirmed_disagreeing_answer_when_the_same_revision_arrives_again_then_the_answer_stays_until_a_newer_revision() = runBlocking {
         val store = store(File(root, "smy.db"), oldSchemaFile("bundle.db"))
-        store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10)
+        store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10)), "revision", 10)
         store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Bundled?", listOf("A", "B"), "B", previousAnswer = "A")), reviewed = true, confirmed = true)
-        // A full sync downloads the same correction again: the user's confirmed answer stays in use and queued.
-        assertEquals(RemoteApplyResult(skipped = 1), store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true)), "revision", 10))
+        // A full sync downloads the same entry again: the user's confirmed answer stays in use and queued.
+        assertEquals(RemoteApplyResult(skipped = 1), store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10)), "revision", 10))
         assertEquals(listOf("B"), store.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
         assertEquals(1, store.pendingUploadCount())
-        // The admin acts (a new revision): it replaces the user's answer.
-        assertEquals(RemoteApplyResult(updated = 1), store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 11, authoritative = true)), "revision", 11))
+        // The admin acts (a new revision, for example rejecting the conflict): it replaces the user's answer.
+        assertEquals(RemoteApplyResult(updated = 1), store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 11)), "revision", 11))
         val entry = store.entries("bank.json")!!.single { it.question == "Bundled?" }
         assertEquals(listOf("A"), entry.answers)
         assertEquals("compass", entry.source)
@@ -322,16 +327,16 @@ class QuestionAnswerSyncTest {
         }
     }
 
-    @Test fun given_a_retired_authoritative_entry_when_applied_then_the_question_is_left_without_its_old_bundled_answer() = runBlocking {
+    @Test fun given_a_retired_entry_when_applied_then_the_question_is_left_without_its_old_bundled_answer() = runBlocking {
         var bundle = oldSchemaFile("bundle.db")
         val store = SqliteQuestionAnswerStore(File(root, "smy.db")) { bundle.inputStream() }
         store.applyRemote(listOf(
-            remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10, authoritative = true),
-            remote("e2", "New?", listOf("P", "Q"), listOf("Q"), 11, authoritative = true),
+            remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10),
+            remote("e2", "New?", listOf("P", "Q"), listOf("Q"), 11),
         ), "revision", 11)
         val result = store.applyRemote(listOf(
-            remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 20, retired = true, authoritative = true),
-            remote("e2", "New?", listOf("P", "Q"), listOf("Q"), 21, retired = true, authoritative = true),
+            remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 20, retired = true),
+            remote("e2", "New?", listOf("P", "Q"), listOf("Q"), 21, retired = true),
         ), "revision", 21)!!
         assertEquals(2, result.removed)
         assertEquals(emptyList(), store.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
@@ -346,6 +351,43 @@ class QuestionAnswerSyncTest {
         assertEquals(emptyList(), entries.single { it.question == "Bundled?" }.answers)
         assertTrue(entries.none { it.question == "New?" })
         assertEquals(listOf("No"), entries.single { it.question == "Learned?" }.answers)
+    }
+
+    @Test fun given_learned_answers_for_questions_cosmos_lacks_when_a_full_download_is_applied_then_they_are_kept_and_queued() = runBlocking {
+        var bundle = oldSchemaFile("bundle.db")
+        val store = SqliteQuestionAnswerStore(File(root, "smy.db")) { bundle.inputStream() }
+        store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Mine?", listOf("Up", "Down"), "Up")), reviewed = true, confirmed = true)
+        store.save("bank.json", listOf(LearnedQuestionAnswer("Module", "Seen?", listOf("Here", "There"), "There")), reviewed = false)
+        // Cosmos has only the bundled question.
+        assertEquals(RemoteApplyResult(updated = 1), store.applyRemote(listOf(remote("e1", "Bundled?", listOf("A", "B"), listOf("A"), 10)), "revision", 10))
+        val entries = store.entries("bank.json")!!.associateBy { it.question }
+        assertEquals(listOf("A"), entries.getValue("Bundled?").answers)
+        assertEquals(listOf("Up"), entries.getValue("Mine?").answers)
+        assertEquals(listOf("There"), entries.getValue("Seen?").answers)
+        assertEquals(listOf("No"), entries.getValue("Learned?").answers)
+        assertEquals("Mine?", store.pendingUploads(100)!!.single().question)
+        // A later bundle merge leaves both the Cosmos answer and the learned ones alone.
+        bundle = changedBundle(bundle)
+        val merged = store.entries("bank.json")!!.associateBy { it.question }
+        assertEquals(listOf("A"), merged.getValue("Bundled?").answers)
+        assertEquals("compass", merged.getValue("Bundled?").source)
+        assertEquals(listOf("Up"), merged.getValue("Mine?").answers)
+        assertEquals(1, store.pendingUploadCount())
+    }
+
+    @Test fun given_a_file_synced_under_the_earlier_rule_when_opened_then_its_cursor_is_cleared_once_and_answers_kept() = runBlocking {
+        val bundle = oldSchemaFile("bundle.db")
+        val installed = File(root, "smy.db")
+        store(installed, bundle).applyRemote(listOf(remote("e1", "Remote?", listOf("Red", "Blue"), listOf("Blue"), 7)), "revision", 7)
+        // What an earlier version left: the flag unset and a cursor past an entry whose bundled answer won.
+        BundledSQLiteDriver().open(installed.absolutePath).use { db -> db.sql("DELETE FROM metadata WHERE key='cosmos_owns_entries'") }
+        val restarted = store(installed, bundle)
+        assertNull(restarted.syncValue("revision"))
+        assertEquals(listOf("Blue"), restarted.entries("bank.json")!!.single { it.question == "Remote?" }.answers)
+        // Downloading everything again applies the current rule; the new cursor then stays.
+        restarted.applyRemote(listOf(remote("e2", "Bundled?", listOf("A", "B"), listOf("A"), 5), remote("e1", "Remote?", listOf("Red", "Blue"), listOf("Blue"), 7)), "revision", 7)
+        assertEquals(listOf("A"), restarted.entries("bank.json")!!.single { it.question == "Bundled?" }.answers)
+        assertEquals("7", store(installed, bundle).syncValue("revision"))
     }
 
     /** A file exactly as version 3 left it; [change] adds the rows under test. */

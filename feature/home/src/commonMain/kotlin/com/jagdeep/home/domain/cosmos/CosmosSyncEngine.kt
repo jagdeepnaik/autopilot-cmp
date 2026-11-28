@@ -356,8 +356,9 @@ class CosmosSyncEngine(
         var sent = 0
         val outcome = try {
             for (bank in local.banks) {
-                downloaded += pull(bank)
+                // Upload first: a confirmed answer reaches the admin's review before Cosmos's answer replaces it here.
                 sent += push(bank)
+                downloaded += pull(bank)
             }
             CosmosSyncOutcome.Synced
         } catch (cancelled: CancellationException) {

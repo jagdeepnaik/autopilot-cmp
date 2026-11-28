@@ -259,14 +259,19 @@ Problem kinds, computed by Cosmos with the text rules above:
 - A correction stores each answer as the chosen option's `text` (with `optionText` applied) and `answerKey =
   normalize(that text)`, records who changed what and when (with the note), and marks the entry **authoritative**:
   `"authoritative": true` in `Entry`. Retire and restore are recorded the same way.
-- **Authoritative entries win in the app.** When AutoPilot applies an entry with `"authoritative": true`, its answers
-  replace every local answer for that `(bankName, module, questionKey)`, whatever their source (bundled, learned or
-  earlier Cosmos rows). Entries without it keep today's rule: bundled and learned answers win.
+- **Cosmos is the source of truth for every entry** (owner decision, 28 November 2026). When AutoPilot applies any
+  approved entry, its answers replace every local answer for that `(bankName, module, questionKey)`, whatever their
+  source (bundled, learned or earlier Cosmos rows), and a later bundle merge never brings the local answer back. Local
+  answers are used only for questions Cosmos does not have yet, and the confirmed ones are submitted for review.
+  `authoritative` now only records that an admin corrected the entry (shown on the website); the app treats every
+  approved entry the same way.
 - Approving a submission also makes the entry authoritative.
-- **Disagreeing with a correction.** If a user confirms an answer that differs from an authoritative entry, the app
-  uses it on that computer and still submits it; Cosmos answers `conflict` and the admin sees both answers in Q&A
-  review, to keep the correction (reject) or change it (approve). Automatic saves never do this: only answers the
-  user confirmed.
+- **Disagreeing with Cosmos.** If a user confirms an answer that differs from an approved entry, the app uses it on
+  that computer and submits it; Cosmos answers `conflict` and the admin sees both answers in Q&A review. Until the
+  admin decides, that computer keeps the user's answer for that entry's current revision. **Rejecting** a conflict
+  gives the entry a new revision (its answers unchanged), so the next sync puts Cosmos's answer back on that computer;
+  **approving** adds the answer (or the admin corrects the entry on the Q&A database page), which also gives a new
+  revision. Automatic saves never do this: only answers the user confirmed.
 
 ## Seeding the server
 
