@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-28
+
 - The Cosmos admin signs in with a code from an authenticator app (or a recovery code) after the password; Settings asks for it, says when a code didn't work, and explains when two-step sign-in still needs setting up on the server.
 
 ## [1.3.1] - 2026-11-28
