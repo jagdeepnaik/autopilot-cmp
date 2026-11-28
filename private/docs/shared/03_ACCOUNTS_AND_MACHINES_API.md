@@ -4,8 +4,9 @@
 
 Last checked: 28 November 2026. Owner: Cosmos (the server owns the contract; AutoPilot adapts to it).
 
-Cosmos accounts are created only by the admin, and every account works only on the machines the admin approved. A
-machine is identified by the AutoPilot app; the browser on that machine is linked through the app. This replaces open
+Cosmos accounts are created only by the admin. Apps that sign in to Cosmos (AutoPilot, and other apps later) work
+only on the machines the admin approved; the Cosmos website is independent of any app and signs in with email and
+password from any browser. This replaces open
 registration and changes sign-in in [01_QA_SYNC_API.md](01_QA_SYNC_API.md#signing-in).
 
 On this page:
@@ -14,7 +15,7 @@ On this page:
 - [Accounts](#accounts)
 - [Machines](#machines)
 - [Signing in from the app](#signing-in-from-the-app)
-- [Linking the browser on a machine](#linking-the-browser-on-a-machine)
+- [Opening Cosmos from the app (shortcut)](#opening-cosmos-from-the-app-shortcut)
 - [Signing in on the website](#signing-in-on-the-website)
 - [Admin routes (website and app)](#admin-routes-website-and-app)
 - [Errors](#errors)
@@ -46,7 +47,7 @@ On this page:
   `firstSeenAt`, `lastSeenAt`, `approvedAt`. The same physical machine may appear under several accounts.
 - **Limit:** an account may have at most its machine limit of `approved` machines. Approving beyond it answers `409`;
   the admin raises the limit or revokes another machine first. Pending machines don't count.
-- **Revoking** a machine ends that machine's app sessions and browser links for that account at once.
+- **Revoking** a machine ends that machine's app sessions for that account at once.
 
 ## Signing in from the app
 
@@ -67,35 +68,35 @@ On this page:
 - Refresh tokens and app access tokens carry the machine; they stop working as soon as the machine is revoked or the
   account disabled.
 
-## Linking the browser on a machine
+## Opening Cosmos from the app (shortcut)
 
-1. In the signed-in app, **Open Cosmos** calls `POST /api/auth/app/browser-link` and gets
-   `{ "url": "https://cosmos.naikio.in/link#<token>", "expiresIn": 60 }`. The token is random (at least 32 bytes),
-   stored only as a SHA-256 hash, valid for 60 seconds and usable once.
-2. The app opens that URL in the computer's default browser. The token is in the URL **fragment**, so it never reaches
-   server logs or `Referer` headers; the page reads it and calls `POST /api/auth/browser-link/redeem` `{ "token" }`.
-3. The server marks the token used (`UPDATE … SET used_at … RETURNING`), and answers with the website session cookie
-   (`cosmos_token`, as today) plus a **machine cookie** `__Secure-cosmos_machine` (HttpOnly, Secure,
-   SameSite=Strict, path `/api`, 400 days), whose value is a random token stored hashed and bound to that account and
-   machine. The page then opens the dashboard.
-4. A used, expired or unknown token answers `400 { "error": "This link has expired. Open Cosmos from the AutoPilot
-   app again." }`.
+**Open Cosmos** in a signed-in app signs the computer's default browser in to the website without typing the password
+again. It is a convenience only: the website does not need it.
+
+1. The app calls `POST /api/auth/app/browser-link` and gets `{ "url": "https://cosmos.naikio.in/link#<token>",
+   "expiresIn": 60 }`. The token is random (at least 32 bytes), stored only as a SHA-256 hash, valid for 60 seconds
+   and usable once.
+2. The app opens that URL; the token is in the URL **fragment**, so it never reaches server logs or `Referer`
+   headers. The page calls `POST /api/auth/browser-link/redeem` `{ "token" }`.
+3. The server marks the token used (`UPDATE … SET used_at … RETURNING`) and answers with the ordinary website session
+   cookie (`cosmos_token`). A used, expired or unknown token answers `400 { "error": "This link has expired. Open
+   Cosmos from the AutoPilot app again." }`.
 
 ## Signing in on the website
 
-- `POST /api/auth/login` checks the email and password first: an unknown email and a wrong password both answer
-  `401 { "error": "Invalid email or password" }`, with or without a machine cookie. Only after a correct password does
-  it answer `403 { "code": "ACCOUNT_DISABLED" }` or, without a valid machine cookie for an **approved** machine of that
-  account, `403 { "code": "MACHINE_LINK_REQUIRED", "error": "Open Cosmos from the AutoPilot app on your computer to
-  sign in here." }`.
-- Every cookie-authenticated request checks the machine cookie too, so revoking the machine signs that browser out.
-- Signing out on the website keeps the machine cookie (the browser stays linked); revoking the machine removes it.
-- Forgotten password: the OTP reset still works, but only from a linked browser.
+- `POST /api/auth/login` takes `{ "email", "password" }` from any browser. An unknown email and a wrong password both
+  answer `401 { "error": "Invalid email or password" }`; a disabled account answers `403 { "code":
+  "ACCOUNT_DISABLED" }` only after a correct password. No machine or app is involved.
+- A temporary password (`mustChangePassword`) must be changed first, on the website (`POST
+  /api/auth/change-password`) or in the app.
+- Forgotten password: the email-code reset works from any browser and never reveals whether an account exists.
+- Website sessions end when the account is disabled, when the admin resets its password, or when the account holder
+  changes the password (other sessions only). Approving or revoking a machine affects app sessions only.
 
 ## Admin routes (website and app)
 
-All under `/api/admin`, admin only (role read from the database), from a linked browser or an approved app session.
-Responses never include password hashes, tokens or machine cookies.
+All under `/api/admin`, admin only (role read from the database), from the website or an approved app session.
+Responses never include password hashes or tokens.
 
 | Route | Purpose |
 | --- | --- |
