@@ -6,6 +6,10 @@ import com.jagdeep.automation.InputAccessGate
 import com.jagdeep.automation.PointerDevice
 import com.jagdeep.automation.ScreenPoint
 import com.jagdeep.automation.isSameApp
+import com.jagdeep.shared.diagnostics.NoRunLog
+import com.jagdeep.shared.diagnostics.RunLog
+import com.jagdeep.shared.diagnostics.RunLogLevel
+import com.jagdeep.shared.diagnostics.RunLogSource
 import com.jagdeep.shared.history.RunOutcome
 import kotlin.math.abs
 import kotlin.math.min
@@ -38,6 +42,7 @@ internal class ClickRun(
     private val access: InputAccessGate,
     private val now: () -> Long,
     private val random: Random,
+    private val runLog: RunLog = NoRunLog,
 ) {
     /** Reports each change of click count or pause, then returns how the run ended. */
     suspend fun execute(
@@ -64,7 +69,7 @@ internal class ClickRun(
             is RunLimit.Passes -> clicks >= limit.count * (points?.size ?: 1)
         }
 
-        fun safetyStop(): RunOutcome? {
+        fun safetyCheck(): RunOutcome? {
             if (access.access() != InputAccess.Granted) return RunOutcome.AccessLost
             val position = pointer.position() ?: return null
             val placed = placedAt
@@ -72,6 +77,12 @@ internal class ClickRun(
             if (safety.stopAtScreenCorner && pointer.isScreenCorner(position)) return RunOutcome.ScreenCorner
             if (safety.stopWhenPointerMoves && placed != null) return RunOutcome.PointerMoved
             return null
+        }
+
+        fun safetyStop(): RunOutcome? {
+            val stop = safetyCheck()
+            if (stop != null) runLog.event(RunLogSource.Routine, "routine.safetyStop", mapOf("reason" to stop.name, "clicks" to clicks), RunLogLevel.Warn)
+            return stop
         }
 
         /** Waits in short slices; returns the outcome if the run should end during the wait. */
@@ -105,7 +116,10 @@ internal class ClickRun(
             }
 
             val button = steps?.get(nextPoint)?.button ?: routine.button
-            if (!pointer.click(point, button, routine.clicksPerAction)) return RunOutcome.Failed
+            if (!pointer.click(point, button, routine.clicksPerAction)) {
+                runLog.event(RunLogSource.Click, "click.failed", mapOf("pointIndex" to if (points != null) nextPoint else null, "clicks" to clicks), RunLogLevel.Error)
+                return RunOutcome.Failed
+            }
             clicks++
             placedAt = point
             onProgress(clicks, null)

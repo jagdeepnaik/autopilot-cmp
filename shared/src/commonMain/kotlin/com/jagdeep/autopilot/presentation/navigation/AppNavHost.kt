@@ -47,6 +47,8 @@ fun AppNavHost(
     extensionStatus: Flow<com.jagdeep.shared.browser.BrowserExtensionStatus> = kotlinx.coroutines.flow.flowOf(com.jagdeep.shared.browser.BrowserExtensionStatus()),
     onTestSound: suspend () -> String? = { "Sound testing isn't available." },
     compassSync: com.jagdeep.shared.compass.CompassSync = com.jagdeep.shared.compass.NoCompassSync,
+    runLogFiles: com.jagdeep.shared.diagnostics.RunLogFiles = com.jagdeep.shared.diagnostics.NoRunLogFiles,
+    updateCheck: com.jagdeep.shared.update.UpdateCheck = com.jagdeep.shared.update.NoUpdateCheck,
 ) {
     androidx.compose.runtime.LaunchedEffect(controller, navigator) {
         observeRunningNavigation(kotlinx.coroutines.flow.combine(controller.state, controller.page.state) { run, page ->
@@ -59,7 +61,7 @@ fun AppNavHost(
     val stacks = navigationState.rememberDecoratedStacks(entryProvider {
         homeEntryProvider(navigator, controller, routineRepository, newId, appIcon, routineFiles, answerBanks)
         activityEntryProvider(navigator, runHistory, now, liveLog, developerMode = preferencesStore.data.map { it.developerMode })
-        settingsEntryProvider(navigator, preferencesStore, accessGate, appVersion, browserConnected, onInstallExtension = ::installBrowserExtension, routineTransfer = routineTransfer, displayWakeProblem = displayWakeProblem, answerBanks = answerBanks, extensionStatus = extensionStatus, onTestSound = onTestSound, compassSync = compassSync)
+        settingsEntryProvider(navigator, preferencesStore, accessGate, appVersion, browserConnected, onInstallExtension = ::installBrowserExtension, routineTransfer = routineTransfer, displayWakeProblem = displayWakeProblem, answerBanks = answerBanks, extensionStatus = extensionStatus, onTestSound = onTestSound, compassSync = compassSync, runLogFiles = runLogFiles, updateCheck = updateCheck)
     })
     if (isDesktopPlatform()) {
         // Desktop navigates with the sidebar.

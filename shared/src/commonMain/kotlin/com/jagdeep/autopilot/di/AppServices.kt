@@ -60,9 +60,14 @@ internal class AppServices private constructor() {
     private val courseProgress = createCourseProgressRepository()
     private val courseCertificates = createCourseCertificateStore()
     val answerBanks = createCourseAnswerBankStore()
-    /** Opt-in Compass Q&A sync; idle until the user signs in. Never pauses a routine. */
+    /** Always-on routine run logs (desktop), uploaded to Compass only while signed in. */
+    private val runLogs = com.jagdeep.autopilot.platform.createRunLogServices()
+    val runLogFiles: com.jagdeep.shared.diagnostics.RunLogFiles get() = runLogs.files
+    /** Opt-in Compass Q&A sync and run-log upload; idle until the user signs in. Never pauses a routine. */
+    /** Compass's public update check (no sign-in); asked at start-up and when Settings opens. */
+    val updateCheck: com.jagdeep.shared.update.UpdateCheck = com.jagdeep.autopilot.platform.createUpdateCheck(scope).also { it.check() }
     val compassSync: com.jagdeep.shared.compass.CompassSync =
-        com.jagdeep.autopilot.platform.createCompassSync(answerBanks, scope) { line -> liveLog.log(LiveSource.App) { line } }
+        com.jagdeep.autopilot.platform.createCompassSync(answerBanks, scope, runLogs) { line -> liveLog.log(LiveSource.App) { line } }
     private val dgsTimeOrigin=kotlin.time.TimeSource.Monotonic.markNow()
     val page = PageController(
         automation = automation,
@@ -80,6 +85,7 @@ internal class AppServices private constructor() {
         dgsStudyRepository = com.jagdeep.home.data.StoredDgsStudyRepository(courseProgress),
         dgsElapsedMillis = {dgsTimeOrigin.elapsedNow().inWholeMilliseconds},
         extensionStatus = browserExtensionStatus,
+        runLog = runLogs.log,
     )
 
     // Runs every kind of routine, one at a time, handing Chrome routines to [page].
@@ -93,6 +99,7 @@ internal class AppServices private constructor() {
         newId = ::newId,
         page = page,
         live = liveLog,
+        runLog = runLogs.log,
     )
 
     init {
@@ -176,6 +183,7 @@ internal class AppServices private constructor() {
         controller.stop()
         page.stop()
         page.awaitStopped()
+        runLogs.close()
         scope.cancel()
         bridge.close()
         courseProgress.close()

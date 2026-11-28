@@ -206,6 +206,24 @@
     return false;
   }
 
+  // The first watched video's player state, for the app's run log: numbers and flags only, never its
+  // address. Whole seconds, so it changes about once a second rather than on every frame.
+  function videoDetail(roots) {
+    if (!isWatchingVideos()) return null;
+    for (const root of roots) {
+      for (const video of root.querySelectorAll("video")) {
+        if (!videosReached.has(video) || !isWorthWatching(video)) continue;
+        return {
+          paused: video.paused, ended: video.ended, currentTime: Math.floor(video.currentTime || 0),
+          duration: Number.isFinite(video.duration) ? Math.round(video.duration) : null,
+          readyState: video.readyState, networkState: video.networkState, errorCode: video.error ? video.error.code : null,
+          muted: video.muted, buffering: !video.paused && !video.ended && video.readyState < 3,
+        };
+      }
+    }
+    return null;
+  }
+
   // "playing", "needsPlay" or "none". Once started, a pause is left alone: it's the viewer's choice.
   function checkVideos(roots) {
     if (!isWatchingVideos()) return "none";
@@ -270,6 +288,7 @@
     let area = 0;
     let reading = null;
     let video = "none";
+    let detail = null;
     let textMatch = null;
     if (settings.enabled) {
       const roots = allRoots();
@@ -279,11 +298,12 @@
       area = scroll.area;
       if (settings.autoRun) reading = readPage();
       video = checkVideos(roots);
+      detail = videoDetail(roots);
       if (settings.clickText) textMatch = findButton([settings.clickText], roots);
     }
     let response;
     try {
-      response = await chrome.runtime.sendMessage({ type: "tick", area, reading, video, textRank: textMatch ? textMatch.rank : null });
+      response = await chrome.runtime.sendMessage({ type: "tick", area, reading, video, videoDetail: detail, textRank: textMatch ? textMatch.rank : null });
     } catch {
       if (!chrome.runtime?.id) {
         return; // The extension was reloaded; the new copy takes over.

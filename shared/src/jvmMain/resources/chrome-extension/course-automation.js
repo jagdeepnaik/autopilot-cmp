@@ -266,7 +266,11 @@
           visible: visible(node), enabled: !node.matches(':disabled') && !node.closest('[inert],[aria-disabled="true"]') && getComputedStyle(node).pointerEvents !== 'none',
           expanded: node.hasAttribute('aria-expanded') ? node.getAttribute('aria-expanded') === 'true' : null,
           svg: !!node.querySelector('svg'), courseTitle: courseTitle(node),
-          ...(tag === 'video' ? { paused: node.paused, ended: node.ended, mediaPosition: Number.isFinite(node.currentTime) ? node.currentTime : null, decorative: node.loop || (node.muted && node.autoplay) || node.duration === Infinity } : {}),
+          ...(tag === 'video' ? { paused: node.paused, ended: node.ended, mediaPosition: Number.isFinite(node.currentTime) ? node.currentTime : null, decorative: node.loop || (node.muted && node.autoplay) || node.duration === Infinity,
+            // Player state only, for the app's run log (why a video doesn't play): never its address or captions.
+            readyState: node.readyState, networkState: node.networkState, errorCode: node.error ? node.error.code : null,
+            duration: Number.isFinite(node.duration) ? Math.round(node.duration * 10) / 10 : null, muted: node.muted,
+            buffering: !node.paused && !node.ended && node.readyState < 3 } : {}),
         });
         if (result.length >= 2000) return { items: result, truncated: true };
       }

@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.jagdeep.settings.ui.util.compassPendingText
 import com.jagdeep.settings.ui.util.compassStatusText
+import com.jagdeep.settings.ui.util.runLogsText
 import com.jagdeep.shared.compass.CompassSyncState
 import kotlinx.coroutines.delay
 
@@ -48,11 +49,14 @@ internal fun CompassSyncSection(
     onSyncNow: () -> Unit,
     onSignOut: () -> Unit,
     now: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    runLogsAvailable: Boolean = false,
+    onOpenRunLogs: () -> Unit = {},
 ) {
     val transparent = ListItemDefaults.colors(containerColor = Color.Transparent)
     if (!state.available) {
         ListItem(colors = transparent, headlineContent = { Text("Compass sync") },
             supportingContent = { Text("Not available on this computer. Sync needs the system's secure storage to keep your session safe.") })
+        RunLogsRow(state, runLogsAvailable, onOpenRunLogs)
         return
     }
     val account = state.account
@@ -83,6 +87,7 @@ internal fun CompassSyncSection(
                 }
             }
         }
+        RunLogsRow(state, runLogsAvailable, onOpenRunLogs)
         return
     }
     // Re-reads the clock every minute so "5 minutes ago" stays true while Settings is open.
@@ -94,4 +99,14 @@ internal fun CompassSyncSection(
     ListItem(colors = transparent, headlineContent = { Text("Your answers") },
         supportingContent = { Text(compassPendingText(state.pendingUploads)) },
         trailingContent = { TextButton(onClick = onSyncNow, enabled = !state.syncing) { Text(if (state.syncing) "Syncing…" else "Sync now") } })
+    RunLogsRow(state, runLogsAvailable, onOpenRunLogs)
+}
+
+/** The routine run logs kept on this computer, and the folder they're in. */
+@Composable
+private fun RunLogsRow(state: CompassSyncState, available: Boolean, onOpen: () -> Unit) {
+    if (!available) return
+    ListItem(colors = ListItemDefaults.colors(containerColor = Color.Transparent), headlineContent = { Text("Routine run logs") },
+        supportingContent = { Text(runLogsText(state.runLogsWaiting, state.account != null, state.available)) },
+        trailingContent = { TextButton(onClick = onOpen) { Text("Open logs folder") } })
 }

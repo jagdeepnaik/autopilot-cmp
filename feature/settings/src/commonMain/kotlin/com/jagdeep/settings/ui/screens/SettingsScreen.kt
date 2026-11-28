@@ -138,6 +138,7 @@ fun SettingsScreen(
                 com.jagdeep.settings.ui.components.CompassSyncSection(
                     state.compass, state.compassSigningIn, state.compassSignInProblem,
                     onSignIn = viewModel::signInToCompass, onSyncNow = viewModel::syncCompassNow, onSignOut = viewModel::signOutOfCompass,
+                    runLogsAvailable = state.runLogsAvailable, onOpenRunLogs = viewModel::openRunLogsFolder,
                 )
             }
 
@@ -185,8 +186,16 @@ fun SettingsScreen(
 
             Group("About")
             ListItem(colors = transparent(), headlineContent = { Text("Version") }, trailingContent = { Text(appVersion) })
+            state.update?.let { update ->
+                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                ListItem(colors = transparent(), headlineContent = { Text("Update available: ${update.version} (${update.build})") },
+                    supportingContent = { Text("Opens the Compass download page in your browser.") },
+                    trailingContent = {
+                        androidx.compose.material3.Button(onClick = { runCatching { uriHandler.openUri(update.downloadUrl) } }) { Text("Install") }
+                    })
+            }
             ListItem(colors = transparent(), headlineContent = { Text("Privacy") }, supportingContent = {
-                Text("Settings, routines and saved progress stay on this computer. Browser actions happen on the website you open. Only shortcut keys are monitored; typed text is not recorded. If you sign in to Compass sync, only Q&A answers are shared with Compass.")
+                Text("Settings, routines and saved progress stay on this computer. Browser actions happen on the website you open. Only shortcut keys are monitored; typed text is not recorded. Each routine run is logged on this computer (steps and timings, never page text or answers). If you sign in to Compass sync, only Q&A answers and those run logs are shared with Compass. AutoPilot also asks Compass whether a newer version is published.")
             })
         }
     }

@@ -24,6 +24,14 @@ internal fun compassPendingText(pending: Int): String = when (pending) {
     else -> "$pending confirmed answers are waiting to be sent."
 }
 
+/** The routine run-log line: what waits to go to Compass, or that logs stay here while signed out. */
+internal fun runLogsText(waiting: Int, signedIn: Boolean, syncAvailable: Boolean): String = when {
+    !syncAvailable || !signedIn -> "Run logs: every routine run is logged on this computer for 30 days. They're sent to Compass only while you're signed in."
+    waiting == 0 -> "Run logs: all sent. Logs keep routine steps and timings only, never page text or answers."
+    waiting == 1 -> "Run logs: 1 waiting to upload."
+    else -> "Run logs: $waiting waiting to upload."
+}
+
 private fun syncedCounts(downloaded: Int, sent: Int): String = when {
     downloaded == 0 && sent == 0 -> "Everything is up to date."
     else -> "Received ${count(downloaded, "approved answer")}, sent ${count(sent, "answer")}."

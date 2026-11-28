@@ -29,7 +29,7 @@ internal fun compassBaseUrl(): String? =
             Properties().apply { load(stream) }.getProperty("url")
         }?.takeIf { it.isNotBlank() }
 
-internal actual fun createCompassSync(answerBanks: CourseAnswerBankStore, scope: CoroutineScope, log: (String) -> Unit): CompassSync {
+internal actual fun createCompassSync(answerBanks: CourseAnswerBankStore, scope: CoroutineScope, runLogs: RunLogServices, log: (String) -> Unit): CompassSync {
     val files = answerBanks as? SqliteCourseAnswerBanks ?: return NoCompassSync
     val url = compassBaseUrl()?.takeIf(KtorCompassApi::isAllowedBaseUrl) ?: return NoCompassSync
     // The refresh token goes only to the Keychain, DPAPI or the Secret Service: never to a plain file.
@@ -43,8 +43,11 @@ internal actual fun createCompassSync(answerBanks: CourseAnswerBankStore, scope:
         now = System::currentTimeMillis,
         deviceName = "AutoPilot on ${desktopName()}",
         log = log,
+        runLogs = runLogs.outbox,
     )
     scope.launch { files.reviewedSaves.collect { engine.answersChanged() } }
+    // Each finished run is uploaded shortly after it ends (when signed in).
+    scope.launch { runLogs.finished.collect { engine.uploadRunLogs() } }
     engine.start()
     return engine
 }

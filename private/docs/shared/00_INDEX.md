@@ -8,3 +8,4 @@ read-only into Compass (`private/handbook/shared/`) and AutoPilot (`private/docs
 | Document | Purpose | Last checked |
 | --- | --- | --- |
 | [01_QA_SYNC_API.md](01_QA_SYNC_API.md) | How AutoPilot apps sign in to Compass and sync the routine Q&A banks | 28 November 2026 |
+| [02_DIAGNOSTICS_AND_DOWNLOADS_API.md](02_DIAGNOSTICS_AND_DOWNLOADS_API.md) | Routine run logs (local files, upload, admin viewer) and publishing AutoPilot installers to Compass downloads | 28 November 2026 |

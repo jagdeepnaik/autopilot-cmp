@@ -20,6 +20,12 @@ internal class DesktopDataPaths(val root:File) {
         }
         return target
     }
+    /** Routine run logs (diagnostics contract): logs/runs/<YYYY-MM-DD>/<runId>.jsonl. */
+    @Synchronized fun runLogs():File {
+        val target=File(root,"logs/runs")
+        if(!target.isDirectory && !target.mkdirs()) throw IOException("Could not create the run-log folder")
+        return target
+    }
     @Synchronized fun chromeExtension():File {
         val target=File(root,"extensions/chrome");val previous=File(root,"chrome-extension")
         if(previous.exists()) {

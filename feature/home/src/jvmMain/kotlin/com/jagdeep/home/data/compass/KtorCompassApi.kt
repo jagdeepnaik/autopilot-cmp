@@ -20,6 +20,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
+import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.content.TextContent
 import io.ktor.http.takeFrom
 import kotlinx.coroutines.CancellationException
@@ -28,7 +29,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Compass over HTTPS with Ktor. Requests go only to [baseUrl]; every one carries
+ * Compass over HTTPS with Ktor: Q&A sync and run-log uploads. Requests go only to [baseUrl]; every one carries
  * `X-AutoPilot-App-Version`. Responses are mapped to [CompassApiException]s without their bodies, so
  * nothing the server sends (or any token) reaches logs or the UI.
  */
@@ -72,6 +73,27 @@ class KtorCompassApi(
         }
     }
 
+    override suspend fun uploadRun(accessToken: String, body: String): String {
+        val compressed = java.io.ByteArrayOutputStream().also { bytes ->
+            java.util.zip.GZIPOutputStream(bytes).use { it.write(body.encodeToByteArray()) }
+        }.toByteArray()
+        return call(HttpMethod.Post, listOf("diagnostics", "runs"), accessToken, gzipBody = compressed) {
+            decode(RunUploadResponse.serializer(), it).status
+        }
+    }
+
+    /**
+     * The public update check, `GET /api/app/:platform` (no sign-in); null when nothing is published
+     * for [platform] (404). Other failures throw, and the caller shows nothing.
+     */
+    suspend fun latestBuild(platform: String): com.jagdeep.shared.update.LatestBuild? {
+        require(platform in setOf("windows", "macos", "linux", "android"))
+        return try {
+            call(HttpMethod.Get, listOf("app", platform)) { decode(LatestBuildResponse.serializer(), it) }
+                .let { com.jagdeep.shared.update.LatestBuild(it.version, it.build, it.downloadUrl) }
+        } catch (_: CompassApiException.NotFound) { null }
+    }
+
     fun close() = client.close()
 
     private suspend fun <T> call(
@@ -80,6 +102,8 @@ class KtorCompassApi(
         accessToken: String? = null,
         body: String? = null,
         query: Map<String, String> = emptyMap(),
+        /** A JSON body already gzipped, sent with `Content-Encoding: gzip`. */
+        gzipBody: ByteArray? = null,
         read: (String) -> T,
     ): T {
         val response: HttpResponse = try {
@@ -90,6 +114,10 @@ class KtorCompassApi(
                 header(HttpHeaders.Accept, ContentType.Application.Json.toString())
                 accessToken?.let { header(HttpHeaders.Authorization, "Bearer $it") }
                 body?.let { setBody(TextContent(it, ContentType.Application.Json)) }
+                gzipBody?.let {
+                    header(HttpHeaders.ContentEncoding, "gzip")
+                    setBody(ByteArrayContent(it, ContentType.Application.Json))
+                }
             }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { throw CompassApiException.Offline() }
@@ -119,6 +147,8 @@ class KtorCompassApi(
     @Serializable private data class RefreshRequest(val refreshToken: String)
     @Serializable private data class SubmissionsRequest(val submissions: List<CompassSubmission>)
     @Serializable private data class SubmissionsResponse(val results: List<CompassSubmissionResult>)
+    @Serializable private data class LatestBuildResponse(val platform: String? = null, val version: String, val build: Int? = null, val commit: String? = null, val releasedAt: String? = null, val downloadUrl: String? = null)
+    @Serializable private data class RunUploadResponse(val runId: String? = null, val status: String)
 
     companion object {
         const val APP_VERSION_HEADER = "X-AutoPilot-App-Version"

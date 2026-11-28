@@ -43,6 +43,13 @@ internal data class CourseElement(
     val decorative: Boolean = false,
     val courseTitle: String? = null,
     val mediaPosition: Double? = null,
+    /** Video state only (extension 1.15.24+), for the run log: HTMLMediaElement readyState, networkState, error code. */
+    val readyState: Int? = null,
+    val networkState: Int? = null,
+    val errorCode: Int? = null,
+    val duration: Double? = null,
+    val muted: Boolean? = null,
+    val buffering: Boolean? = null,
 )
 
 @Serializable
@@ -140,6 +147,12 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
     private val automaticAnswerKeys = mutableSetOf<String>()
     private val manualAnswerKeys = mutableSetOf<String>()
     fun configureAnswers(bank: CourseAnswerBank?) { persistedAnswerBank = bank; answerBank = bank }
+
+    /** Told of every answer lookup (hit or miss), for the run log; never changes a decision. */
+    var onAnswerLookup: ((question: CourseQuestion, found: Boolean) -> Unit)? = null
+
+    private fun CourseAnswerBank?.lookup(module: String, question: CourseQuestion): CourseOption? =
+        this?.answer(module, question).also { onAnswerLookup?.invoke(question, it != null) }
     var approval: CourseApprovalRequest? = null
         private set
     var attention: String? = null
@@ -534,7 +547,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
                     issue(next, "assessmentNext", if (next.label.trim() == "Finish") "Finishing the practice quiz." else "Opening the next practice question.")
                     return
                 }
-                val answer = answerBank?.answer(assessment.module, question)
+                val answer = answerBank.lookup(assessment.module, question)
                 // A practice quiz is ungraded and reveals the correct answer after Submit.
                 // If the bank has no exact match, try one option and learn only from explicit feedback.
                 val candidate = answer ?: question.options.firstOrNull { it.enabled && it.visible }
@@ -595,7 +608,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             }
             retryStartedAt = null
             if (answerThisPage && !isQuiz && assessmentMode == AssessmentMode.Manual && assessment.result == null) {
-                val unknown = assessment.questions.firstOrNull { answerBank?.answer(assessment.module, it) == null }
+                val unknown = assessment.questions.firstOrNull { answerBank.lookup(assessment.module, it) == null }
                 if (unknown != null) {
                     attention = "$path:${CourseAnswerBank.normalize(unknown.text)}:" + unknown.options.map { CourseAnswerBank.optionText(it.text) }.sorted().joinToString("|")
                     val selected = unknown.options.singleOrNull { it.selected && it.visible && it.enabled }
@@ -729,7 +742,7 @@ internal class CourseAutomationSession(val session: String, private val waitAfte
             if (assessment.questions.map { it.id }.toSet().size != assessment.questions.size) {
                 detail = "Assessment paused: duplicate question controls need review."; return
             }
-            val answers = assessment.questions.map { q -> q to bank?.answer(assessment.module, q) }
+            val answers = assessment.questions.map { q -> q to bank.lookup(assessment.module, q) }
             val unknown = answers.firstOrNull { it.second == null }?.first
             if (unknown != null) {
                 attention = "$path:${CourseAnswerBank.normalize(unknown.text)}:" +

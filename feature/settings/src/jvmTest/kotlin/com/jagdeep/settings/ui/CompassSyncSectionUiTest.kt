@@ -3,6 +3,7 @@ package com.jagdeep.settings.ui
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -70,5 +71,35 @@ class CompassSyncSectionUiTest {
         setContent { AppTheme(darkTheme = false) { SettingsScreen(vm, {}, "1.0.0") } }
         onNodeWithText("Not available on this computer. Sync needs the system's secure storage to keep your session safe.").performScrollTo().assertExists()
         onNodeWithText("Email").assertDoesNotExist()
+    }
+
+    @Test fun given_run_logs_waiting_when_signed_in_then_settings_counts_them_and_opens_the_folder() = runDesktopComposeUiTest(1000, 2400) {
+        var opened = 0
+        val files = object : com.jagdeep.shared.diagnostics.RunLogFiles {
+            override val isAvailable = true
+            override suspend fun openFolder(): String? { opened++; return null }
+        }
+        val sync = FakeSync(CompassSyncState(available = true, account = CompassAccount("Tester"), runLogsWaiting = 3))
+        val vm = SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate, compassSync = sync, runLogFiles = files)
+        setContent { AppTheme(darkTheme = false) { SettingsScreen(vm, {}, "1.0.0") } }
+        onNodeWithText("Run logs: 3 waiting to upload.").performScrollTo().assertExists()
+        onNodeWithText("Open logs folder").performClick()
+        waitForIdle()
+        assertEquals(1, opened)
+    }
+
+    @Test fun given_a_newer_build_is_published_when_settings_opens_then_about_offers_it_with_install() = runDesktopComposeUiTest(1000, 2400) {
+        var checks = 0
+        val updates = object : com.jagdeep.shared.update.UpdateCheck {
+            override val update = MutableStateFlow<com.jagdeep.shared.update.AppUpdate?>(com.jagdeep.shared.update.AppUpdate("1.1.1", 171, "https://compass.test/downloads"))
+            override fun check() { checks++ }
+        }
+        val vm = SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate, updateCheck = updates)
+        setContent { AppTheme(darkTheme = false) { SettingsScreen(vm, {}, "1.1.0 (170 · abc1234)") } }
+        onNodeWithText("Update available: 1.1.1 (171)").performScrollTo().assertExists()
+        onNodeWithText("Install").assertExists()
+        assertEquals(1, checks)
+        updates.update.value = null
+        waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("Update available: 1.1.1 (171)").fetchSemanticsNodes().isEmpty() }
     }
 }

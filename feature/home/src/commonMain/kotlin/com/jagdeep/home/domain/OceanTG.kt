@@ -80,6 +80,9 @@ internal class OceanTGSession(val session: String, private val answerPracticeQue
     val action: OceanAction? get() = pending
 
     fun configureAnswers(bank: CourseAnswerBank?) { answers = bank }
+
+    /** Told of every practice-answer lookup (hit or miss), for the run log; never changes a decision. */
+    var onAnswerLookup: ((question: CourseQuestion, found: Boolean) -> Unit)? = null
     fun configureProfile(name: String?, saved: Collection<String>) {
         val value = name?.trim()?.takeIf { it.isNotEmpty() } ?: return
         profile = com.jagdeep.persistence.room.learning.LearningAccount("olp:" + CourseAnswerBank.normalize(value), value, 0)
@@ -93,7 +96,8 @@ internal class OceanTGSession(val session: String, private val answerPracticeQue
         val practice = reading.practice
         if (practice != null) {
             val question = CourseQuestion(practice.text, practice.text, practice.options.map { CourseOption(it.id, it.text) })
-            val answer = answers?.answer(reading.chapterTitle.orEmpty(), question) ?: answers?.answerAny(question)
+            val answer = (answers?.answer(reading.chapterTitle.orEmpty(), question) ?: answers?.answerAny(question))
+                .also { onAnswerLookup?.invoke(question, it != null) }
             progress = OceanProgress(if (answer == null) "Practice question needs an answer in the answer bank." else "Answering practice question", reading.chapterTitle, reading.slide, reading.slideCount)
             if (answer != null && answer.id != practice.options.firstOrNull { it.selected }?.id && answerPracticeQuestions) issue(reading, "answerPractice", answer.id)
             return

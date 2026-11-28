@@ -119,7 +119,9 @@ async function reportPageFrom(tabId, frameId, scroller, reading, video) {
   if (!reading || frameId !== (scroller ? scroller.frameId : 0)) return;
   const window = await chrome.windows.getLastFocused();
   const progress = `${reading.scrollPosition ?? 0}|${frameEntries(tabId).sort((a,b) => a.frameId-b.frameId).map(f => `${f.frameId}:${f.mediaPosition ?? ""}`).join("|")}`;
-  const page = { progress, focused: window.focused, atBottom: reading.atBottom, signature: pageSignature(tabId), video };
+  // Player state of the first frame with a watched video (run log only).
+  const videoDetail = frameEntries(tabId).sort((a, b) => a.frameId - b.frameId).find((f) => f.videoDetail)?.videoDetail ?? null;
+  const page = { progress, focused: window.focused, atBottom: reading.atBottom, signature: pageSignature(tabId), video, videoDetail };
   if (JSON.stringify(page) !== JSON.stringify(lastPage)) reportPage(page);
 }
 
@@ -129,7 +131,7 @@ async function onTick(message, sender) {
   const active = tabId !== undefined && tabId === (await activeTabId());
   if (!command || !command.enabled || !active) return { enabled: false };
   frames.set(`${tabId}:${frameId}`, {
-    tabId, frameId, area: message.area, video: message.video,
+    tabId, frameId, area: message.area, video: message.video, videoDetail: message.videoDetail ?? null,
     content: message.reading?.content, mediaPosition: message.reading?.mediaPosition, textRank: message.textRank ?? null, at: Date.now(),
   });
   clickTextIfFound(tabId);

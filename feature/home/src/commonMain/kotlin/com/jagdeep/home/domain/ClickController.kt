@@ -5,6 +5,11 @@ import com.jagdeep.automation.DesktopAutomation
 import com.jagdeep.automation.InputAccess
 import com.jagdeep.automation.ScreenPoint
 import com.jagdeep.logger.Log
+import com.jagdeep.shared.diagnostics.NoRunLog
+import com.jagdeep.shared.diagnostics.RunLog
+import com.jagdeep.shared.diagnostics.RunLogLevel
+import com.jagdeep.shared.diagnostics.RunLogSource
+import com.jagdeep.shared.diagnostics.error
 import com.jagdeep.shared.history.RunHistoryStore
 import com.jagdeep.shared.history.RunOutcome
 import com.jagdeep.shared.history.RunRecord
@@ -63,8 +68,10 @@ class ClickController(
     /** Runs the Chrome routines, so that only one routine of any kind runs at a time. */
     val page: PageRunner = NoPageRunner,
     private val live: LiveLog = NoLiveLog,
+    /** The always-on run log (desktop); every click routine run gets one, sampled so fast clicking stays small. */
+    private val runLog: RunLog = NoRunLog,
 ) {
-    private val run = ClickRun(automation.pointer, automation.apps, automation.access, now, random)
+    private val run = ClickRun(automation.pointer, automation.apps, automation.access, now, random, runLog)
     private val currentPreferences: StateFlow<AppPreferences> = preferences.stateIn(scope, SharingStarted.Eagerly, AppPreferences())
     private val mutableState = MutableStateFlow<RunState>(RunState.Idle)
     private val mutableLastRun = MutableStateFlow<RunRecord?>(null)
@@ -90,6 +97,8 @@ class ClickController(
             automation.hotKeys.presses.collect { key ->
                 live.log(LiveSource.Keys) { "${key.name} pressed" }
                 val prefs = currentPreferences.value
+                val job = when (key) { prefs.toggleHotKey -> "toggle"; prefs.captureHotKey -> "capture"; prefs.pageScrollHotKey -> "pageScroll"; else -> "other" }
+                runLog.event(RunLogSource.Keys, "key.pressed", mapOf("key" to key.name, "action" to job))
                 when (key) {
                     prefs.toggleHotKey -> toggle()
                     prefs.captureHotKey -> if (state.value == RunState.Idle) automation.pointer.position()?.let(mutableCaptures::tryEmit)
@@ -101,6 +110,7 @@ class ClickController(
         scope.launch {
             automation.hotKeys.controls.collect { press ->
                 live.log(LiveSource.Keys) { "${press.name} control pressed" }
+                runLog.event(RunLogSource.Keys, "control.pressed", mapOf("control" to press.name))
                 when (press) {
                     ControlPress.Toggle -> toggle()
                     ControlPress.Capture -> if (state.value == RunState.Idle) automation.pointer.position()?.let(mutableCaptures::tryEmit)
@@ -142,14 +152,21 @@ class ClickController(
             return
         }
         live.log(LiveSource.Routine) { "Starting ${routine.name} (${routine.kind.label}) after ${routine.startDelaySeconds} s" }
-        when (automation.access.access()) {
+        val access = automation.access.access()
+        runLog.start(routine.kind.name, routine.name, runLogSettings(routine) + safetySettings())
+        runLog.event(RunLogSource.Routine, "routine.access", mapOf("access" to access.name))
+        when (access) {
             InputAccess.Granted -> Unit
             InputAccess.NeedsPermission -> {
                 mutableMessages.tryEmit("Allow Accessibility access so clicks can reach other apps.")
+                runLog.event(RunLogSource.Routine, "routine.refused", mapOf("reason" to "accessibilityPermissionNeeded"), RunLogLevel.Warn)
+                runLog.end(NOT_STARTED)
                 return
             }
             InputAccess.Unsupported -> {
                 mutableMessages.tryEmit("Clicking in other apps works on Mac and Windows for now.")
+                runLog.event(RunLogSource.Routine, "routine.refused", mapOf("reason" to "clickingUnsupported"), RunLogLevel.Warn)
+                runLog.end(NOT_STARTED)
                 return
             }
         }
@@ -158,9 +175,16 @@ class ClickController(
         job = scope.launch { perform(routine) }.also { started ->
             // Cancelled before its first dispatch, the body never runs to reset this.
             started.invokeOnCompletion {
-                if (mutableState.value is RunState.CountingDown) mutableState.value = RunState.Idle
+                if (mutableState.value is RunState.CountingDown) {
+                    mutableState.value = RunState.Idle
+                    runLog.end(CANCELLED_DURING_COUNTDOWN)
+                }
             }
         }
+    }
+
+    private fun safetySettings(): Map<String, Any?> = currentPreferences.value.let {
+        mapOf("stopWhenPointerMoves" to it.stopWhenPointerMoves, "stopAtScreenCorner" to it.stopAtScreenCorner)
     }
 
     /** Stops whatever routine is running. */
@@ -171,13 +195,15 @@ class ClickController(
 
     private suspend fun perform(routine: ClickRoutine) {
         try {
+            runLog.event(RunLogSource.Routine, "routine.countdown", mapOf("seconds" to routine.startDelaySeconds))
             for (secondsLeft in routine.startDelaySeconds downTo 1) {
                 mutableState.value = RunState.CountingDown(routine, secondsLeft)
                 delay(COUNTDOWN_STEP_MILLIS)
             }
         } catch (e: CancellationException) {
-            // Cancelled before the first click: nothing ran, so there is nothing to record.
+            // Cancelled before the first click: nothing ran, so there is nothing to record in history.
             mutableState.value = RunState.Idle
+            runLog.end(CANCELLED_DURING_COUNTDOWN)
             throw e
         }
 
@@ -187,15 +213,30 @@ class ClickController(
         val prefs = currentPreferences.value
         val safety = RunSafety(prefs.stopWhenPointerMoves, prefs.stopAtScreenCorner)
         var outcome = RunOutcome.StoppedByUser
+        runLog.event(RunLogSource.Routine, "routine.started", mapOf("frontAppKnown" to (automation.apps.frontmost() != null)))
+        val sampler = ClickLogSampler(now)
         try {
             var lastPause: PauseReason? = null
+            var pausedAt = 0L
             val onWait: (Long) -> Unit = { at ->
                 mutableState.update { state -> (state as? RunState.Running)?.copy(nextClickAtMillis = at) ?: state }
+                sampler.waiting(at - now(), clicks, runLog)
             }
             outcome = run.execute(routine, safety, onWait) { count, pause ->
-                if (count > clicks) live.log(LiveSource.Click) { "Click $count" }
+                if (count > clicks) {
+                    live.log(LiveSource.Click) { "Click $count" }
+                    sampler.clicked(count, runLog)
+                }
                 if (pause != lastPause) {
                     live.log(LiveSource.Routine) { if (pause == null) "Clicking again" else "Paused: $pause" }
+                    if (pause == null) runLog.event(RunLogSource.Routine, "routine.resumed", mapOf("pausedMs" to now() - pausedAt, "clicks" to count))
+                    else {
+                        pausedAt = now()
+                        runLog.event(RunLogSource.Routine, "routine.paused", mapOf("reason" to when (pause) {
+                            is PauseReason.WaitingForApp -> "waitingForApp"
+                            PauseReason.OverOwnWindow -> "overOwnWindow"
+                        }, "clicks" to count))
+                    }
                     lastPause = pause
                 }
                 clicks = count
@@ -205,11 +246,14 @@ class ClickController(
             throw e
         } catch (e: Exception) {
             Log.w("Run failed: ${e.message}", TAG)
+            runLog.error(RunLogSource.Routine, "routine.failed", e)
             outcome = RunOutcome.Failed
         } finally {
             withContext(NonCancellable) {
                 val record = RunRecord(newId(), routine.name, startedAt, now(), clicks, outcome)
                 live.log(LiveSource.Routine) { "Ended ${routine.name}: ${outcome.label}, $clicks clicks" }
+                runLog.event(RunLogSource.Routine, "routine.ended", mapOf("outcome" to outcome.name, "clicks" to clicks, "durationMs" to now() - startedAt))
+                runLog.end(outcome.name)
                 mutableLastRun.value = record
                 mutableState.value = RunState.Idle
                 history.add(record)
@@ -220,5 +264,7 @@ class ClickController(
     private companion object {
         const val TAG = "ClickController"
         const val COUNTDOWN_STEP_MILLIS = 1_000L
+        const val NOT_STARTED = "NotStarted"
+        const val CANCELLED_DURING_COUNTDOWN = "CancelledDuringCountdown"
     }
 }

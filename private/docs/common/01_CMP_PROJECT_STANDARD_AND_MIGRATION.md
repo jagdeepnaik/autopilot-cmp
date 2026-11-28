@@ -359,6 +359,8 @@ kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 
 The versions are AutoPilot's on 24 November 2026. Take newer library versions from Maven, but keep `agp` at the version your Android Studio bundles (`plugins/android/lib/libagp-version.jar`, `buildVersion`): a newer AGP won't sync in an older Studio.
 
+**Toolchain (28 November 2026):** the newest LTS releases. The Gradle daemon runs on **JDK 25 LTS** (Microsoft build), pinned in `gradle/gradle-daemon-jvm.properties` (`./gradlew updateDaemonJvm --jvm-version=25 --jvm-vendor=microsoft`) so every machine provisions the same JDK through the foojay resolver, whatever `java` it has installed; the desktop app bundles that JDK's runtime, and on Windows the Smart App Control fix copies its vendor-signed binaries. Gradle 9.9.3 (`./gradlew wrapper --gradle-version <v> --gradle-distribution-sha256-sum <sum>`, the sum from gradle.org). Android bytecode stays at Java 11 (`jvmTarget`, `sourceCompatibility`) for `minSdk` 26.
+
 ### 5.2 `settings.gradle.kts`
 
 ```kotlin

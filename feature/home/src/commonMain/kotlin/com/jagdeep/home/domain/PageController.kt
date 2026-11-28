@@ -5,6 +5,11 @@ import com.jagdeep.automation.InputAccess
 import com.jagdeep.automation.ScreenPoint
 import com.jagdeep.localbridge.LocalBridge
 import com.jagdeep.logger.Log
+import com.jagdeep.shared.diagnostics.NoRunLog
+import com.jagdeep.shared.diagnostics.RunLog
+import com.jagdeep.shared.diagnostics.RunLogLevel
+import com.jagdeep.shared.diagnostics.RunLogSource
+import com.jagdeep.shared.diagnostics.error
 import com.jagdeep.shared.history.RunHistoryStore
 import com.jagdeep.shared.history.RunOutcome
 import com.jagdeep.shared.history.RunRecord
@@ -158,6 +163,21 @@ internal data class HelperEvent(
     val video: String? = null,
     val request: Long? = null,
     val success: Boolean = false,
+    /** The watched video's state (extension 1.15.24+), for the run log only. */
+    val videoDetail: HelperVideoDetail? = null,
+)
+
+@Serializable
+internal data class HelperVideoDetail(
+    val paused: Boolean? = null,
+    val ended: Boolean? = null,
+    val currentTime: Double? = null,
+    val duration: Double? = null,
+    val readyState: Int? = null,
+    val networkState: Int? = null,
+    val errorCode: Int? = null,
+    val muted: Boolean? = null,
+    val buffering: Boolean? = null,
 )
 
 internal const val BROWSER_APP_NAME = "Google Chrome"
@@ -183,18 +203,27 @@ class PageController(
     private val dgsStudyRepository:DgsStudyRepository = NoDgsStudyRepository,
     private val dgsElapsedMillis:()->Long = now,
     extensionStatus: StateFlow<com.jagdeep.shared.browser.BrowserExtensionStatus> = MutableStateFlow(com.jagdeep.shared.browser.BrowserExtensionStatus()),
+    /** The always-on run log (desktop): every Chrome routine run, its messages, videos, waits and decisions. */
+    private val runLog: RunLog = NoRunLog,
 ) : PageRunner {
     private var historySelection = ""
     private var lastCourseSnapshot: CourseSnapshot? = null
     private val progressMarkers = mutableMapOf<String, String>()
     private fun observeProgress(channel: String, marker: String) {
         if (progressMarkers[channel] == marker) return
+        if (state.value.inactivityWarning != null) runLog.event(RunLogSource.Routine, "routine.stallCleared", mapOf("channel" to channel.substringBefore(':')))
         if (channel !in progressMarkers && progressMarkers.size >= 32) progressMarkers.remove(progressMarkers.keys.first())
         progressMarkers[channel] = marker
         mutableState.update { it.copy(progressRevision = it.progressRevision + 1, inactivityWarning = null) }
     }
     fun reportInactivity(message: String?) {
-        if (state.value.inactivityWarning != message) mutableState.update { it.copy(inactivityWarning = message) }
+        val previous = state.value.inactivityWarning
+        if (previous == message) return
+        if (previous == null && message != null) {
+            runLog.event(RunLogSource.Routine, "routine.stalled", mapOf("noProgressMs" to STALL_MILLIS, "soundUnavailable" to message.contains("unavailable"),
+                "connected" to state.value.isConnected, "messagesReceived" to bridgeStats.received), RunLogLevel.Warn)
+        } else if (previous != null && message == null) runLog.event(RunLogSource.Routine, "routine.stallCleared", mapOf("channel" to "monitor"))
+        mutableState.update { it.copy(inactivityWarning = message) }
     }
     override fun refreshCourseProgress() {
         if (courseProgress == null) return
@@ -234,6 +263,7 @@ class PageController(
             courseProgressMutex.withLock {
                 if (courseProgress !== tracking) return@withLock
                 val accepted = tracking.confirm(token, localName, now())
+                runLog.event(RunLogSource.Routine, "approval.profileConfirmed", mapOf("accepted" to accepted))
                 mutableState.update { state ->
                     val activity = state.activity as? PageActivity.Automation ?: return@update state
                     state.copy(activity = activity.copy(progressProfile = tracking.request,
@@ -258,6 +288,8 @@ class PageController(
             catch (_: Exception) { AnswerBankSaveResult.Unavailable }
             else null
             if (courseAutomation !== runner || runner.manualAnswer?.token != token) return@launch
+            runLog.event(RunLogSource.Answers, "answers.manualConfirmed", mapOf("questionKey" to runLogQuestionKey(request.question, request.options),
+                "moduleIndex" to moduleIndex(request.module), "save" to save, "result" to result?.let { it::class.simpleName }))
             val problem = when (result) {
                 AnswerBankSaveResult.Conflict -> "The bank already has a different answer or changed while saving. Review it before replacing anything."
                 AnswerBankSaveResult.Invalid -> "The answer bank needs review before this answer can be saved."
@@ -290,6 +322,8 @@ class PageController(
             catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (_: Exception) { AnswerBankSaveResult.Unavailable }
             if (courseAutomation !== runner || runner.failure?.token != token) return@launch
+            runLog.event(RunLogSource.Answers, "answers.reviewSaved", mapOf("count" to reviewed.size, "moduleIndex" to moduleIndex(failure.module),
+                "result" to result::class.simpleName, "questionKeys" to reviewed.joinToString(",") { runLogQuestionKey(it.answer.question, it.answer.options).take(16) }))
             if (result is AnswerBankSaveResult.Saved) runner.configureAnswers(result.bank)
             mutableState.update { state ->
                 val current = state.activity as? PageActivity.Automation ?: return@update state
@@ -303,6 +337,7 @@ class PageController(
     override fun retryAssessment(token: String, automatic: Boolean) {
         val runner = courseAutomation ?: return
         if (runner.failure?.token != token) return
+        runLog.event(RunLogSource.Routine, "approval.retry", mapOf("automatic" to automatic, "canRetry" to runner.failure?.canRetry))
         if (automatic) {
             if (!runner.retryAssessment(token)) return
             mutableState.update { state ->
@@ -315,6 +350,7 @@ class PageController(
     override fun approveAssessment(token: String) {
         val runner = courseAutomation ?: return
         if (runner.approval?.token != token) return
+        runLog.event(RunLogSource.Routine, "approval.granted", mapOf("kind" to runner.approval?.kind?.name, "moduleIndex" to moduleIndex(runner.approval?.module)))
         runner.approveAssessment(token)
         mutableState.update { state ->
             val activity = state.activity as? PageActivity.Automation ?: return@update state
@@ -325,6 +361,7 @@ class PageController(
 
     override fun runCourseModule(module: String, action: CourseModuleAction) {
         val runner = courseAutomation ?: return
+        runLog.event(RunLogSource.Routine, "routine.moduleRun", mapOf("action" to action.name, "moduleIndex" to moduleIndex(module)))
         runner.runModule(module, action)
         mutableState.update { state ->
             val activity = state.activity as? PageActivity.Automation ?: return@update state
@@ -336,6 +373,7 @@ class PageController(
 
     override fun stopCourseModule() {
         val runner = courseAutomation ?: return
+        runLog.event(RunLogSource.Routine, "routine.moduleStopped")
         runner.stopFocusedModule()
         mutableState.update { state ->
             val activity = state.activity as? PageActivity.Automation ?: return@update state
@@ -380,6 +418,59 @@ class PageController(
     private val courseChunks = CourseSnapshotAssembler()
     private var courseRunSequence = 0L
     private var lastCourseSnapshotSummary: String? = null
+    // Run-log state: reset when each Chrome routine starts.
+    private val videoSampler = VideoLogSampler()
+    private val bridgeStats = BridgeLogStats()
+    private var clickSampler = ClickLogSampler(now)
+    private var ticker: Job? = null
+    private var lastReason: String? = null
+    private var lastActionKey: String? = null
+    private var lastDecisionKey: String? = null
+    private var lastPageState: String? = null
+    private var lastPhase: ScrollClickPhase? = null
+    private var phaseSince = 0L
+    private var runStartedAt = 0L
+    private var dgsStaleLogged = false
+    private val loggedLookups = mutableSetOf<String>()
+
+    private fun bridgeData(): Map<String, Any?> = state.value.let {
+        mapOf("connected" to it.isConnected, "bridgeProblem" to (it.problem != null), "extensionVersion" to it.extension.connectedVersion,
+            "bundledVersion" to it.extension.latestVersion, "extensionWarning" to (it.extension.warning != null))
+    }
+
+    private fun moduleIndex(module: String?): Int? = module?.let { name ->
+        SAGAR_MEIN_YOG_MODULES.indexOfFirst { CourseAnswerBank.normalize(it) == CourseAnswerBank.normalize(name) }.takeIf { it >= 0 }
+    }
+
+    /** Logs a routine's status line as a reason template when it changes (see [reasonTemplate]). */
+    private fun logReason(detail: String, sensitive: List<String?>, extra: Map<String, Any?> = emptyMap()) {
+        val reason = reasonTemplate(detail, sensitive)
+        if (reason == lastReason) return
+        lastReason = reason
+        runLog.event(RunLogSource.Routine, "routine.step", mapOf("reason" to reason) + extra)
+    }
+
+    private fun logLookup(question: CourseQuestion, found: Boolean, module: String?) {
+        val key = runLogQuestionKey(question.text, question.options.map { it.text })
+        if (!loggedLookups.add("$key:$found") || loggedLookups.size > 5_000) return
+        runLog.event(RunLogSource.Answers, "answers.lookup", mapOf("questionKey" to key, "found" to found, "options" to question.options.size,
+            "moduleIndex" to moduleIndex(module)), if (found) RunLogLevel.Info else RunLogLevel.Warn)
+    }
+
+    private fun refusalCode(refusal: String): String = when {
+        refusal == state.value.problem -> "bridgeProblem"
+        refusal == NOT_CONNECTED -> "extensionNotConnected"
+        refusal == state.value.extension.warning -> "extensionNeedsReload"
+        refusal.startsWith("Allow Accessibility") -> "accessibilityPermissionNeeded"
+        else -> "notAChromeRoutine"
+    }
+
+    /** Once a second while a Chrome routine runs: silences, message summaries and video heartbeats. */
+    private fun tick() {
+        val at = now()
+        bridgeStats.tick(at, runLog)
+        videoSampler.heartbeat(at, runLog)
+    }
     private val textClicks = object : TextClicker {
         val done = MutableStateFlow(0L)
         override val clicked: StateFlow<Long> = done
@@ -408,6 +499,8 @@ class PageController(
         scope.launch {
             bridge.connected.collect { connected ->
                 live.log(LiveSource.Chrome) { if (connected) "Extension connected" else "Extension not connected" }
+                runLog.event(RunLogSource.Bridge, if (connected) "bridge.connected" else "bridge.disconnected", emptyMap(),
+                    if (connected) RunLogLevel.Info else RunLogLevel.Warn)
                 // Nothing is highlighted, as far as anyone knows, without a connection.
                 mutableState.update { it.copy(isConnected = connected, foundLabel = it.foundLabel.takeIf { connected }, extension = if (connected) it.extension else it.extension.copy(connectedVersion = null)) }
             }
@@ -415,6 +508,7 @@ class PageController(
         scope.launch {
             bridge.problem.collect { problem ->
                 if (problem != null) live.log(LiveSource.Chrome) { "Link problem: $problem" }
+                if (problem != null) runLog.event(RunLogSource.Bridge, "bridge.problem", mapOf("problem" to problem), RunLogLevel.Error)
                 mutableState.update { it.copy(problem = problem) }
             }
         }
@@ -434,6 +528,7 @@ class PageController(
     override fun selectDgsCourse(id: String) {
         val runner=dgsSession ?: return
         runner.selectCourse(id,dgsElapsedMillis())
+        runLog.event(RunLogSource.Routine, "routine.courseSelected", mapOf("courseIndex" to runner.progress.courses.indexOfFirst { it.id == id }.takeIf { it >= 0 }))
         val activity=state.value.activity as? PageActivity.Dgs ?: return
         mutableState.update { it.copy(activity=activity.copy(progress=runner.progress)) }; publish()
         automation.apps.bringToFront(BROWSER_APP_NAME)
@@ -450,6 +545,12 @@ class PageController(
         val refusal = startOrRefuse(routine)
         live.log(LiveSource.Routine) {
             if (refusal == null) "Started ${routine.name} (${routine.kind.label})" else "Didn't start ${routine.name}: $refusal"
+        }
+        if (refusal != null) {
+            // A start that was refused is logged too: "Chrome isn't connected" is often why a routine seems stuck.
+            runLog.start(routine.kind.name, routine.name, runLogSettings(routine))
+            runLog.event(RunLogSource.Routine, "routine.refused", mapOf("reason" to refusalCode(refusal)) + bridgeData(), RunLogLevel.Warn)
+            runLog.end(NOT_STARTED)
         }
         return refusal
     }
@@ -478,6 +579,7 @@ class PageController(
                 quizSavedAnswers = 0
                 lastCourseSnapshot = null
                 courseAutomation = CourseAutomationSession("${newId()}:${now()}:${++courseRunSequence}", routine.waitAfterClickMillis, routine.playbackSpeed, routine.answerAssessments, routine.assessmentMode, routine.learningOrder, bankFile, routine.answerQuizzes, routine.autoDownloadCertificates)
+                    .also { session -> session.onAnswerLookup = { question, found -> logLookup(question, found, session.currentModule) } }
                 courseProgress = if (progressRepository.available) CourseProgressSession(progressRepository, courseAutomation!!.session, routine.waitAfterClickMillis) else null
                 courseChunks.clear()
                 launchActivity(
@@ -498,6 +600,7 @@ class PageController(
                 val bankFile = com.jagdeep.shared.answers.resolvedAnswerBankFileName(routine.answerBankFile) ?: routine.answerBankFile
                 activeAnswerBankStore = answerBankStore.forName(bankFile)
                 val runner = OceanTGSession("${newId()}:${now()}", routine.answerPracticeQuestions, routine.courseCodes)
+                runner.onAnswerLookup = { question, found -> logLookup(question, found, null) }
                 oceanTG = runner
                 launchActivity(PageActivity.Ocean(routine.copy(answerBankFile = bankFile), runner.progress), scrolling = false) {
                     performOceanTG(routine, runner)
@@ -567,12 +670,35 @@ class PageController(
         // Include wall-clock time so an extension worker retained across app restarts still
         // sees this as a fresh request; keep it monotonic if two runs start in one millisecond.
         focusBrowserRequest = maxOf(now(), focusBrowserRequest + 1)
+        runStartedAt = now()
+        runLog.start(activity.routine.kind.name, activity.routine.name, runLogSettings(activity.routine) +
+            mapOf("stopAtScreenCorner" to currentPreferences.value.stopAtScreenCorner, "stopWhenPointerMoves" to currentPreferences.value.stopWhenPointerMoves))
+        runLog.event(RunLogSource.Routine, "routine.started", bridgeData() + mapOf("accessibility" to automation.access.access().name))
+        videoSampler.reset(); bridgeStats.reset(runStartedAt); clickSampler = ClickLogSampler(now)
+        lastReason = null; lastActionKey = null; lastDecisionKey = null; lastPageState = null; lastPhase = null; phaseSince = runStartedAt
+        dgsStaleLogged = false; loggedLookups.clear()
+        ticker?.cancel()
+        ticker = scope.launch { while (true) { kotlinx.coroutines.delay(TICK_MILLIS); tick() } }
         mutableState.update { it.copy(activity = activity, isScrolling = scrolling) }
         publish()
-        job = scope.launch { body() }.also { started ->
+        job = scope.launch {
+            try { body() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (e: Exception) {
+                // Logged before the run's end line, which the routine's own finally block writes.
+                Log.w("Chrome routine failed: ${e.message}", TAG)
+                throw e
+            }
+        }.also { started ->
             // Cancelled before its first dispatch, the body never runs to reset this.
             started.invokeOnCompletion { if (state.value.activity != null) endActivity() }
         }
+    }
+
+    /** Logs an unexpected failure inside a routine body, then lets the run end as Failed. */
+    private fun failed(e: Exception): RunOutcome {
+        runLog.error(RunLogSource.Routine, "routine.failed", e)
+        return RunOutcome.Failed
     }
 
     private suspend fun performScrollClick(routine: ScrollClickRoutine) {
@@ -595,6 +721,13 @@ class PageController(
                     val previous = (state.value.activity as? PageActivity.ScrollClick)?.progress
                     if (progress.clicks > clicks) {
                         live.log(LiveSource.Click) { "Clicked step ${progress.step} of ${progress.steps} (round ${progress.round} of ${progress.rounds})" }
+                        clickSampler.clicked(progress.clicks, runLog)
+                    }
+                    if (progress.phase != lastPhase || previous?.round != progress.round || (progress.phase == ScrollClickPhase.ClickingSteps && previous?.step != progress.step)) {
+                        val at = now()
+                        runLog.event(RunLogSource.Routine, "routine.phase", mapOf("phase" to progress.phase.name, "round" to progress.round, "rounds" to progress.rounds,
+                            "step" to progress.step, "steps" to progress.steps, "previousPhase" to lastPhase?.name, "previousPhaseMs" to at - phaseSince))
+                        if (progress.phase != lastPhase) { lastPhase = progress.phase; phaseSince = at }
                     }
                     if (previous == null || previous.phase != progress.phase || previous.round != progress.round) {
                         live.log(LiveSource.Routine) { "Round ${progress.round} of ${progress.rounds}: ${progress.phase.name}" }
@@ -607,7 +740,7 @@ class PageController(
             throw e
         } catch (e: Exception) {
             Log.w("Scroll and click failed: ${e.message}", TAG)
-            outcome = RunOutcome.Failed
+            outcome = failed(e)
         } finally {
             withContext(NonCancellable) {
                 endActivity()
@@ -625,6 +758,7 @@ class PageController(
                 if(!state.value.isConnected) { outcome=RunOutcome.BrowserDisconnected; break }
                 if(runner.completed) { outcome=RunOutcome.Completed; break }
                 if(dgsElapsedMillis()-dgsLastReading>4_000) {
+                    if(!dgsStaleLogged) { dgsStaleLogged=true; runLog.event(RunLogSource.Page, "page.stale", mapOf("sinceReadingMs" to dgsElapsedMillis()-dgsLastReading), RunLogLevel.Warn) }
                     runner.stale()
                     mutableState.update { it.copy(activity=PageActivity.Dgs(routine,runner.progress)) }; publish()
                 }
@@ -633,7 +767,9 @@ class PageController(
                 if(currentPreferences.value.stopAtScreenCorner && position!=null && automation.pointer.isScreenCorner(position)) { outcome=RunOutcome.ScreenCorner; break }
                 kotlinx.coroutines.delay(250)
             }
-        } finally { withContext(NonCancellable) { study?.checkpoint(now(),if(runner.completed) "completed" else "stopped",dgsElapsedMillis()); endActivity(); record(routine.name,started,runner.progress.clicks,outcome) } }
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { outcome = failed(e); throw e }
+        finally { withContext(NonCancellable) { study?.checkpoint(now(),if(runner.completed) "completed" else "stopped",dgsElapsedMillis()); endActivity(); record(routine.name,started,runner.progress.clicks,outcome) } }
     }
 
     private suspend fun performCourseAutomation(routine: CourseAutomationRoutine) {
@@ -647,7 +783,9 @@ class PageController(
             if (routine.answerAssessments || routine.answerQuizzes) {
                 val bank = try { activeAnswerBankStore.load() }
                 catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                catch (_: Exception) { null }
+                catch (e: Exception) { runLog.error(RunLogSource.Answers, "answers.loadFailed", e); null }
+                runLog.event(RunLogSource.Answers, "answers.loaded", mapOf("loaded" to (bank != null), "questions" to bank?.questionCount),
+                    if (bank == null) RunLogLevel.Warn else RunLogLevel.Info)
                 runner?.configureAnswers(bank)
             }
             while (true) {
@@ -655,6 +793,7 @@ class PageController(
                 runner?.certificateDownload?.let { target ->
                     if (certificateStore.collectDownloaded(target)) {
                         runner.certificateDownloaded(target)
+                        runLog.event(RunLogSource.Routine, "routine.certificateSaved", mapOf("moduleIndex" to moduleIndex(target.module)))
                         live.log(LiveSource.Routine) { "Saved ${target.module} certificate for ${target.profileName}" }
                     }
                 }
@@ -679,7 +818,9 @@ class PageController(
                 if (finished) { outcome = RunOutcome.Completed; break }
                 kotlinx.coroutines.delay(100)
             }
-        } finally {
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { outcome = failed(e); throw e }
+        finally {
             withContext(NonCancellable) {
                 val clicks = runner?.clicks ?: 0
                 if (quizSavedAnswers > 0) {
@@ -697,13 +838,17 @@ class PageController(
         val startedAt = now()
         var outcome = RunOutcome.StoppedByUser
         try {
-            runner.configureAnswers(try { activeAnswerBankStore.loadAll(OLP_BUNDLED_ANSWER_BANKS + routine.answerBankFile) } catch (_: Exception) { null })
+            val banks = try { activeAnswerBankStore.loadAll(OLP_BUNDLED_ANSWER_BANKS + routine.answerBankFile) } catch (e: Exception) { runLog.error(RunLogSource.Answers, "answers.loadFailed", e); null }
+            runLog.event(RunLogSource.Answers, "answers.loaded", mapOf("loaded" to (banks != null), "questions" to banks?.questionCount))
+            runner.configureAnswers(banks)
             while (true) {
                 if (!state.value.isConnected) { outcome = RunOutcome.BrowserDisconnected; break }
                 if (runner.progress.completed) { outcome = RunOutcome.Completed; break }
                 kotlinx.coroutines.delay(200)
             }
-        } finally {
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { outcome = failed(e); throw e }
+        finally {
             withContext(NonCancellable) { endActivity(); record(routine.name, startedAt, 0, outcome) }
         }
     }
@@ -719,14 +864,16 @@ class PageController(
                     val checkpoint = saved?.let { json.decodeFromString(MarineSamrajCheckpoint.serializer(), it.details) } ?: MarineSamrajCheckpoint()
                     if (routine.continueSavedCollection) runner.restore(checkpoint)
                 } catch (error: CancellationException) { throw error }
-                catch (_: Exception) { runner.pauseForStorageFailure() }
+                catch (e: Exception) { runLog.error(RunLogSource.Routine, "routine.checkpointLoadFailed", e); runner.pauseForStorageFailure() }
             }
             while (true) {
                 if (!state.value.isConnected) { outcome = RunOutcome.BrowserDisconnected; break }
                 if (runner.progress.completed) { outcome = RunOutcome.Completed; break }
                 kotlinx.coroutines.delay(200)
             }
-        } finally {
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { outcome = failed(e); throw e }
+        finally {
             withContext(NonCancellable) { endActivity(); record(routine.name, startedAt, runner.progress.questions.toLong(), outcome) }
         }
     }
@@ -734,6 +881,9 @@ class PageController(
     private suspend fun record(name: String, startedAt: Long, clicks: Long, outcome: RunOutcome) {
         val record = RunRecord(newId(), name, startedAt, now(), clicks, outcome)
         live.log(LiveSource.Routine) { "Ended $name: ${outcome.label}, $clicks clicks" }
+        runLog.event(RunLogSource.Routine, "routine.ended", mapOf("outcome" to outcome.name, "clicks" to clicks, "durationMs" to now() - startedAt,
+            "messagesReceived" to bridgeStats.received) + bridgeData())
+        runLog.end(outcome.name)
         mutableLastRun.value = record
         history.add(record)
     }
@@ -745,6 +895,8 @@ class PageController(
     }
 
     private fun endActivity() {
+        ticker?.cancel()
+        ticker = null
         dgsSession=null
         dgsStudy=null
         courseAutomation = null
@@ -762,10 +914,13 @@ class PageController(
     }
 
     private suspend fun onMessage(raw: String) {
+        if (runLog.isOpen) bridgeStats.incoming(now(), messageType(raw), raw.length, runLog)
         if(raw.length<=4_000) {
             val event=runCatching {json.decodeFromString(DgsBrowserAction.serializer(),raw)}.getOrNull()
             if(event?.type=="dgsBrowserAction") {
                 val runner=dgsSession ?: return
+                runLog.event(RunLogSource.Extension, "extension.ack", mapOf("routine" to "dgs", "success" to event.success, "problem" to event.problem),
+                    if (event.success) RunLogLevel.Debug else RunLogLevel.Warn)
                 runner.acknowledgeBrowserAction(event)
                 val activity=state.value.activity as? PageActivity.Dgs ?: return
                 mutableState.update {it.copy(activity=activity.copy(progress=runner.progress))};publish();return
@@ -779,7 +934,9 @@ class PageController(
                 if(event.x !in -100_000..100_000 || event.y !in -100_000..100_000 || !runner.claimNativeClick(event)) return
                 val point=ScreenPoint(event.x,event.y)
                 val safe=state.value.isConnected && automation.access.access()==InputAccess.Granted && automation.apps.frontmost()==BROWSER_APP_NAME && !automation.pointer.isOverOwnFocusedWindow(point)
-                if(!safe || !automation.pointer.click(point,com.jagdeep.automation.PointerButton.Left,1)) runner.nativeClickFailed("Couldn't click DGS. Keep its Chrome window in front, check Accessibility access and select the course again, or use the page button manually.")
+                val clicked = safe && automation.pointer.click(point,com.jagdeep.automation.PointerButton.Left,1)
+                runLog.event(RunLogSource.Click, "click.native", mapOf("action" to event.action, "safe" to safe, "clicked" to clicked), if (clicked) RunLogLevel.Info else RunLogLevel.Warn)
+                if(!clicked) runner.nativeClickFailed("Couldn't click DGS. Keep its Chrome window in front, check Accessibility access and select the course again, or use the page button manually.")
                 else {runner.nativeClickSucceeded(); live.log(LiveSource.Click) { "DGS native click: ${event.action}" }}
                 val activity=state.value.activity as? PageActivity.Dgs ?: return
                 mutableState.update { it.copy(activity=activity.copy(progress=runner.progress)) }; publish(); return
@@ -793,9 +950,17 @@ class PageController(
                 if(reading.session!=runner.session) return
                 observeProgress("dgs", listOf(reading.page, reading.courseId, reading.scroll.toInt(), reading.atBottom,
                     reading.videos.map { listOf(it.id, it.position.toLong(), it.ended) }).toString())
+                if (dgsStaleLogged) { dgsStaleLogged = false; runLog.event(RunLogSource.Page, "page.fresh") }
                 dgsLastReading=dgsElapsedMillis(); dgsStudy?.read(reading,now(),dgsElapsedMillis())
+                videoSampler.observe(now(), reading.videos.map { video ->
+                    VideoSample(video.id, state = reading.media.takeIf { reading.videos.size == 1 }, ended = video.ended, currentTime = video.position, duration = video.duration)
+                }, runLog, "dgs")
+                logPageState("dgs", mapOf("ready" to reading.ready, "focused" to reading.focused, "atBottom" to reading.atBottom, "media" to reading.media,
+                    "next" to reading.next, "previous" to reading.previous, "problem" to (reading.problem != null)))
                 val activity=state.value.activity as? PageActivity.Dgs ?: return
                 if(activity.progress.detail!=runner.progress.detail) live.log(LiveSource.Chrome) { "DGS · ${runner.progress.page}: ${runner.progress.detail}" }
+                logReason(runner.progress.detail, listOf(runner.progress.page, runner.progress.courseName, runner.progress.accountName, runner.progress.username, reading.title, reading.course, reading.courseName, reading.accountName),
+                    mapOf("needsAttention" to runner.progress.needsAttention))
                 mutableState.update { it.copy(activity=activity.copy(progress=runner.progress)) }; publish(); return
             }
         }
@@ -807,26 +972,52 @@ class PageController(
             json.decodeFromString(HelperEvent.serializer(), raw)
         } catch (_: SerializationException) {
             live.log(LiveSource.Chrome) { "Ignored a message that isn't valid" }
+            runLog.event(RunLogSource.Extension, "extension.invalidMessage", mapOf("bytes" to raw.length, "type" to messageType(raw)), RunLogLevel.Warn)
             return
         } catch (_: IllegalArgumentException) {
             live.log(LiveSource.Chrome) { "Ignored a message that isn't valid" }
+            runLog.event(RunLogSource.Extension, "extension.invalidMessage", mapOf("bytes" to raw.length, "type" to messageType(raw)), RunLogLevel.Warn)
             return
         }
         when (event.type) {
             "extensionVersion" -> {
                 val version = event.version?.takeIf { Regex("[0-9]{1,5}(?:\\.[0-9]{1,5}){0,3}").matches(it) }
+                if (version != state.value.extension.connectedVersion) runLog.event(RunLogSource.Extension, "extension.version",
+                    mapOf("extensionVersion" to version, "bundledVersion" to state.value.extension.latestVersion))
                 mutableState.update { it.copy(extension = it.extension.copy(connectedVersion = version)) }
             }
-            "found" -> mutableState.update { it.copy(foundLabel = event.label?.take(MAX_LABEL_LENGTH)) }
-            "textClicked" -> if (event.request == textRequest) textClicks.done.value = textRequest
-            "browserFocus" -> live.log(LiveSource.Chrome) {
-                if (event.success) "Chrome window brought to the front" else "Chrome could not be brought to the front; select its window to continue"
+            "found" -> {
+                if (event.label != state.value.foundLabel) runLog.event(RunLogSource.Page, "page.targetFound", mapOf("found" to (event.label != null), "label" to event.label))
+                mutableState.update { it.copy(foundLabel = event.label?.take(MAX_LABEL_LENGTH)) }
+            }
+            "textClicked" -> {
+                runLog.event(RunLogSource.Click, "click.text", mapOf("request" to event.request, "current" to (event.request == textRequest)))
+                if (event.request == textRequest) textClicks.done.value = textRequest
+            }
+            "browserFocus" -> {
+                runLog.event(RunLogSource.Extension, "extension.browserFocus", mapOf("success" to event.success), if (event.success) RunLogLevel.Info else RunLogLevel.Warn)
+                live.log(LiveSource.Chrome) {
+                    if (event.success) "Chrome window brought to the front" else "Chrome could not be brought to the front; select its window to continue"
+                }
             }
             "page" -> {
                 observeProgress("scroll", "${event.signature}:${event.progress?.take(4000)}:${event.atBottom}:${event.video}")
                 pageReading.value = PageReading(event.focused, event.atBottom, event.signature?.take(MAX_SIGNATURE_LENGTH), pageVideo(event.video))
+                logPageState("scroll", mapOf("focused" to event.focused, "atBottom" to event.atBottom, "video" to event.video))
+                val detail = event.videoDetail
+                videoSampler.observe(now(), if (detail == null && event.video.isNullOrEmpty()) emptyList() else listOf(VideoSample("page", state = event.video?.takeIf { detail == null },
+                    paused = detail?.paused, ended = detail?.ended, currentTime = detail?.currentTime, duration = detail?.duration, readyState = detail?.readyState,
+                    networkState = detail?.networkState, errorCode = detail?.errorCode, muted = detail?.muted, buffering = detail?.buffering)).filter { detail != null || it.state != "none" }, runLog, "scroll")
             }
         }
+    }
+
+    /** Logs what the page says about itself (focus, bottom, readiness) when that changes, not every reading. */
+    private fun logPageState(page: String, values: Map<String, Any?>) {
+        val key = "$page:$values"
+        if (key == lastPageState) return
+        lastPageState = key
+        runLog.event(RunLogSource.Page, "page.state", values + ("page" to page))
     }
 
     private fun pageVideo(reported: String?): PageVideo = when (reported) {
@@ -845,6 +1036,8 @@ class PageController(
         }
         val action = runCatching { json.decodeFromString(MarineSamrajActionAck.serializer(), raw) }.getOrNull()
         if (action?.type == "marineSamrajAction") {
+            runLog.event(RunLogSource.Extension, "extension.ack", mapOf("routine" to "marineSamraj", "request" to action.request, "success" to action.success),
+                if (action.success) RunLogLevel.Debug else RunLogLevel.Warn)
             marineSamraj?.takeIf { it.session == action.session }?.acknowledge(action.request, action.success)
             publish()
             return true
@@ -866,6 +1059,8 @@ class PageController(
             } catch (error: CancellationException) { throw error }
             catch (_: Exception) { false }
             runner.captureSaved(result)
+            runLog.event(RunLogSource.Answers, "answers.referenceSaved", mapOf("questionKey" to runLogQuestionKey(capture.question, listOf(capture.answer, "Reference answer")), "saved" to result),
+                if (result) RunLogLevel.Info else RunLogLevel.Warn)
         }
         if (progressRepository.available) runner.checkpoint()?.let { checkpoint ->
             val encoded = json.encodeToString(MarineSamrajCheckpoint.serializer(), checkpoint)
@@ -877,9 +1072,10 @@ class PageController(
                     progressRepository.save(account, listOf(row))
                     marineSamrajCheckpointJson = encoded
                 } catch (error: CancellationException) { throw error }
-                catch (_: Exception) { runner.pauseForStorageFailure() }
+                catch (e: Exception) { runLog.error(RunLogSource.Routine, "routine.checkpointSaveFailed", e); runner.pauseForStorageFailure() }
             }
         }
+        logReason(runner.progress.detail, emptyList(), mapOf("pages" to runner.progress.pages, "questions" to runner.progress.questions, "actionPending" to (runner.action != null)))
         val activity = state.value.activity as? PageActivity.MarineSamraj ?: return true
         mutableState.update { it.copy(activity = activity.copy(progress = runner.progress)) }
         observeProgress("marinesamraj", "${runner.progress.pages}:${runner.progress.questions}:${runner.progress.detail}")
@@ -893,6 +1089,8 @@ class PageController(
     private suspend fun handleOceanMessage(raw: String): Boolean {
         val action = runCatching { json.decodeFromString(OceanActionAck.serializer(), raw) }.getOrNull()
         if (action?.type == "oceanAction") {
+            runLog.event(RunLogSource.Extension, "extension.ack", mapOf("routine" to "oceanTG", "request" to action.request, "success" to action.success),
+                if (action.success) RunLogLevel.Debug else RunLogLevel.Warn)
             oceanTG?.takeIf { it.session == action.session }?.acknowledge(action.request, action.success)
             publish()
             return true
@@ -907,6 +1105,8 @@ class PageController(
             if (correct != null) {
                 val current = try { activeAnswerBankStore.load() } catch (_: Exception) { null }
                 val saved = activeAnswerBankStore.save(reading.chapterTitle, CourseAnswer(question.text, question.options.map { it.text }, correct.text))
+                runLog.event(RunLogSource.Answers, "answers.learned", mapOf("questionKey" to runLogQuestionKey(question.text, question.options.map { it.text }),
+                    "result" to saved::class.simpleName, "routine" to "oceanTG"))
                 if (saved is AnswerBankSaveResult.Saved) runner.configureAnswers(saved.bank)
             }
         }
@@ -924,8 +1124,10 @@ class PageController(
                 }
                 progressRepository.save(account.copy(checkedAt = now()), rows)
                 runner.pendingRecords.clear()
-            } catch (_: Exception) { /* Retry after the next OLP page update. */ }
+            } catch (e: Exception) { runLog.error(RunLogSource.Routine, "routine.progressSaveFailed", e) /* Retry after the next OLP page update. */ }
         }
+        logReason(runner.progress.detail, listOf(runner.progress.chapter, reading.chapterTitle, reading.profileName),
+            mapOf("slide" to runner.progress.slide, "slides" to runner.progress.slideCount, "actionKind" to runner.action?.kind, "actionRequest" to runner.action?.request))
         val activity = state.value.activity as? PageActivity.Ocean ?: return true
         mutableState.update { it.copy(activity = activity.copy(progress = runner.progress)) }
         publish()
@@ -963,7 +1165,14 @@ class PageController(
             },
         )
         val encoded = json.encodeToString(HelperCommand.serializer(), command)
-        if (encoded != lastPublished) live.log(LiveSource.Chrome) { "→ $encoded" }
+        if (encoded != lastPublished) {
+            live.log(LiveSource.Chrome) { "→ $encoded" }
+            runLog.event(RunLogSource.Bridge, "bridge.publish", mapOf("bytes" to encoded.length, "enabled" to command.enabled, "scrolling" to command.scrolling,
+                "autoRun" to command.autoRun, "clickRequest" to command.clickRequest, "clickPending" to (command.clickText != null),
+                "courseActionKind" to command.courseAutomation?.action?.kind, "courseActionRequest" to command.courseAutomation?.action?.request,
+                "dgsAction" to command.dgs?.action, "oceanActionKind" to command.oceanTG?.action?.kind, "marineSamrajActionRequest" to command.marineSamraj?.action?.request),
+                RunLogLevel.Debug)
+        }
         lastPublished = encoded
         bridge.publish(encoded)
     }
@@ -974,6 +1183,7 @@ class PageController(
         val runner = courseAutomation ?: return true
         if (event.session != runner.session) return true
         if (event.type == "smyPageFound") {
+            runLog.event(RunLogSource.Page, "page.smyFound", mapOf("success" to event.success), if (event.success) RunLogLevel.Info else RunLogLevel.Warn)
             if (event.success) {
                 val activity = state.value.activity as? PageActivity.Automation
                 if (activity != null) {
@@ -986,10 +1196,16 @@ class PageController(
         courseProgressMutex.withLock {
         if (event.type == "courseAction") {
             live.log(LiveSource.Chrome) { "Course action ${event.request}: ${if (event.success) "accepted" else "refused"}" }
+            runLog.event(RunLogSource.Extension, "extension.ack", mapOf("routine" to "courseAutomation", "request" to event.request, "success" to event.success,
+                "progressAction" to (courseProgress?.action?.request == event.request)), if (event.success) RunLogLevel.Info else RunLogLevel.Warn)
             if (courseProgress?.acknowledge(event.request, event.success, now()) != true) runner.acknowledge(event.request, event.success, now())
         } else courseChunks.accept(event)?.let { snapshot ->
             lastCourseSnapshot = snapshot
             lastCourseInventoryAt = now()
+            if (snapshot.top) videoSampler.observe(now(), snapshot.elements.filter { it.tag == "video" && !it.decorative }.map { video ->
+                VideoSample(video.id, paused = video.paused, ended = video.ended, currentTime = video.mediaPosition, duration = video.duration,
+                    readyState = video.readyState, networkState = video.networkState, errorCode = video.errorCode, muted = video.muted, buffering = video.buffering)
+            }, runLog, "course")
             // Normal SMY pages show the signed-in account, while assessment pages do not.
             // Capture it before the profile dialog is prepared so the user can confirm the
             // actual Chrome account instead of creating it by hand.
@@ -1010,6 +1226,12 @@ class PageController(
             if (summary != lastCourseSnapshotSummary) {
                 lastCourseSnapshotSummary = summary
                 live.log(LiveSource.Chrome) { summary }
+                runLog.event(RunLogSource.Page, "page.snapshot", mapOf("top" to snapshot.top, "ready" to snapshot.ready, "truncated" to snapshot.truncated,
+                    "elements" to snapshot.elements.size, "visibleElements" to snapshot.elements.count { it.visible },
+                    "videos" to snapshot.elements.count { it.tag == "video" && !it.decorative }, "pathHash" to summary.substringBefore(" top=").hashCode().toString(16),
+                    "assessment" to (snapshot.assessment != null), "practice" to snapshot.assessment?.practice, "questions" to snapshot.assessment?.questions?.size,
+                    "totalQuestions" to snapshot.assessment?.totalQuestions, "resultKind" to snapshot.assessment?.result?.let { if (it.contains("pass", true)) "passed" else if (it.contains("fail", true)) "failed" else "other" },
+                    "profileFound" to (snapshot.profileName != null), "progressTable" to (snapshot.progress != null)), RunLogLevel.Debug)
             }
             if (snapshot.top) mutableState.update { state ->
                 val current = state.activity as? PageActivity.Automation ?: return@update state
@@ -1046,6 +1268,8 @@ class PageController(
                                         CourseAnswer(question.text, question.options.map { it.text }, correct.text), previous)))
                                 } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                                 catch (_: Exception) { AnswerBankSaveResult.Unavailable }
+                                runLog.event(RunLogSource.Answers, "answers.learned", mapOf("questionKey" to runLogQuestionKey(question.text, question.options.map { it.text }),
+                                    "kind" to if (existing == null) "new" else "corrected", "result" to result::class.simpleName, "moduleIndex" to moduleIndex(module)))
                                 if (result is AnswerBankSaveResult.Saved) {
                                     runner.configureAnswers(result.bank)
                                     quizLearningProblem = null
@@ -1075,11 +1299,35 @@ class PageController(
                     runner.certificateDownload?.let(certificateStore::prepareDownload)
                 }
                 val target = snapshot.elements.firstOrNull { it.id == runner.action?.element }
+                runner.action?.let { action ->
+                    val actionKey = "${action.request}:${action.kind}"
+                    if (actionKey != lastActionKey) {
+                        lastActionKey = actionKey
+                        runLog.event(RunLogSource.Routine, "routine.action", mapOf("kind" to action.kind, "request" to action.request, "elementId" to action.element,
+                            "targetFound" to (target != null), "tag" to target?.tag, "label" to (action.expectedLabel ?: target?.label), "targetEnabled" to target?.enabled,
+                            "targetVisible" to target?.visible, "moduleIndex" to moduleIndex(runner.currentModule)))
+                    }
+                }
                 live.log(LiveSource.Chrome) {
                     "Course target ${target?.id}: ${target?.tag} '${target?.label}' · ${target?.context?.take(180)}"
                 }
             }
         }
+        val decision = listOf(runner.approval?.kind?.name, runner.attention?.hashCode(), runner.manualAnswer?.token?.hashCode(), runner.failure?.token?.hashCode(),
+            courseProgress?.request != null, courseProgress?.isChecking).joinToString("|")
+        if (decision != lastDecisionKey) {
+            lastDecisionKey = decision
+            runLog.event(RunLogSource.Routine, "routine.decision", mapOf(
+                "approvalKind" to runner.approval?.kind?.name, "attention" to (runner.attention != null),
+                "manualAnswerQuestionKey" to runner.manualAnswer?.let { runLogQuestionKey(it.question, it.options) },
+                "failure" to (runner.failure != null), "canRetry" to runner.failure?.canRetry, "failedQuestions" to runner.failure?.questions?.size,
+                "profileChoiceNeeded" to (courseProgress?.request != null), "checkingProgress" to courseProgress?.isChecking,
+                "moduleIndex" to moduleIndex(runner.currentModule)),
+                if (runner.attention != null || runner.failure != null) RunLogLevel.Warn else RunLogLevel.Info)
+        }
+        logReason(courseProgress?.takeIf { it.action != null || it.request != null || it.isChecking }?.detail ?: runner.detail,
+            listOf(runner.currentModule, courseProgress?.summary?.displayName, lastCourseSnapshot?.profileName, (state.value.activity as? PageActivity.Automation)?.routine?.answerBankFile),
+            mapOf("moduleIndex" to moduleIndex(runner.currentModule), "clicks" to runner.clicks))
         val activity = state.value.activity as? PageActivity.Automation ?: return true
         val key = runner.attention ?: runner.failure?.token
         val detail = (courseProgress?.takeIf { it.action != null || it.request != null || it.isChecking }?.detail ?: runner.detail) +
@@ -1154,7 +1402,9 @@ class PageController(
             questionAlertKey = question
             questionAlertAt = now()
         }
-        runCatching { assessmentAlerts.play(kind) }.onFailure {
+        val played = runCatching { assessmentAlerts.play(kind) }
+        runLog.event(RunLogSource.App, "app.alert", mapOf("kind" to kind.name, "played" to played.isSuccess), if (played.isSuccess) RunLogLevel.Info else RunLogLevel.Warn)
+        played.onFailure {
             failedAudioAttention = key
             mutableState.update { state ->
                 val activity = state.activity as? PageActivity.Automation ?: return@update state
@@ -1170,6 +1420,9 @@ class PageController(
         const val MAX_SIGNATURE_LENGTH = 128
         const val MAX_LOGGED_MESSAGE = 300
         const val NOT_CONNECTED = "Open Chrome with the extension added first. The steps are in Settings."
+        const val NOT_STARTED = "NotStarted"
+        const val TICK_MILLIS = 1_000L
+        const val STALL_MILLIS = 5 * 60_000L
         val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     }
 }

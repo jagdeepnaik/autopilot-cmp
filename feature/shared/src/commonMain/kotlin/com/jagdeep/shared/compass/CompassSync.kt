@@ -5,7 +5,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Opt-in Q&A sync with Compass: the routine Q&A banks only. Course automation owns the engine;
+ * Opt-in Q&A sync with Compass: the routine Q&A banks, plus sanitised routine run logs for
+ * diagnosing stuck routines. Course automation owns the engine;
  * Settings shows its state and signs in and out. Holds no credentials: tokens never leave the engine.
  */
 interface CompassSync {
@@ -39,6 +40,8 @@ data class CompassSyncState(
     val lastDownloaded: Int = 0,
     val lastSent: Int = 0,
     val pendingUploads: Int = 0,
+    /** Finished routine run logs on this computer that Compass hasn't received yet. */
+    val runLogsWaiting: Int = 0,
     /** Compass ended the session (expired or signed out elsewhere); the user needs to sign in again. */
     val signInExpired: Boolean = false,
 )

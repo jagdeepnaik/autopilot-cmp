@@ -132,6 +132,8 @@ fun App(
                         routineFiles = routineFiles,
                         answerBanks = services.answerBanks,
                         compassSync = services.compassSync,
+                        runLogFiles = services.runLogFiles,
+                        updateCheck = services.updateCheck,
                         displayWakeProblem = services.displayWakeProblem,
                         accessGate = services.automation.access,
                         appVersion = appVersionName,

@@ -111,4 +111,34 @@ class KtorCompassApiTest {
         assertFalse(KtorCompassApi.isAllowedBaseUrl("ftp://compass.naikio.in"))
         assertFailsWith<IllegalArgumentException> { KtorCompassApi("http://example.com", "v", MockEngine { respond("") }) }
     }
+
+    @Test fun given_a_run_log_when_uploaded_then_it_posts_gzipped_json_with_the_bearer_token() = runBlocking {
+        val body = """{"runId":"r1","header":{"type":"run.start","runId":"r1"},"events":[],"end":null,"truncated":false}"""
+        val status = api { json("""{"runId":"r1","status":"stored"}""") }.uploadRun("test-access", body)
+        assertEquals("stored", status)
+        val request = requests.single()
+        assertEquals(HttpMethod.Post, request.method)
+        assertEquals("https://compass.test/api/diagnostics/runs", request.url.toString())
+        assertEquals("Bearer test-access", request.headers[HttpHeaders.Authorization])
+        assertEquals("1.1.0+build.7.gabc1234", request.headers[KtorCompassApi.APP_VERSION_HEADER])
+        val content = request.body as io.ktor.http.content.OutgoingContent.ByteArrayContent
+        assertEquals("gzip", request.headers[HttpHeaders.ContentEncoding] ?: content.headers[HttpHeaders.ContentEncoding])
+        val inflated = java.util.zip.GZIPInputStream(content.bytes().inputStream()).readBytes().decodeToString()
+        assertEquals(body, inflated)
+    }
+
+    @Test fun given_a_too_large_or_malformed_run_when_uploaded_then_it_is_rejected() = runBlocking {
+        val tooLarge = assertFailsWith<CompassApiException.Rejected> { api { json("""{"error":"Too large"}""", HttpStatusCode.PayloadTooLarge) }.uploadRun("a", "{}") }
+        assertEquals(413, tooLarge.status)
+        val malformed = assertFailsWith<CompassApiException.Rejected> { api { json("""{"error":"Bad"}""", HttpStatusCode.BadRequest) }.uploadRun("a", "{}") }
+        assertEquals(400, malformed.status)
+    }
+
+    @Test fun given_the_update_check_when_called_then_it_asks_without_a_token_and_404_means_nothing_published() = runBlocking {
+        val latest = api { json("""{"platform":"macos","version":"1.1.1","build":171,"commit":"abc1234","releasedAt":"2026-11-28T12:00:00.000Z","downloadUrl":"https://compass.test/downloads"}""") }.latestBuild("macos")
+        assertEquals(com.jagdeep.shared.update.LatestBuild("1.1.1", 171, "https://compass.test/downloads"), latest)
+        assertEquals("https://compass.test/api/app/macos", requests.last().url.toString())
+        assertEquals(null, requests.last().headers[HttpHeaders.Authorization])
+        assertEquals(null, api { json("""{"error":"Not found"}""", HttpStatusCode.NotFound) }.latestBuild("linux"))
+    }
 }

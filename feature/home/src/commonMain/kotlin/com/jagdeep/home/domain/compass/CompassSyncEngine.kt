@@ -40,6 +40,8 @@ class CompassSyncEngine(
     private val sleep: suspend (Long) -> Unit = { delay(it) },
     private val debounceMillis: Long = 10_000,
     private val retryLaterMillis: List<Long> = listOf(60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000),
+    /** Finished routine run logs to upload (diagnostics contract); none on platforms without them. */
+    private val runLogs: RunLogOutbox = NoRunLogOutbox,
 ) : CompassSync {
     private val mutableState = MutableStateFlow(CompassSyncState(available = true))
     override val state: StateFlow<CompassSyncState> = mutableState.asStateFlow()
@@ -53,6 +55,10 @@ class CompassSyncEngine(
     private var retryLater: Job? = null
     private var failures = 0
     private var started = false
+    private val runLogRequests = Channel<Unit>(Channel.CONFLATED)
+    private var runLogUpload: Job? = null
+    private var runLogRetry: Job? = null
+    private var runLogFailures = 0
 
     /** Restores a saved session and syncs once; call once at app start. */
     fun start() {
@@ -66,13 +72,23 @@ class CompassSyncEngine(
             }
         }
         scope.launch {
+            for (request in runLogRequests) {
+                val job = scope.launch { uploadRunLogsOnce() }
+                runLogUpload = job
+                job.join()
+            }
+        }
+        scope.launch {
             val saved = runCatching { credentials.data.first() }.getOrNull()
             refreshPendingCount()
+            refreshRunLogCount()
             // A sign-in that finished first has already asked for its own sync.
             if (saved != null && state.value.account == null) {
                 mutableState.update { it.copy(account = CompassAccount(saved.userName)) }
                 syncNow()
             }
+            // Runs that ended while the app was closed, or while signed out.
+            if (saved != null) uploadRunLogs()
         }
     }
 
@@ -103,6 +119,7 @@ class CompassSyncEngine(
         mutableState.update { it.copy(account = CompassAccount(session.user.name), signInExpired = false, lastOutcome = null) }
         log("Signed in to Compass")
         syncNow()
+        uploadRunLogs()
         return CompassSignInResult.SignedIn
     }
 
@@ -110,6 +127,8 @@ class CompassSyncEngine(
         retryLater?.cancel()
         debounce?.cancel()
         currentSync?.cancel()
+        runLogRetry?.cancel()
+        runLogUpload?.cancel()
         val saved = tokenMutex.withLock {
             val value = runCatching { credentials.data.first() }.getOrNull()
             accessToken = null
@@ -124,6 +143,54 @@ class CompassSyncEngine(
     }
 
     override fun syncNow() { requests.trySend(Unit) }
+
+    /**
+     * Uploads finished run logs (after each run ends, and at start-up). Does nothing on the network
+     * while signed out; the waiting count still updates. Never touches a running routine.
+     */
+    fun uploadRunLogs() { runLogRequests.trySend(Unit) }
+
+    private suspend fun uploadRunLogsOnce() {
+        if (runCatching { credentials.data.first() }.getOrNull() == null) { refreshRunLogCount(); return }
+        runLogRetry?.cancel()
+        var retry = false
+        try {
+            var rounds = 0
+            uploads@ while (rounds++ < MAX_PAGES) {
+                val ids = runLogs.unsent(RUN_LOG_BATCH)
+                if (ids.isEmpty()) break
+                for (id in ids) {
+                    val lines = runLogs.lines(id)
+                    val body = lines?.let { RunLogUploadBody.build(id, it) }
+                    if (body == null) { runLogs.mark(id, RunLogMark.Unreadable); continue }
+                    val status = try { authed { token -> api.uploadRun(token, body) } }
+                    // Compass refused this run (malformed or too large): keep it here, but don't resend it forever.
+                    catch (_: CompassApiException.Rejected) { runLogs.mark(id, RunLogMark.Rejected); continue }
+                    if (status !in RunLogUploadBody.SENT) { retry = true; break@uploads }
+                    runLogs.mark(id, RunLogMark.Sent)
+                    refreshRunLogCount()
+                }
+                if (ids.size < RUN_LOG_BATCH) break
+            }
+            if (!retry) runLogFailures = 0
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: SignInNeeded) { }
+        catch (_: CompassApiException.NotFound) { }
+        catch (_: CompassApiException) { retry = true }
+        catch (_: StorageProblem) { retry = true }
+        catch (_: Exception) { retry = true }
+        refreshRunLogCount()
+        if (retry && state.value.account != null) {
+            val wait = retryLaterMillis[runLogFailures.coerceAtMost(retryLaterMillis.lastIndex)]
+            runLogFailures++
+            runLogRetry = scope.launch { delay(wait); uploadRunLogs() }
+        }
+    }
+
+    private suspend fun refreshRunLogCount() {
+        val count = runCatching { runLogs.waitingCount() }.getOrNull() ?: return
+        mutableState.update { it.copy(runLogsWaiting = count) }
+    }
 
     override fun answersChanged() {
         debounce?.cancel()
@@ -298,6 +365,7 @@ class CompassSyncEngine(
     private companion object {
         const val PAGE_SIZE = 500
         const val BATCH_SIZE = 100
+        const val RUN_LOG_BATCH = 20
         const val MAX_PAGES = 1_000
         const val ATTEMPTS = 3
         const val REFRESH_ATTEMPTS = 2

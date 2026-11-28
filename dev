@@ -11,6 +11,10 @@
 #   ./dev sync-certificates all
 #   ./dev merge-answer-bank all
 #
+# Release and publish:
+#   ./dev version patch          (then runs ./dev publish)
+#   ./dev publish --dry-run
+#
 # Git:
 #   ./dev git status
 #   ./dev git push-all "Describe the change"
@@ -92,10 +96,15 @@ GIT
   ./dev git branches           Show branches and tracking state.
   ./dev git push-all [message] Commit all non-ignored changes and push main.
 
-VERSION RELEASE
-  ./dev version patch          Increment the bug-fix version.
-  ./dev version minor          Increment the feature version.
-  ./dev version major          Increment the breaking-change version.
+VERSION RELEASE AND PUBLISH
+  ./dev version patch          Increment the bug-fix version, tag, push, then publish.
+  ./dev version minor          Increment the feature version, tag, push, then publish.
+  ./dev version major          Increment the breaking-change version, tag, push, then publish.
+  ./dev version patch --no-publish   Release without publishing.
+  ./dev publish                Build the DMG and APK here, the MSI on Legion and the DEB on
+                               mac-vm-linux from the pushed commit, then publish to Compass.
+  ./dev publish --dry-run      Print the plan and the manifest; build and change nothing remote.
+  ./dev publish --skip windows Leave a platform out (macos, android, windows, linux; repeatable).
 
 COMMON EXAMPLES
   ./dev sync all
@@ -1122,14 +1131,17 @@ esac
 version_main() {
     set -euo pipefail
 
-    local kind="${1:-}" catalog current major minor patch next tag temp
+    local kind="${1:-}" catalog current major minor patch next tag temp publish=1 arg
+    for arg in "${@:2}"; do
+        case "$arg" in --no-publish) publish=0 ;; *) echo "Unknown option: $arg (use --no-publish to skip publishing)." >&2; exit 2 ;; esac
+    done
 
     version_usage() {
         cat <<'EOF'
 Release version command
 
 Usage:
-  ./dev version <patch|minor|major>
+  ./dev version <patch|minor|major> [--no-publish]
 
 Examples:
   ./dev version patch    # 1.1.0 -> 1.1.1
@@ -1139,6 +1151,8 @@ Examples:
 This command requires a clean, up-to-date main branch. It updates versionName,
 creates one release commit, creates an annotated v<version> tag, and pushes both.
 The Git-generated build number continues increasing and is never reset.
+It then runs ./dev publish, which builds every installer from the release commit
+and publishes it to Compass downloads; --no-publish stops after the push.
 EOF
     }
 
@@ -1147,7 +1161,7 @@ EOF
         -h|--help|help|'') version_usage; [ -n "$kind" ] && exit 0 || exit 2 ;;
         *) echo "Unknown version type: $kind" >&2; version_usage >&2; exit 2 ;;
     esac
-    [ "$#" -eq 1 ] || { echo "Use exactly: ./dev version <patch|minor|major>." >&2; exit 2; }
+    [ "$#" -ge 1 ] || { echo "Use exactly: ./dev version <patch|minor|major> [--no-publish]." >&2; exit 2; }
 
     cd "$ROOT"
     [ "$(git branch --show-current)" = main ] || { echo "Stopped: releases only run on main." >&2; exit 1; }
@@ -1186,12 +1200,271 @@ EOF
     mv "$temp" "$catalog"
     trap - RETURN
 
+    # The Unreleased notes become this release's section (kept for the Compass release notes).
+    if [ -f "$ROOT/CHANGELOG.md" ] && grep -q '^## \[Unreleased\]' "$ROOT/CHANGELOG.md"; then
+        awk -v version="$next" -v day="$(date -u +%Y-%m-%d)" '
+            /^## \[Unreleased\]/ && !done { print; print ""; print "## [" version "] - " day; done = 1; next }
+            { print }
+        ' "$ROOT/CHANGELOG.md" >"$ROOT/CHANGELOG.md.tmp" && mv "$ROOT/CHANGELOG.md.tmp" "$ROOT/CHANGELOG.md"
+        git add "$ROOT/CHANGELOG.md"
+    fi
+
     git add "$catalog"
     git commit -m "Release $next"
     git tag -a "$tag" -m "Release $next"
     git push origin main
     git push origin "$tag"
     echo "Released $next. The next desktop build keeps its increasing Git build number."
+    if [ "$publish" -eq 1 ]; then
+        echo
+        echo "Publishing $next to Compass downloads (./dev publish). If it stops, run ./dev publish again to retry."
+        "$ROOT/dev" publish
+    else
+        echo "Not published (--no-publish). Run ./dev publish when the installers should go to Compass."
+    fi
+}
+
+publish_main() {
+# Build every installer from the pushed release commit and publish it to Compass downloads.
+#
+#   ./dev publish [--dry-run] [--skip <platform>]... [--no-tests] [--remote]
+#
+#   platform  macos (DMG, this Mac), android (APK, this Mac), windows (MSI, Legion),
+#             linux (DEB, the Mac's Linux VM mac-vm-linux; never the home server)
+#
+# The home server only serves the files: /srv/sites/compass/downloads/autopilot/<version>/ plus
+# manifest.json, replaced atomically. The three newest version folders are kept. It ends by asking
+# Compass's public update check for each published platform and printing "Published <version> (<build>)".
+set -euo pipefail
+
+local dry_run=0 tests=1 remote=0 skip=() arg expect_skip=0
+for arg in "$@"; do
+    if [ "$expect_skip" -eq 1 ]; then
+        case "$arg" in macos|android|windows|linux) skip+=("$arg") ;; *) echo "Unknown platform for --skip: $arg (macos, android, windows or linux)." >&2; exit 2 ;; esac
+        expect_skip=0; continue
+    fi
+    case "$arg" in
+        --dry-run) dry_run=1 ;;
+        --skip) expect_skip=1 ;;
+        --no-tests) tests=0 ;;
+        --remote) remote=1 ;;
+        -h|--help|help) awk '/^publish_main\(\) \{/ { on = 1; next } on && /^#/ { sub(/^# ?/, ""); print; next } on { exit }' "$ROOT/dev"; return 0 ;;
+        *) echo "Unknown option: $arg (see ./dev publish --help)." >&2; exit 2 ;;
+    esac
+done
+[ "$expect_skip" -eq 0 ] || { echo "--skip needs a platform: macos, android, windows or linux." >&2; exit 2; }
+
+local server="${PUBLISH_SERVER_HOST:-home-server}" downloads_dir='/srv/sites/compass/downloads/autopilot'
+[ "$remote" -eq 1 ] && server="${PUBLISH_SERVER_HOST:-home-server-remote}"
+local legion_host=home-legion; [ "$remote" -eq 1 ] && legion_host=home-legion-remote
+local legion_msi_dir='C:/Users/jagdeep/Projects/AutoPilot/desktopApp/build/compose/binaries/main-release/msi'
+local linux_host="${MAC_LINUX_HOST:-mac-vm-debian}" linux_dir="${MAC_LINUX_DIR:-/home/jagdeep/Projects/AutoPilot}"
+local compass_url
+compass_url="$(sed -n 's/^compassUrl = "\(.*\)"/\1/p' "$ROOT/gradle/libs.versions.toml")"
+
+pstep() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
+pwarn() { printf '\033[33m%s\033[0m\n' "$*" >&2; }
+pfail() { printf '\n\033[31mStopped: %s\033[0m\n' "$*" >&2; exit 1; }
+skipped() { local p; for p in "${skip[@]+"${skip[@]}"}"; do [ "$p" = "$1" ] && return 0; done; return 1; }
+
+cd "$ROOT"
+pstep "Check the release commit"
+if [ "$(git rev-parse --abbrev-ref HEAD)" != main ]; then
+    [ "$dry_run" -eq 1 ] && pwarn "Not on main (dry run continues)." || pfail "publish builds only main. Switch to main first."
+fi
+if [ -n "$(git status --porcelain)" ]; then
+    git status --short | head -20
+    [ "$dry_run" -eq 1 ] && pwarn "Uncommitted changes (dry run continues; a real publish stops here)." \
+        || pfail "the working tree has uncommitted changes. Commit and push them (./dev version runs publish after its release commit)."
+fi
+if [ "$dry_run" -eq 0 ]; then
+    git fetch -q origin main
+    [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || pfail "main isn't the same as GitHub. Push (or pull) first: remote machines build only the pushed commit."
+elif git rev-parse -q --verify origin/main >/dev/null && [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+    pwarn "HEAD isn't the same as origin/main (dry run continues)."
+fi
+
+local version build commit major minor package released_at
+version="$(awk -F'"' '/^versionName = / { print $2 }' gradle/libs.versions.toml)"
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || pfail "versionName must be MAJOR.MINOR.PATCH, got '$version'."
+IFS=. read -r major minor _ <<<"$version"
+build="$(git rev-list --count HEAD)"
+commit="$(git rev-parse --short=7 HEAD)"
+package="$major.$minor.$build"
+released_at="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+echo "Release $version, build $build, commit $commit (installer version $package)"
+
+local stage="${PUBLISH_STAGE_DIR:-$HOME/Downloads/AutoPilot/Publish}/$version"
+local files_tsv="$stage/.files.tsv" failed=()
+mkdir -p "$stage"
+: >"$files_tsv"
+
+# Records one installer: platform, kind, file name, bytes, sha256, minimum system.
+add_file() {
+    local platform="$1" kind="$2" path="$3" minimum="$4" name bytes sha
+    name="$(basename "$path")"
+    bytes="$(stat -f%z "$path")"
+    sha="$(shasum -a 256 "$path" | awk '{print $1}')"
+    if ! [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || [ "$bytes" -le 0 ]; then pwarn "$name has no valid size or SHA-256; left out."; failed+=("$platform"); return 0; fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$platform" "$kind" "$name" "$bytes" "$sha" "$minimum" >>"$files_tsv"
+    echo "$platform: $name ($bytes bytes, SHA-256 $sha)"
+}
+
+plan() { echo "  $1"; }
+if [ "$dry_run" -eq 1 ]; then
+    pstep "Plan (dry run: nothing is built, copied or changed)"
+    if skipped macos; then plan "macos: skipped"; else plan "macos: ./gradlew :desktopApp:packageReleaseDmg on this Mac -> AutoPilot-$package.dmg"; fi
+    if skipped android; then plan "android: skipped"
+    elif [ -f "$ROOT/keystore.properties" ]; then plan "android: ./gradlew :androidApp:assembleRelease (signed) on this Mac -> AutoPilot-$version-$build.apk"
+    else plan "android: no keystore.properties, so the release APK would be unsigned; publishes the debug-signed APK instead -> AutoPilot-$version-$build-debug.apk"; fi
+    if skipped windows; then plan "windows: skipped"; else plan "windows: ./dev build legion$( [ "$tests" -eq 1 ] || echo ' --no-tests') on Legion ($legion_host), then copy and verify AutoPilot-$package.msi"; fi
+    if skipped linux; then plan "linux: skipped"; else plan "linux: ./dev build mac-vm-linux$( [ "$tests" -eq 1 ] || echo ' --no-tests') on the Mac's Linux VM ($linux_host), then copy and verify autopilot_${package}_amd64.deb"; fi
+    plan "upload: rsync to $server:$downloads_dir/$version.uploading/, rename it to $version/, then write manifest.json.tmp and mv it over manifest.json"
+    plan "prune: keep the three newest version folders in $server:$downloads_dir"
+    plan "check: GET $compass_url/api/app/<platform> for each published platform, then print \"Published $version ($build)\""
+    # The manifest uses installers already built on this Mac, if any (their sizes and hashes are real).
+    local dmg apk
+    dmg="$ROOT/desktopApp/build/compose/binaries/main-release/dmg/AutoPilot-$package.dmg"
+    if [ -f "$dmg" ] && ! skipped macos; then add_file macos dmg "$dmg" "macOS 13, Apple silicon"; fi
+    for apk in "$ROOT/androidApp/build/outputs/apk/release/androidApp-release.apk" "$ROOT/androidApp/build/outputs/apk/debug/androidApp-debug.apk"; do
+        if [ -f "$apk" ] && ! skipped android; then
+            local named="$stage/AutoPilot-$version-$build$( [[ "$apk" == *debug* ]] && echo -debug).apk"
+            cp "$apk" "$named"; add_file android apk "$named" "Android 8.0"; break
+        fi
+    done
+else
+    if ! skipped macos; then
+        pstep "macOS: build the DMG on this Mac"
+        local dmg_tasks=(:desktopApp:packageReleaseDmg)
+        [ "$tests" -eq 1 ] && dmg_tasks=(:feature:home:jvmTest --tests '*DgsStudy*' :shared:jvmTest --tests '*DesktopDataPathsTest*' "${dmg_tasks[@]}")
+        local dmg="$ROOT/desktopApp/build/compose/binaries/main-release/dmg/AutoPilot-$package.dmg"
+        if ./gradlew --console=plain "${dmg_tasks[@]}" && [ -f "$dmg" ]; then
+            cp "$dmg" "$stage/AutoPilot-$package.dmg"; add_file macos dmg "$stage/AutoPilot-$package.dmg" "macOS 13, Apple silicon"
+        else pwarn "macOS: the DMG build failed; left out."; failed+=(macos); fi
+    fi
+    if ! skipped android; then
+        if [ -f "$ROOT/keystore.properties" ]; then
+            pstep "Android: build the signed release APK on this Mac"
+            if ./gradlew --console=plain :androidApp:assembleRelease && [ -f androidApp/build/outputs/apk/release/androidApp-release.apk ]; then
+                cp androidApp/build/outputs/apk/release/androidApp-release.apk "$stage/AutoPilot-$version-$build.apk"
+                add_file android apk "$stage/AutoPilot-$version-$build.apk" "Android 8.0"
+            else pwarn "Android: the release APK build failed; left out."; failed+=(android); fi
+        else
+            pstep "Android: no keystore.properties, so publishing the debug-signed APK (labelled -debug)"
+            pwarn "The release APK would be unsigned and can't be installed. Add keystore.properties to publish a release-signed APK."
+            if ./gradlew --console=plain :androidApp:assembleDebug && [ -f androidApp/build/outputs/apk/debug/androidApp-debug.apk ]; then
+                cp androidApp/build/outputs/apk/debug/androidApp-debug.apk "$stage/AutoPilot-$version-$build-debug.apk"
+                add_file android apk "$stage/AutoPilot-$version-$build-debug.apk" "Android 8.0"
+            else pwarn "Android: the debug APK build failed; left out."; failed+=(android); fi
+        fi
+    fi
+    local passthrough=()
+    [ "$tests" -eq 1 ] || passthrough+=(--no-tests)
+    [ "$remote" -eq 1 ] && passthrough+=(--remote)
+    if ! skipped windows; then
+        pstep "Windows: build the MSI on Legion, then copy and verify it"
+        local msi="AutoPilot-$package.msi" remote_hash=''
+        if "$ROOT/dev" build legion "${passthrough[@]+"${passthrough[@]}"}" \
+            && scp -q "$legion_host:$legion_msi_dir/$msi" "$stage/$msi" \
+            && remote_hash=$(ssh "$legion_host" "powershell -NoProfile -Command \"(Get-FileHash -Algorithm SHA256 -LiteralPath '$legion_msi_dir/$msi').Hash\"" | tr -d '\r' | tr 'A-F' 'a-f') \
+            && [ "$remote_hash" = "$(shasum -a 256 "$stage/$msi" | awk '{print $1}')" ]; then
+            add_file windows msi "$stage/$msi" "Windows 10 64-bit"
+        else rm -f "${stage:?}/${msi:?}"; pwarn "Windows: the Legion build or copy failed (or the hash didn't match); left out."; failed+=(windows); fi
+    fi
+    if ! skipped linux; then
+        pstep "Linux: build the DEB on the Mac's Linux VM ($linux_host), then copy and verify it"
+        local deb="autopilot_${package}_amd64.deb" remote_deb='' remote_hash=''
+        if "$ROOT/dev" build mac-vm-linux "${passthrough[@]+"${passthrough[@]}"}" \
+            && remote_deb=$(ssh "$linux_host" "ls '$linux_dir'/desktopApp/build/compose/binaries/main-release/deb/*$package*.deb | head -1") \
+            && [ -n "$remote_deb" ] && scp -q "$linux_host:$remote_deb" "$stage/$deb" \
+            && remote_hash=$(ssh "$linux_host" "sha256sum '$remote_deb'" | awk '{print $1}') \
+            && [ "$remote_hash" = "$(shasum -a 256 "$stage/$deb" | awk '{print $1}')" ]; then
+            add_file linux deb "$stage/$deb" "Debian 12 / Ubuntu 22.04, x86-64"
+        else rm -f "${stage:?}/${deb:?}"; pwarn "Linux: the VM build or copy failed (or the hash didn't match); left out."; failed+=(linux); fi
+    fi
+fi
+
+# Release notes: the CHANGELOG's "## [x.y.z]" section, else commit subjects since the previous tag.
+local notes_file="$stage/.notes.txt" previous_tag
+if [ -f "$ROOT/CHANGELOG.md" ] && grep -q "^## \[$version\]" "$ROOT/CHANGELOG.md"; then
+    awk -v v="## [$version]" 'index($0, v) == 1 { on = 1; next } on && /^## / { exit } on && /^[-*] / { sub(/^[-*] +/, ""); print }' "$ROOT/CHANGELOG.md" | head -20 >"$notes_file"
+else
+    previous_tag="$(git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)"
+    { git log --no-merges --format=%s ${previous_tag:+"$previous_tag"..}HEAD | grep -v '^Release [0-9]' | head -20; } >"$notes_file" || true
+fi
+
+pstep "Read the published manifest"
+local current="$stage/.current-manifest.json"
+if ssh -o ConnectTimeout=8 -o BatchMode=yes "$server" "cat '$downloads_dir/manifest.json'" >"$current" 2>/dev/null; then
+    echo "Read $server:$downloads_dir/manifest.json"
+else
+    echo "{}" >"$current"; echo "No manifest on $server yet (or it couldn't be reached): this release starts the list."
+fi
+
+local manifest="$stage/manifest.json"
+VERSION="$version" BUILD="$build" COMMIT="$commit" RELEASED_AT="$released_at" FILES="$files_tsv" NOTES="$notes_file" CURRENT="$current" OUT="$manifest" python3 - <<'PY'
+import json, os, re
+files = []
+for line in open(os.environ["FILES"], encoding="utf-8"):
+    platform, kind, name, size, sha, minimum = line.rstrip("\n").split("\t")
+    # Compass refuses a manifest without the full 64-character hex digest and the real size.
+    assert re.fullmatch(r"[0-9a-f]{64}", sha) and int(size) > 0, name
+    files.append({"platform": platform, "kind": kind, "fileName": name, "bytes": int(size), "sha256": sha, "minimumOs": minimum})
+notes = [n.strip()[:200] for n in open(os.environ["NOTES"], encoding="utf-8") if n.strip()][:20]
+release = {"version": os.environ["VERSION"], "build": int(os.environ["BUILD"]), "commit": os.environ["COMMIT"],
+           "releasedAt": os.environ["RELEASED_AT"], "notes": notes, "files": files}
+try:
+    current = json.load(open(os.environ["CURRENT"], encoding="utf-8"))
+except Exception:
+    current = {}
+older = ([current["latest"]] if isinstance(current.get("latest"), dict) else []) + [r for r in current.get("previous", []) if isinstance(r, dict)]
+previous = [r for r in older if r.get("version") != release["version"]][:2]
+json.dump({"latest": release, "previous": previous}, open(os.environ["OUT"], "w", encoding="utf-8"), indent=2)
+PY
+
+if [ "$dry_run" -eq 1 ]; then
+    pstep "Manifest it would write (installers not built on this Mac yet are missing from files)"
+    cat "$manifest"; echo
+    echo "Dry run: nothing was built remotely, uploaded or changed on $server."
+    return 0
+fi
+
+[ -s "$files_tsv" ] || pfail "no installer was built, so nothing was published${failed[*]+ (failed: ${failed[*]})}."
+
+pstep "Upload $version to $server"
+local names=() name
+while IFS=$'\t' read -r _ _ name _ _ _; do names+=("$stage/$name"); done <"$files_tsv"
+ssh "$server" "mkdir -p '$downloads_dir/${version:?}.uploading'" || pfail "couldn't create the upload folder on $server."
+rsync -a --checksum "${names[@]}" "$server:$downloads_dir/$version.uploading/" || pfail "the upload to $server failed; the published manifest is unchanged."
+# The new folder replaces any older copy of this version, then the manifest is swapped in one rename.
+ssh "$server" "set -e; cd '$downloads_dir'
+rm -rf './${version:?}.previous'; if [ -d './$version' ]; then mv './$version' './$version.previous'; fi
+mv './$version.uploading' './$version'; rm -rf './${version:?}.previous'
+cat > manifest.json.tmp" <"$manifest" || pfail "couldn't write the manifest on $server."
+ssh "$server" "set -e; cd '$downloads_dir'; mv manifest.json.tmp manifest.json
+ls -1d */ 2>/dev/null | tr -d / | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\$' | sort -V | head -n -3 | while read -r old; do rm -rf -- \"./\$old\"; echo \"Removed old release \$old\"; done" \
+    || pfail "couldn't replace the manifest on $server."
+local sha
+ssh "$server" "cd '$downloads_dir/$version' && sha256sum -- *" | while read -r sha name; do
+    awk -F'\t' -v n="$name" -v h="$sha" '$3 == n && $5 == h { found = 1 } END { exit !found }' "$files_tsv" \
+        || pwarn "$name on $server doesn't match its manifest SHA-256."
+done
+
+pstep "Check what Compass answers"
+local platform answer listed mismatch=0
+while IFS=$'\t' read -r platform _ _ _ _ _; do
+    answer="$(curl -fsS --max-time 15 "$compass_url/api/app/$platform" 2>/dev/null || true)"
+    listed="$(printf '%s' "$answer" | python3 -c 'import json, sys
+try:
+    d = json.load(sys.stdin); print("%s (%s)" % (d["version"], d["build"]))
+except Exception:
+    print("")')"
+    if [ "$listed" = "$version ($build)" ]; then echo "$platform: Compass lists $listed"
+    else pwarn "Mismatch: Compass lists ${listed:-nothing} for $platform, expected $version ($build)."; mismatch=1; fi
+done <"$files_tsv"
+[ "${#failed[@]}" -eq 0 ] || pwarn "Left out (failed to build or copy): ${failed[*]}"
+[ "$mismatch" -eq 0 ] || pwarn "Compass doesn't list this release for every platform; check $compass_url/downloads."
+printf '\n\033[32mPublished %s (%s)\033[0m\n' "$version" "$build"
 }
 
 home_server_main() {
@@ -1410,6 +1683,10 @@ case "$command" in
     version)
         shift
         version_main "$@"
+        ;;
+    publish)
+        shift
+        publish_main "$@"
         ;;
     home-server)
         shift

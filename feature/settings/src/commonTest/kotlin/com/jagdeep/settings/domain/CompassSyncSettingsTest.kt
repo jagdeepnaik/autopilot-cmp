@@ -5,6 +5,7 @@ import com.jagdeep.automation.InputAccessGate
 import com.jagdeep.persistence.preferences.InMemoryPreferencesStore
 import com.jagdeep.settings.ui.util.compassPendingText
 import com.jagdeep.settings.ui.util.compassStatusText
+import com.jagdeep.settings.ui.util.runLogsText
 import com.jagdeep.settings.ui.util.timeAgo
 import com.jagdeep.shared.compass.CompassAccount
 import com.jagdeep.shared.compass.CompassSignInResult
@@ -132,5 +133,28 @@ class CompassSyncSettingsTest {
         assertEquals("Every answer you confirmed has been sent.", compassPendingText(0))
         assertEquals("1 hour ago", timeAgo(61 * 60_000L))
         assertEquals("2 days ago", timeAgo(49 * 60 * 60_000L))
+    }
+
+    @Test fun given_run_logs_waiting_when_shown_then_the_line_counts_them_and_signed_out_explains_they_stay_here() {
+        assertEquals("Run logs: 3 waiting to upload.", runLogsText(3, signedIn = true, syncAvailable = true))
+        assertEquals("Run logs: 1 waiting to upload.", runLogsText(1, signedIn = true, syncAvailable = true))
+        assertTrue(runLogsText(0, signedIn = true, syncAvailable = true).startsWith("Run logs: all sent."))
+        assertTrue(runLogsText(5, signedIn = false, syncAvailable = true).contains("only while you're signed in"))
+    }
+
+    @Test fun given_run_logs_on_this_computer_when_open_folder_is_chosen_then_the_folder_opens_and_problems_are_explained() = test {
+        var opened = 0
+        val files = object : com.jagdeep.shared.diagnostics.RunLogFiles {
+            override val isAvailable = true
+            override suspend fun openFolder(): String? { opened++; return if (opened > 1) "Couldn't open the logs folder." else null }
+        }
+        val vm = SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate, runLogFiles = files)
+        assertTrue(vm.state.value.runLogsAvailable)
+        vm.openRunLogsFolder()
+        advanceUntilIdle()
+        assertEquals(1, opened)
+        vm.openRunLogsFolder()
+        assertEquals("Couldn't open the logs folder.", vm.messages.first())
+        assertFalse(SettingsViewModel(InMemoryPreferencesStore(AppPreferences()), gate).state.value.runLogsAvailable)
     }
 }

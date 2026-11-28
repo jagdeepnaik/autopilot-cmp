@@ -16,6 +16,6 @@ class CompassSyncFactoryTest {
     }
 
     @Test fun given_no_routine_q_and_a_files_then_sync_is_not_offered() {
-        assertSame(NoCompassSync, createCompassSync(NoCourseAnswerBankStore, CoroutineScope(Dispatchers.Unconfined)) {})
+        assertSame(NoCompassSync, createCompassSync(NoCourseAnswerBankStore, CoroutineScope(Dispatchers.Unconfined), RunLogServices(com.jagdeep.shared.diagnostics.NoRunLog, com.jagdeep.shared.diagnostics.NoRunLogFiles, com.jagdeep.home.domain.compass.NoRunLogOutbox, kotlinx.coroutines.flow.emptyFlow())) {})
     }
 }

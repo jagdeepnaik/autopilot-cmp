@@ -71,6 +71,29 @@ class CompassSyncEngineTest {
             submitted += submissions
             return submissions.map { CompassSubmissionResult(it.clientId, statusFor(it)) }
         }
+        val uploads = mutableListOf<String>()
+        val uploadFailures = ArrayDeque<CompassApiException>()
+        var uploadStatus: (String) -> String = { "stored" }
+        override suspend fun uploadRun(accessToken: String, body: String): String {
+            uploadFailures.removeFirstOrNull()?.let { throw it }
+            if (accessToken != validAccess) throw CompassApiException.Unauthorized()
+            uploads += body
+            return uploadStatus(body)
+        }
+    }
+
+    private class FakeOutbox : RunLogOutbox {
+        val runs = linkedMapOf<String, List<String>>()
+        val marks = mutableMapOf<String, RunLogMark>()
+        override suspend fun unsent(limit: Int) = runs.keys.filter { it !in marks }.take(limit)
+        override suspend fun lines(runId: String) = runs[runId]
+        override suspend fun mark(runId: String, mark: RunLogMark) { marks[runId] = mark }
+        override suspend fun waitingCount() = runs.keys.count { it !in marks }
+        fun add(id: String) { runs[id] = listOf(
+            """{"type":"run.start","runId":"$id","at":"2026-11-28T10:00:00.000Z","routineKind":"Click","routineName":"R","appVersion":"v","os":"o","settings":{}}""",
+            """{"type":"event","at":"2026-11-28T10:00:01.000Z","seq":1,"level":"info","source":"routine","event":"routine.step","data":{}}""",
+            """{"type":"run.end","at":"2026-11-28T10:00:02.000Z","outcome":"Completed","events":1,"durationMs":2000}""",
+        ) }
     }
 
     private class FakeStore : CompassQaStore {
@@ -102,7 +125,8 @@ class CompassSyncEngineTest {
         val store = FakeStore()
         val credentials = FakeCredentials()
         val logs = mutableListOf<String>()
-        val engine = CompassSyncEngine(api, store, credentials, scope, now = { test.testScheduler.currentTime }, deviceName = "AutoPilot on test", log = { logs += it }, debounceMillis = 1_000)
+        val outbox = FakeOutbox()
+        val engine = CompassSyncEngine(api, store, credentials, scope, now = { test.testScheduler.currentTime }, deviceName = "AutoPilot on test", log = { logs += it }, debounceMillis = 1_000, runLogs = outbox)
     }
 
     private fun syncTest(block: suspend TestScope.(Setup) -> Unit): TestResult = runTest {
@@ -352,5 +376,55 @@ class CompassSyncEngineTest {
         setup.logs.forEach { line -> secrets.forEach { secret -> assertFalse(secret in line, "Log line exposes a secret: $line") } }
         assertFalse("refresh-" in CompassCredentials("refresh-9", "User", "u").toString())
         assertFalse("access-" in CompassSession("access-9", 1, "refresh-9", null, CompassUser("u", "User")).toString())
+    }
+
+    @Test fun given_signed_out_when_a_run_finishes_then_nothing_is_uploaded_but_the_count_updates() = syncTest { setup ->
+        setup.outbox.add("r1")
+        setup.engine.start()
+        setup.engine.uploadRunLogs()
+        advanceUntilIdle()
+        assertTrue(setup.api.uploads.isEmpty())
+        assertEquals(1, setup.engine.state.value.runLogsWaiting)
+    }
+
+    @Test fun given_signed_in_when_runs_finish_then_each_is_uploaded_once_and_marked_sent() = syncTest { setup ->
+        setup.outbox.add("r1")
+        setup.outbox.add("r2")
+        setup.api.uploadStatus = { if (it.contains("\"r2\"")) "duplicate" else "stored" }
+        setup.engine.start()
+        setup.engine.signIn("person@example.com", "test-password")
+        advanceUntilIdle()
+        assertEquals(2, setup.api.uploads.size)
+        assertEquals(mapOf("r1" to RunLogMark.Sent, "r2" to RunLogMark.Sent), setup.outbox.marks)
+        assertEquals(0, setup.engine.state.value.runLogsWaiting)
+        setup.engine.uploadRunLogs()
+        advanceUntilIdle()
+        assertEquals(2, setup.api.uploads.size)
+    }
+
+    @Test fun given_compass_refuses_one_run_when_uploading_then_it_is_set_aside_and_the_others_still_go() = syncTest { setup ->
+        setup.outbox.add("bad")
+        setup.outbox.add("good")
+        setup.outbox.runs["broken"] = listOf("not json")
+        setup.api.uploadFailures += CompassApiException.Rejected(413)
+        setup.engine.start()
+        setup.engine.signIn("person@example.com", "test-password")
+        advanceUntilIdle()
+        assertEquals(mapOf("bad" to RunLogMark.Rejected, "good" to RunLogMark.Sent, "broken" to RunLogMark.Unreadable), setup.outbox.marks)
+    }
+
+    @Test fun given_compass_is_unreachable_when_uploading_then_it_waits_and_retries_later() = syncTest { setup ->
+        setup.outbox.add("r1")
+        // Three failed attempts (with short back-off) end this upload; the next try is a minute later.
+        setup.api.uploadFailures += List(3) { CompassApiException.Offline() }
+        setup.engine.start()
+        setup.engine.signIn("person@example.com", "test-password")
+        // Still backing off between attempts.
+        advanceTimeBy(5_000)
+        assertTrue(setup.outbox.marks.isEmpty())
+        assertEquals(1, setup.engine.state.value.runLogsWaiting)
+        advanceTimeBy(120_000)
+        runCurrent()
+        assertEquals(RunLogMark.Sent, setup.outbox.marks["r1"])
     }
 }

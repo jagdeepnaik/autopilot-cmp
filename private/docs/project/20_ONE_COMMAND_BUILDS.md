@@ -2,7 +2,7 @@
 
 [All guides](../00_INDEX.md) · [Manual Legion build](21_BUILD_WINDOWS_ON_LEGION.md) · [Manual install over SSH](../common/06_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Manual server build](26_BUILD_LINUX_ON_SERVER.md)
 
-**On this page:** [Commit and push everything](#commit-and-push-everything) · [Release a version](#release-a-version) · [Quick reference](#quick-reference) · [Sync machine data](#sync-machine-data) · [Merge answer banks](#merge-answer-banks) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
+**On this page:** [Commit and push everything](#commit-and-push-everything) · [Release a version](#release-a-version) · [Publish a release to Compass](#publish-a-release-to-compass) · [Quick reference](#quick-reference) · [Sync machine data](#sync-machine-data) · [Merge answer banks](#merge-answer-banks) · [What each machine does](#what-each-machine-does) · [How it works](#how-it-works) · [Server VM start/stop](#server-windows-vm--start-and-stop) · [When it stops](#when-it-stops) · [Files](#files) · [Recorded runs](#recorded-run--11-november-2026)
 
 **Related:** [Git guide](../common/02_GIT_GUIDE.md) · [Fetch and verify build artifacts](#fetch-and-verify-build-artifacts) · [Start/stop/test the server VM](28_START_STOP_WINDOWS_BUILD_VM.md) · [Install over SSH](../common/06_INSTALL_AND_TEST_WINDOWS.md#part-s--install-or-update-over-ssh--from-the-mac) · [Fix installer errors](../common/08_FIX_WINDOWS_INSTALLER.md)
 
@@ -19,6 +19,7 @@
 | `./dev run <target> [--no-tests] [--remote]` | Builds, installs and checks the target where installation is supported. |
 | `./dev fetch <target> [--no-tests] [--remote]` | Copies and verifies existing artifacts for `all` and `legion`; `home-server` and `home-server-vm-win` build first. Output: `~/Downloads/AutoPilot/Builds`. Other fetch targets are unsupported. |
 | `./dev debug <target> [--remote]` | Syncs the target, starts its debug run and prepares the port-5005 debug connection. |
+| `./dev publish [--dry-run] [--skip <platform>] [--no-tests] [--remote]` | Builds every installer from the pushed release commit (DMG and APK here, MSI on Legion, DEB on `mac-vm-linux`) and publishes them to Compass downloads. `--dry-run` prints the plan and manifest only. |
 | `./dev merge-answer-bank all` | Merges legacy JSON answer-bank exports from synced machine folders; it does not merge SQLite databases. |
 
 `--remote` and `--no-tests` may appear anywhere in the command. The preferred style is flag-last,
@@ -73,6 +74,31 @@ Use one deliberate command to raise the Semantic Version number, commit it, tag 
 ```
 
 It requires a clean, up-to-date `main` branch. The command updates `versionName`, creates a `Release <version>` commit and annotated `v<version>` tag, then pushes both. It never guesses a release type from ordinary commits. The Git build number rises on every commit and never resets.
+
+It then runs `./dev publish` (below). Add `--no-publish` to stop after the push, for example `./dev version patch --no-publish`, and run `./dev publish` later.
+
+## Publish a release to Compass
+
+Signed-in Compass accounts download AutoPilot from the Compass website. `./dev publish` puts a release there ([the downloads contract](../shared/02_DIAGNOSTICS_AND_DOWNLOADS_API.md#publishing-a-release)):
+
+```sh
+./dev publish --dry-run          # the plan and the manifest it would write; builds and changes nothing remote
+./dev publish                    # build, copy, verify and publish every platform
+./dev publish --skip windows     # leave a platform out (macos, android, windows, linux; repeatable)
+```
+
+| Platform | Built on | File |
+| --- | --- | --- |
+| macOS | this Mac (`:desktopApp:packageReleaseDmg`) | `AutoPilot-<major>.<minor>.<build>.dmg` |
+| Android | this Mac: `:androidApp:assembleRelease` when `keystore.properties` exists; otherwise the debug-signed APK, labelled `-debug` | `AutoPilot-<version>-<build>.apk` |
+| Windows | Legion (`./dev build legion`), copied and hash-checked | `AutoPilot-<major>.<minor>.<build>.msi` |
+| Linux | the Mac's Linux VM `mac-vm-linux` (`./dev build mac-vm-linux`), copied and hash-checked | `autopilot_<major>.<minor>.<build>_amd64.deb` |
+
+- It needs a clean `main` that matches GitHub: every machine builds the pushed release commit. The home server never builds; it only serves `/srv/sites/compass/downloads/autopilot/`.
+- Files are staged in `~/Downloads/AutoPilot/Publish/<version>/`. Each gets its size and full SHA-256; a platform that fails to build or copy is reported and left out, and the rest are still published.
+- The release notes are the `## [<version>]` section of `CHANGELOG.md`, or the commit subjects since the previous `v*` tag.
+- On the server the version folder is uploaded as `<version>.uploading` and renamed into place, then `manifest.json` (this release plus up to two previous ones) is written as `manifest.json.tmp` and renamed over the old one. Only the three newest version folders are kept.
+- Last, it asks `https://compass.naikio.in/api/app/<platform>` for each published platform and prints `Published <version> (<build>)`, with a warning for any platform where Compass disagrees.
 
 ## Run from the project root
 

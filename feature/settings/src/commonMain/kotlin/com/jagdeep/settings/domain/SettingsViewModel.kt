@@ -36,6 +36,10 @@ data class SettingsUiState(
     val compassSigningIn: Boolean = false,
     /** Why the last sign-in didn't work, in plain words; null when there's nothing to explain. */
     val compassSignInProblem: String? = null,
+    /** True where routine run logs are kept on this computer (desktop). */
+    val runLogsAvailable: Boolean = false,
+    /** A newer published build of this app, offered in About; null when there's none or the check failed. */
+    val update: com.jagdeep.shared.update.AppUpdate? = null,
 )
 
 private enum class HotKeyJob(val description: String, val keyIn: (AppPreferences) -> HotKey) {
@@ -56,8 +60,11 @@ class SettingsViewModel(
     extensionStatus: Flow<com.jagdeep.shared.browser.BrowserExtensionStatus> = flowOf(com.jagdeep.shared.browser.BrowserExtensionStatus()),
     private val testSound: suspend () -> String? = { "Sound testing isn't available on this platform." },
     private val compassSync: com.jagdeep.shared.compass.CompassSync = com.jagdeep.shared.compass.NoCompassSync,
+    private val runLogFiles: com.jagdeep.shared.diagnostics.RunLogFiles = com.jagdeep.shared.diagnostics.NoRunLogFiles,
+    private val updateCheck: com.jagdeep.shared.update.UpdateCheck = com.jagdeep.shared.update.NoUpdateCheck,
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(SettingsUiState(access = accessGate.access(), routineFilesAvailable = routineTransfer.isAvailable, answerBankFolder=answerBanks.folderPath))
+    private val mutableState = MutableStateFlow(SettingsUiState(access = accessGate.access(), routineFilesAvailable = routineTransfer.isAvailable, answerBankFolder=answerBanks.folderPath,
+        runLogsAvailable = runLogFiles.isAvailable))
     val state = mutableState.asStateFlow()
     private val mutableMessages = Channel<String>(Channel.BUFFERED)
     val messages: Flow<String> = mutableMessages.receiveAsFlow()
@@ -65,6 +72,12 @@ class SettingsViewModel(
         try { answerBanks.openFolder()?.let { mutableMessages.send(it) } }
         catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: Exception) { mutableMessages.send("Couldn't open the answer-bank folder. Check folder permissions.") }
+    } }
+
+    fun openRunLogsFolder() { viewModelScope.launch {
+        try { runLogFiles.openFolder()?.let { mutableMessages.send(it) } }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { mutableMessages.send("Couldn't open the logs folder. Check folder permissions.") }
     } }
 
     fun importRoutines() = transfer { routineTransfer.importRoutines() }
@@ -107,6 +120,9 @@ class SettingsViewModel(
     }
 
     init {
+        // Settings (with About) opening is one of the two times the app asks about updates.
+        updateCheck.check()
+        viewModelScope.launch { updateCheck.update.collect { update -> mutableState.update { it.copy(update = update) } } }
         viewModelScope.launch { compassSync.state.collect { sync -> mutableState.update { it.copy(compass = sync) } } }
         viewModelScope.launch { extensionStatus.collect { status -> mutableState.update { it.copy(extension = status) } } }
         viewModelScope.launch { displayWakeProblem.collect { problem -> mutableState.update { it.copy(displayWakeProblem = problem) } } }

@@ -3,8 +3,8 @@ package com.jagdeep.home.domain.compass
 import kotlinx.serialization.Serializable
 
 /**
- * The Compass Q&A sync API (private/docs/shared/01_QA_SYNC_API.md). Only Q&A banks and the
- * account's own session travel through it.
+ * The Compass API (private/docs/shared/01_QA_SYNC_API.md and 02_DIAGNOSTICS_AND_DOWNLOADS_API.md).
+ * Only Q&A banks, the account's own session and sanitised routine run logs travel through it.
  */
 interface CompassApi {
     suspend fun login(email: String, password: String, deviceName: String): CompassSession
@@ -12,6 +12,9 @@ interface CompassApi {
     suspend fun logout(refreshToken: String)
     suspend fun entries(accessToken: String, bank: String, after: Long, limit: Int): CompassEntriesPage
     suspend fun submit(accessToken: String, bank: String, submissions: List<CompassSubmission>): List<CompassSubmissionResult>
+
+    /** `POST /api/diagnostics/runs` with [body] (a [RunLogUploadBody]) gzipped; returns `stored` or `duplicate`. */
+    suspend fun uploadRun(accessToken: String, body: String): String
 }
 
 /** Failures carry no response body, token or request detail, so they are safe to log or show. */

@@ -37,6 +37,23 @@ val generateCompassConfig by tasks.registering {
 val desktopVersion = rootProject.extra["desktopVersion"] as String
 val desktopBuildIdentity = rootProject.extra["desktopBuildIdentity"] as String
 
+// AndroidBuildInfo.kt: the Android app's build identity (for the update check's build number) and the
+// Compass address. Desktop reads both from launcher properties and resources instead.
+val generateAndroidBuildInfo by tasks.registering {
+    val identity = desktopBuildIdentity
+    val url = compassUrl
+    val output = layout.buildDirectory.dir("generated/android-build-info")
+    inputs.property("identity", identity)
+    inputs.property("compassUrl", url)
+    outputs.dir(output)
+    doLast {
+        output.get().file("com/jagdeep/autopilot/platform/AndroidBuildInfo.kt").asFile.apply {
+            parentFile.mkdirs()
+            writeText("package com.jagdeep.autopilot.platform\n\ninternal object AndroidBuildInfo {\n    const val BUILD_IDENTITY = \"$identity\"\n    const val COMPASS_URL = \"${url.get()}\"\n}\n")
+        }
+    }
+}
+
 kotlin {
     androidLibrary {
         namespace = "com.jagdeep.autopilot.shared"
@@ -120,6 +137,7 @@ kotlin {
         }
         // answer-banks/index.txt: lists every bank in resources/answer-banks, so adding a bank file is enough.
         jvmMain { resources.srcDir(generateAnswerBankIndex); resources.srcDir(generateCompassConfig) }
+        androidMain { kotlin.srcDir(generateAndroidBuildInfo) }
     }
 }
 

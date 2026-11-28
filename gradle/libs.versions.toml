@@ -78,7 +78,7 @@ workManager = "2.12.0"
 # realm = "3.0.0"
 
 # --> Networking
-ktor = "3.6.1"
+ktor = "3.6.2"
 jmdns = "3.6.5"
 slf4j = "1.7.36"
 logback-android = "3.0.0"
