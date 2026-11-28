@@ -5,6 +5,8 @@ release's `## [x.y.z]` section, and `./dev publish` uses it as the release notes
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-28
+
 - Every routine run is logged on this computer (steps, timings, video and page state; never page text or answers) and uploaded to Compass while signed in.
 - Settings shows how many run logs wait to upload, and opens the logs folder.
 - Settings → About offers a newer published version, with Install.
